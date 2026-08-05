@@ -45,6 +45,10 @@ jobs:
           cargo fmt --all -- --check
           cargo test --all-targets -- --nocapture
           cargo clippy --all-targets -- -D warnings
+          # This library intentionally does not commit Cargo.lock. Cargo creates
+          # one while resolving test dependencies; remove only that generated
+          # file before asserting the reviewed source tree is otherwise clean.
+          rm -f Cargo.lock
           test -z "$(git status --porcelain)"
           cargo package
           mkdir -p dist
