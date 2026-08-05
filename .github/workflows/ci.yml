@@ -69,15 +69,15 @@ jobs:
           python3 scripts/check-package-contract.py
           cargo package
           mkdir -p dist
-          cp target/package/zed-lock-0.1.0.crate dist/
-          sha256sum dist/zed-lock-0.1.0.crate > dist/zed-lock-0.1.0.crate.sha256
-          test -s dist/zed-lock-0.1.0.crate
-          test -s dist/zed-lock-0.1.0.crate.sha256
+          cp target/package/zed-lock-0.1.1.crate dist/
+          sha256sum dist/zed-lock-0.1.1.crate > dist/zed-lock-0.1.1.crate.sha256
+          test -s dist/zed-lock-0.1.1.crate
+          test -s dist/zed-lock-0.1.1.crate.sha256
 
       - name: Upload the review artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: zed-lock-0.1.0-${{ github.sha }}
+          name: zed-lock-0.1.1-${{ github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 30
