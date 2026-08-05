@@ -21,6 +21,7 @@ jobs:
       RELEASE_VERSION: 0.1.1
       RELEASE_TAG: v0.1.1
       RELEASE_COMMIT: a0dc78d385bc3ab553d3027b427f5f1428239c9c
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Check out the exact reviewed merge commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -44,6 +45,7 @@ jobs:
           cargo fmt --all -- --check
           cargo test --all-targets -- --nocapture
           cargo clippy --all-targets -- -D warnings
+          test -z "$(git status --porcelain)"
           cargo package
           mkdir -p dist
           cp "target/package/zed-lock-${RELEASE_VERSION}.crate" dist/
