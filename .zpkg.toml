@@ -1,10 +1,11 @@
 [package]
 org = "zed-pkg"
 name = "zed-lock"
-version = "0.1.0"
+version = "0.1.1"
 description = "Kernel-backed, event-driven file locking for zed-pkg"
 license = "MIT"
 keywords = ["locking", "flock", "lockfile", "concurrency", "rust"]
+language = "rust"
 
 [package.repository]
 vcs = "git"
@@ -13,18 +14,29 @@ url = "https://github.com/zed-pkg/zed-lock"
 [publish]
 include_readme = true
 tag_format = "v{version}"
-smoke_test = "test -f \"$ZED_PKG_TEST_TARGET/Cargo.toml\" && test -f \"$ZED_PKG_TEST_TARGET/src/lib.rs\" && cargo test --manifest-path \"$ZED_PKG_TEST_TARGET/Cargo.toml\""
-exclude = ["target/**", "tmp/**", "**/*.log", ".DS_Store"]
+smoke_test = "python3 \"$ZED_PKG_TEST_TARGET/scripts/check-package-contract.py\" && cargo test --manifest-path \"$ZED_PKG_TEST_TARGET/Cargo.toml\" --all-targets"
+exclude = [
+  ".env",
+  ".env.*",
+  ".direnv/**",
+  ".zed/**",
+  ".zed-pack/**",
+  "target/**",
+  "tmp/**",
+  "**/*.log",
+  ".DS_Store",
+]
 
 [targets.rust]
 dir = "."
 adapter = "rust"
 
 [targets.rust.native]
-registry = "crates.io"
+registry = "crates-io"
 package = "zed-lock"
 
 [scripts]
-test = "cargo test"
+test = "cargo test --all-targets"
 lint = "cargo clippy --all-targets -- -D warnings"
 format = "cargo fmt --all --check"
+package-contract = "python3 scripts/check-package-contract.py"
