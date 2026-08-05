@@ -1,4 +1,4 @@
-name: Publish zed-lock v0.1.1 release
+name: Verify zed-lock v0.1.1 release
 
 on:
   push:
@@ -7,10 +7,10 @@ on:
 
 permissions:
   actions: read
-  contents: write
+  contents: read
 
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -18,51 +18,48 @@ jobs:
       TARGET_SHA: a0dc78d385bc3ab553d3027b427f5f1428239c9c
       ARTIFACT_ID: "8942659707"
     steps:
-      - name: Download the exact reviewed artifact with gh
+      - name: Download exact reviewed artifact with gh
         shell: bash
         run: |
           set -euo pipefail
-          mkdir artifact
+          mkdir -p reviewed
           gh api \
             -H 'Accept: application/vnd.github+json' \
             "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
-            > artifact.zip
-          unzip -q artifact.zip -d artifact
-          find artifact -maxdepth 2 -type f -print
-      - name: Verify crate and checksum
+            > reviewed.zip
+          unzip -q reviewed.zip -d reviewed
+      - name: Download published release assets with gh
         shell: bash
         run: |
           set -euo pipefail
-          crate="$(find artifact -type f -name '*.crate' -print -quit)"
-          checksum="$(find artifact -type f -name '*.sha256' -print -quit)"
-          test -n "$crate"
-          test -n "$checksum"
-          test "$(find artifact -type f -name '*.crate' | wc -l)" -eq 1
-          test "$(find artifact -type f -name '*.sha256' | wc -l)" -eq 1
-          expected="$(awk '{print $1}' "$checksum")"
-          actual="$(sha256sum "$crate" | awk '{print $1}')"
-          test "$actual" = "$expected"
-          printf 'CRATE=%s\nCHECKSUM=%s\nCRATE_SHA256=%s\n' \
-            "$crate" "$checksum" "$actual" >> "$GITHUB_ENV"
-      - name: Create immutable GitHub release with gh
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(gh api "/repos/$GITHUB_REPOSITORY/commits/$TARGET_SHA" --jq .sha)" = "$TARGET_SHA"
-          gh release create v0.1.1 \
-            "$CRATE#zed-lock v0.1.1 crate" \
-            "$CHECKSUM#SHA-256 checksum" \
+          mkdir -p release
+          gh release download v0.1.1 \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$TARGET_SHA" \
-            --title 'zed-lock v0.1.1' \
-            --notes "Hardened standalone blocking lock package. Linux, macOS, and Windows package-contract, test, format, Clippy, and process-conformance gates passed. Artifact SHA-256: $CRATE_SHA256. This GitHub release does not claim crates.io publication."
-      - name: Verify published tag, target, and assets
+            --dir release \
+            --pattern 'zed-lock-0.1.1.crate' \
+            --pattern 'zed-lock-0.1.1.crate.sha256'
+      - name: Verify tag and both asset checksums
         shell: bash
         run: |
           set -euo pipefail
-          gh release view v0.1.1 \
-            --repo "$GITHUB_REPOSITORY" \
-            --json tagName,targetCommitish,assets \
-            --jq '{tag: .tagName, target: .targetCommitish, assets: [.assets[].name]}'
           test "$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/tags/v0.1.1" --jq .object.sha)" = "$TARGET_SHA"
           test "$(gh release view v0.1.1 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')" -eq 2
+          for directory in reviewed release; do
+            crate="$directory/zed-lock-0.1.1.crate"
+            checksum="$directory/zed-lock-0.1.1.crate.sha256"
+            test -f "$crate"
+            test -f "$checksum"
+            expected="$(awk '{print $1}' "$checksum")"
+            actual="$(sha256sum "$crate" | awk '{print $1}')"
+            test "$actual" = "$expected"
+            printf '%s crate sha256: %s\n' "$directory" "$actual"
+          done
+      - name: Compare unpacked reviewed and released package trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reviewed-tree release-tree
+          tar -xzf reviewed/zed-lock-0.1.1.crate -C reviewed-tree
+          tar -xzf release/zed-lock-0.1.1.crate -C release-tree
+          diff -r --no-dereference reviewed-tree release-tree
+          printf 'reviewed and released crate contents are byte-identical after unpacking\n'
