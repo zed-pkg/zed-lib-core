@@ -42,7 +42,7 @@ def main() -> int:
 
     expected_scalar_fields = {
         "name": "zed-lock",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "license": "MIT",
     }
     for field, expected in expected_scalar_fields.items():
