@@ -1,0 +1,26 @@
+[package]
+name = "zed-orm-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared SeaORM entity/query crate for zed-pkg. Schema imported from oresoftware/k8s-libs-and-shared-defs."
+repository = "https://github.com/zed-pkg/zed-orm-core"
+publish = false
+
+[lib]
+name = "zed_orm_core"
+
+[features]
+# Web servers use the default (read-only) surface.
+# API servers opt into the write surface explicitly.
+default = ["read-only"]
+read-only = []
+read-write = ["read-only"]
+
+[dependencies]
+sea-orm = { version = "1", default-features = false, features = [
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+  "with-chrono",
+  "with-uuid",
+] }
