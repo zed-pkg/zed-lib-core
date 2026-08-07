@@ -1,0 +1,24 @@
+[package]
+name = "zed-lib"
+version = "0.1.0"
+edition = "2024"
+description = "Implementations of the zed-pkg interfaces: resolution and policy over the shared contract types"
+license = "MIT"
+repository = "https://github.com/zed-pkg/zed-lib"
+
+# The Rust slice of a polyglot zed-package; Dart and TypeScript slices land
+# beside it under `src/`. See `docs` in zed-interfaces for why the crate
+# manifest sits inside its own slice rather than at the repository root.
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# Sibling checkout, matching the rest of the org (zed-web-server.rs, the Rust
+# client in zed-clients). Becomes a version requirement once zed-interfaces
+# publishes 0.1.0 to the registry.
+zed-interfaces = { path = "../../../zed-interfaces/src/rust" }
+thiserror = "2.0.19"
+
+[dev-dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"

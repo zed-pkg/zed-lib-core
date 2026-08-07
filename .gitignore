@@ -1,0 +1,14 @@
+/target
+**/target/
+
+# zed-pkg local state
+/zed_modules/
+/.zed/pack/
+/.vendor/
+tmp
+temp
+
+# Language-slice tooling state
+node_modules/
+.dart_tool/
+.DS_Store

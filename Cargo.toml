@@ -1,0 +1,8 @@
+# Virtual workspace. The `zed-lib` crate lives in `src/rust/`, leaving room for
+# the Dart and TypeScript implementations beside it — the same layout as
+# zed-interfaces, and for the same reason: `.zpkg.toml` publishes each language
+# slice as its own package, and a target may not own `dir = "."`.
+[workspace]
+resolver = "3"
+members = ["src/rust"]
+default-members = ["src/rust"]

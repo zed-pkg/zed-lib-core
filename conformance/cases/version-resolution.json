@@ -1,0 +1,97 @@
+{
+  "schema": "zed-lib/conformance/version-resolution/v1",
+  "description": "Every zed-lib implementation must produce these answers. A case is (package scheme, published versions, requirement) -> resolved version or error kind. Error kinds are the stable strings ResolveError::kind() returns.",
+  "cases": [
+    {
+      "name": "range picks the highest stable match",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.4.0", "1.5.0-rc.1", "2.0.0"],
+      "requirement": "^1.2",
+      "expect": { "version": "1.4.0" }
+    },
+    {
+      "name": "prereleases never satisfy a range",
+      "scheme": "semver",
+      "versions": ["1.0.0", "2.0.0-rc.1"],
+      "requirement": "^2",
+      "expect": { "error": "unsatisfied" }
+    },
+    {
+      "name": "the published spelling is preserved, not a normalized one",
+      "scheme": "calver",
+      "versions": ["2026.06.01", "2026.07.24"],
+      "requirement": ">=2026.7",
+      "expect": { "version": "2026.07.24" }
+    },
+    {
+      "name": "a calendar version with a leading zero still orders correctly",
+      "scheme": "calver",
+      "versions": ["2026.09.01", "2026.10.01"],
+      "requirement": "^2026",
+      "expect": { "version": "2026.10.01" }
+    },
+    {
+      "name": "an opaque package resolves an exact tag",
+      "scheme": "opaque",
+      "versions": ["legacy-api", "release-candidate-1"],
+      "requirement": "legacy-api",
+      "expect": { "version": "legacy-api" }
+    },
+    {
+      "name": "an opaque package refuses range algebra",
+      "scheme": "opaque",
+      "versions": ["legacy-api"],
+      "requirement": "^1.0",
+      "expect": { "error": "invalid_requirement" }
+    },
+    {
+      "name": "an unknown opaque tag is unsatisfied, not invalid",
+      "scheme": "opaque",
+      "versions": ["legacy-api"],
+      "requirement": "nope",
+      "expect": { "error": "unsatisfied" }
+    },
+    {
+      "name": "a range-shaped typo is a requirement error",
+      "scheme": "semver",
+      "versions": ["1.0.0"],
+      "requirement": "^1.x.y",
+      "expect": { "error": "invalid_requirement" }
+    },
+    {
+      "name": "npm-style whitespace ranges are accepted",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.9.0", "2.0.0"],
+      "requirement": ">=1.2 <2",
+      "expect": { "version": "1.9.0" }
+    },
+    {
+      "name": "a bare semver requirement is a caret range, not an exact pin",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.0.1"],
+      "requirement": "1.0.0",
+      "expect": { "version": "1.0.1" }
+    },
+    {
+      "name": "`=` is how a semver requirement pins one version",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.0.1"],
+      "requirement": "=1.0.0",
+      "expect": { "version": "1.0.0" }
+    },
+    {
+      "name": "nothing published is its own failure",
+      "scheme": "semver",
+      "versions": [],
+      "requirement": "^1.0",
+      "expect": { "error": "no_versions" }
+    },
+    {
+      "name": "a requirement no version satisfies",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.1.0"],
+      "requirement": "^9",
+      "expect": { "error": "unsatisfied" }
+    }
+  ]
+}

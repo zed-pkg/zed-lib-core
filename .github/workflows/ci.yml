@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: zed-lib
+          persist-credentials: false
+          show-progress: false
+
+      # The crate depends on zed-interfaces by path, the same way the other
+      # Rust repos in this org do. Checking the sibling out here keeps CI
+      # building exactly what a developer builds locally, with no vendored copy
+      # to drift.
+      - name: Check out zed-interfaces
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: zed-pkg/zed-interfaces
+          path: zed-interfaces
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+
+      - name: Format
+        working-directory: zed-lib
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        working-directory: zed-lib
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Test
+        working-directory: zed-lib
+        run: cargo test --locked --all-targets
+
+      - name: Conformance corpus
+        working-directory: zed-lib
+        run: cargo test --locked --test conformance
