@@ -3,7 +3,7 @@
 
 import type { PackageMetadata, VersionScheme } from "@zed-pkg/zed-interfaces";
 
-import { looksLikeRange, parseRequirement, parseVersion, resolve, compareVersions, isStable } from "./version.ts";
+import { compareVersions, isStable, looksLikeRange, parseRequirement, parseVersion, resolveRequirement } from "./version.ts";
 
 /** Stable strings shared with the conformance corpus and the other
  *  implementations. Renaming one breaks every consumer that matches on it. */
@@ -67,7 +67,7 @@ export function resolveVersion(metadata: PackageMetadata, requirement: string): 
     );
   }
 
-  const resolved = resolve(parsed, metadata.versions);
+  const resolved = resolveRequirement(parsed, metadata.versions);
   if (resolved === null) {
     throw new ResolveError(
       "unsatisfied",
@@ -93,7 +93,8 @@ export function latestStable(metadata: PackageMetadata): string | null {
   for (const version of metadata.versions) {
     const parsed = parseVersion(version);
     if (!parsed || !isStable(parsed)) continue;
-    if (bestParsed === null || compareVersions(parsed, bestParsed) > 0) {
+    // Ties go to the last equal element, matching Rust's `Iterator::max_by`.
+    if (bestParsed === null || compareVersions(parsed, bestParsed) >= 0) {
       best = version;
       bestParsed = parsed;
     }

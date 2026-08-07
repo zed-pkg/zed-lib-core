@@ -1,0 +1,136 @@
+{
+  "schema": "zed-lib/conformance/latest-stable/v1",
+  "description": "Cases for `latest_stable`: the newest installable version, which is not the same question as `latest` on the wire. `latest` is what the registry computed when the package was last published and can lag a yank, so an implementation that just forwards it will offer a version the same response says is gone.",
+  "cases": [
+    {
+      "name": "prereleases are never the latest stable version",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "2.0.0",
+        "2.1.0-rc.1"
+      ],
+      "latest": "2.1.0-rc.1",
+      "expect": {
+        "version": "2.0.0"
+      }
+    },
+    {
+      "name": "the newest version wins regardless of list order",
+      "scheme": "semver",
+      "versions": [
+        "2.0.0",
+        "10.0.0",
+        "1.0.0"
+      ],
+      "latest": "1.0.0",
+      "expect": {
+        "version": "10.0.0"
+      }
+    },
+    {
+      "name": "the published spelling is preserved",
+      "scheme": "semver",
+      "versions": [
+        "v1.0.0",
+        "v2.0.0"
+      ],
+      "latest": null,
+      "expect": {
+        "version": "v2.0.0"
+      }
+    },
+    {
+      "name": "calendar versions order by their normalized form",
+      "scheme": "calver",
+      "versions": [
+        "2026.09.01",
+        "2026.10.01",
+        "2026.01.01"
+      ],
+      "latest": null,
+      "expect": {
+        "version": "2026.10.01"
+      }
+    },
+    {
+      "name": "an opaque package has no ordering, so the registry's latest stands",
+      "scheme": "opaque",
+      "versions": [
+        "legacy-api",
+        "nightly"
+      ],
+      "latest": "legacy-api",
+      "expect": {
+        "version": "legacy-api"
+      }
+    },
+    {
+      "name": "an opaque latest that is no longer published is not offered",
+      "scheme": "opaque",
+      "versions": [
+        "legacy-api"
+      ],
+      "latest": "withdrawn",
+      "expect": {
+        "version": null
+      }
+    },
+    {
+      "name": "an opaque package with no latest recorded has no answer",
+      "scheme": "opaque",
+      "versions": [
+        "legacy-api"
+      ],
+      "latest": null,
+      "expect": {
+        "version": null
+      }
+    },
+    {
+      "name": "nothing published, nothing to offer",
+      "scheme": "semver",
+      "versions": [],
+      "latest": null,
+      "expect": {
+        "version": null
+      }
+    },
+    {
+      "name": "only prereleases published means no stable version exists",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0-rc.1",
+        "2.0.0-alpha.1"
+      ],
+      "latest": "2.0.0-alpha.1",
+      "expect": {
+        "version": null
+      }
+    },
+    {
+      "name": "an unparseable tag under a semver scheme is skipped, not crashed on",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "nightly"
+      ],
+      "latest": "nightly",
+      "expect": {
+        "version": "1.0.0"
+      }
+    },
+    {
+      "name": "equal versions spelled differently: the last published wins",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "v1.0.0"
+      ],
+      "latest": null,
+      "expect": {
+        "version": "v1.0.0"
+      }
+    }
+  ]
+}

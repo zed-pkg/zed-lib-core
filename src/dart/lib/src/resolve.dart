@@ -82,7 +82,7 @@ String resolveVersion(PackageMetadata metadata, String requirement) {
     );
   }
 
-  final resolved = resolve(parsed, metadata.versions);
+  final resolved = resolveRequirement(parsed, metadata.versions);
   if (resolved == null) {
     throw ResolveException(
       ResolveErrorKind.unsatisfied,
@@ -109,7 +109,8 @@ String? latestStable(PackageMetadata metadata) {
   for (final version in metadata.versions) {
     final parsed = parseVersion(version);
     if (parsed == null || !parsed.isStable) continue;
-    if (bestParsed == null || parsed.compareTo(bestParsed) > 0) {
+    // Ties go to the last equal element, matching Rust's `Iterator::max_by`.
+    if (bestParsed == null || parsed.compareTo(bestParsed) >= 0) {
       best = version;
       bestParsed = parsed;
     }

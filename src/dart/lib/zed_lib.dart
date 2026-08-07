@@ -10,14 +10,19 @@ library;
 
 export 'src/resolve.dart'
     show ResolveErrorKind, ResolveException, latestStable, resolveVersion, schemeOf;
+// `VersionBound`, not `Comparator`: dart:core exports `Comparator<T>`, and an
+// explicit import *wins* over the implicit dart:core one — so the old name did
+// not raise an ambiguity error, it silently shadowed the real type and broke
+// unrelated consumer code. `resolveRequirement`, not `resolve`: a top-level
+// `resolve` next to `resolveVersion` reads as a typo of it.
 export 'src/version.dart'
     show
-        Comparator,
         ExactRequirement,
         RangeRequirement,
         Requirement,
         SemVer,
+        VersionBound,
         looksLikeRange,
         normalizeCalver,
         parseVersion,
-        resolve;
+        resolveRequirement;

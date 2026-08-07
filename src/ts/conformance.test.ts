@@ -1,8 +1,13 @@
-// Runs the shared conformance corpus against the TypeScript implementation.
-// The Rust and Dart slices run the same file; a case that passes in one
-// language and fails in another is the drift this repository exists to catch.
+// Runs every corpus file in ../../conformance/cases against the TypeScript
+// implementation. The Rust and Dart slices load the same directory.
 //
 //   node --test conformance.test.ts
+//
+// Most of these cases were answered by Rust and written out by
+// `cargo run --example generate_fuzz_corpus`: Rust delegates the hard part to
+// the same `semver` crate Cargo uses, so what is really under test is whether
+// this hand-written algebra agrees with Cargo across combinations nobody would
+// think to write down by hand.
 //
 // No build step: Node strips the types on the way in.
 
@@ -13,56 +18,105 @@ import { test } from "node:test";
 
 import type { PackageMetadata, VersionScheme } from "@zed-pkg/zed-interfaces";
 
-import { ResolveError, resolveVersion } from "./index.ts";
+import { ResolveError, latestStable, resolveVersion } from "./index.ts";
+
+const RESOLUTION_SCHEMA = "zed-lib/conformance/version-resolution/v1";
+const LATEST_SCHEMA = "zed-lib/conformance/latest-stable/v1";
 
 interface Case {
   readonly name: string;
   readonly scheme: string;
   readonly versions: readonly string[];
-  readonly requirement: string;
-  readonly expect: { readonly version?: string; readonly error?: string };
+  readonly requirement?: string;
+  readonly latest?: string | null;
+  readonly expect: { readonly version?: string | null; readonly error?: string };
 }
 
-const corpusPath = path.join(
-  import.meta.dirname,
-  "../../conformance/cases/version-resolution.json",
-);
-const corpus = JSON.parse(fs.readFileSync(corpusPath, "utf8")) as { cases: Case[] };
+interface Corpus {
+  readonly schema: string;
+  readonly cases: readonly Case[];
+}
 
-const metadataFor = (scheme: string, versions: readonly string[]): PackageMetadata => ({
-  org: "acme",
-  name: "conformance",
-  vcs: "git",
-  repo_url: "https://github.com/acme/conformance",
-  latest: versions.length ? (versions[versions.length - 1] as string) : null,
-  versions,
-  version_scheme: (scheme === "calver" || scheme === "opaque" ? scheme : "semver") as VersionScheme,
+const casesDir = path.join(import.meta.dirname, "../../conformance/cases");
+
+/** `latest` is data for a latest-stable case — including when it is null, which
+ *  is what "the registry recorded nothing" looks like. Resolution cases never
+ *  read it, so they get a convenient fallback instead. */
+function metadataFor(testCase: Case, latestIsData: boolean): PackageMetadata {
+  const { versions } = testCase;
+  const fallback = versions.length ? (versions[versions.length - 1] as string) : null;
+  const scheme = testCase.scheme === "calver" || testCase.scheme === "opaque"
+    ? testCase.scheme
+    : "semver";
+  return {
+    org: "acme",
+    name: "conformance",
+    vcs: "git",
+    repo_url: "https://github.com/acme/conformance",
+    latest: latestIsData ? (testCase.latest ?? null) : (testCase.latest ?? fallback),
+    versions,
+    version_scheme: scheme as VersionScheme,
+  };
+}
+
+const files = fs
+  .readdirSync(casesDir)
+  .filter((name) => name.endsWith(".json"))
+  .sort();
+
+test("the corpus directory is not empty", () => {
+  assert.ok(files.length > 0);
 });
 
-test("the corpus is not empty", () => {
-  assert.ok(corpus.cases.length > 0);
-});
+let total = 0;
 
-for (const testCase of corpus.cases) {
-  test(testCase.name, () => {
-    const metadata = metadataFor(testCase.scheme, testCase.versions);
-    const { version: want, error: wantError } = testCase.expect;
-    assert.ok(
-      (want === undefined) !== (wantError === undefined),
-      "a case declares exactly one of `version` or `error`",
-    );
+for (const file of files) {
+  const corpus = JSON.parse(fs.readFileSync(path.join(casesDir, file), "utf8")) as Corpus;
+  assert.ok(corpus.cases.length > 0, `${file} has no cases`);
 
-    if (want !== undefined) {
-      assert.equal(resolveVersion(metadata, testCase.requirement), want);
-      return;
+  for (const testCase of corpus.cases) {
+    total += 1;
+
+    if (corpus.schema === RESOLUTION_SCHEMA) {
+      test(`${file}: ${testCase.name}`, () => {
+        const metadata = metadataFor(testCase, false);
+        const requirement = testCase.requirement;
+        assert.ok(requirement !== undefined, "resolution cases need a `requirement`");
+        const want = testCase.expect.version;
+        const wantError = testCase.expect.error;
+        assert.ok(
+          (want === undefined) !== (wantError === undefined),
+          "declare exactly one of `version` or `error`",
+        );
+        if (want !== undefined) {
+          assert.equal(resolveVersion(metadata, requirement), want);
+          return;
+        }
+        assert.throws(
+          () => resolveVersion(metadata, requirement),
+          (error: unknown) => {
+            assert.ok(error instanceof ResolveError);
+            assert.equal(error.kind, wantError);
+            return true;
+          },
+        );
+      });
+      continue;
     }
-    assert.throws(
-      () => resolveVersion(metadata, testCase.requirement),
-      (error: unknown) => {
-        assert.ok(error instanceof ResolveError);
-        assert.equal(error.kind, wantError);
-        return true;
-      },
-    );
-  });
+
+    if (corpus.schema === LATEST_SCHEMA) {
+      test(`${file}: ${testCase.name}`, () => {
+        assert.equal(testCase.expect.error, undefined, "latest-stable cases return null");
+        assert.equal(latestStable(metadataFor(testCase, true)), testCase.expect.version ?? null);
+      });
+      continue;
+    }
+
+    throw new Error(`${file}: unknown corpus schema \`${corpus.schema}\``);
+  }
 }
+
+// A loader bug that silently matched nothing would look like a clean run.
+test("the generated corpus was loaded too", () => {
+  assert.ok(total > 100, `ran only ${total} cases`);
+});

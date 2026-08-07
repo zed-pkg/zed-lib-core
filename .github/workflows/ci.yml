@@ -31,7 +31,7 @@ jobs:
       - name: Check out zed-interfaces
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: zed-pkg/zed-interfaces
+          repository: ${{ github.repository_owner }}/zed-interfaces
           path: zed-interfaces
           persist-credentials: false
           show-progress: false
@@ -57,6 +57,15 @@ jobs:
         working-directory: zed-lib
         run: cargo test --locked --test conformance
 
+      # Rust is the oracle for the generated cases, so a change here can rewrite
+      # what Dart and TypeScript are held to. Regenerating must be a no-op.
+      - name: Generated corpus is up to date
+        working-directory: zed-lib
+        run: |
+          cargo run --locked --example generate_fuzz_corpus
+          git diff --exit-code conformance/ \
+            || (echo "conformance/ is stale; run 'cargo run --locked --example generate_fuzz_corpus' and commit" && exit 1)
+
   # Each implementation slice runs the same corpus. These jobs are what turn
   # "three implementations of one contract" from a claim into a check.
   dart:
@@ -73,7 +82,7 @@ jobs:
       - name: Check out zed-interfaces
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: zed-pkg/zed-interfaces
+          repository: ${{ github.repository_owner }}/zed-interfaces
           path: zed-interfaces
           persist-credentials: false
           show-progress: false
@@ -107,7 +116,7 @@ jobs:
       - name: Check out zed-interfaces
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: zed-pkg/zed-interfaces
+          repository: ${{ github.repository_owner }}/zed-interfaces
           path: zed-interfaces
           persist-credentials: false
           show-progress: false

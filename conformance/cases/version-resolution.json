@@ -5,149 +5,294 @@
     {
       "name": "range picks the highest stable match",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.4.0", "1.5.0-rc.1", "2.0.0"],
+      "versions": [
+        "1.0.0",
+        "1.4.0",
+        "1.5.0-rc.1",
+        "2.0.0"
+      ],
       "requirement": "^1.2",
-      "expect": { "version": "1.4.0" }
+      "expect": {
+        "version": "1.4.0"
+      }
     },
     {
       "name": "prereleases never satisfy a range",
       "scheme": "semver",
-      "versions": ["1.0.0", "2.0.0-rc.1"],
+      "versions": [
+        "1.0.0",
+        "2.0.0-rc.1"
+      ],
       "requirement": "^2",
-      "expect": { "error": "unsatisfied" }
+      "expect": {
+        "error": "unsatisfied"
+      }
     },
     {
       "name": "the published spelling is preserved, not a normalized one",
       "scheme": "calver",
-      "versions": ["2026.06.01", "2026.07.24"],
+      "versions": [
+        "2026.06.01",
+        "2026.07.24"
+      ],
       "requirement": ">=2026.7",
-      "expect": { "version": "2026.07.24" }
+      "expect": {
+        "version": "2026.07.24"
+      }
     },
     {
       "name": "a calendar version with a leading zero still orders correctly",
       "scheme": "calver",
-      "versions": ["2026.09.01", "2026.10.01"],
+      "versions": [
+        "2026.09.01",
+        "2026.10.01"
+      ],
       "requirement": "^2026",
-      "expect": { "version": "2026.10.01" }
+      "expect": {
+        "version": "2026.10.01"
+      }
     },
     {
       "name": "an opaque package resolves an exact tag",
       "scheme": "opaque",
-      "versions": ["legacy-api", "release-candidate-1"],
+      "versions": [
+        "legacy-api",
+        "release-candidate-1"
+      ],
       "requirement": "legacy-api",
-      "expect": { "version": "legacy-api" }
+      "expect": {
+        "version": "legacy-api"
+      }
     },
     {
       "name": "an opaque package refuses range algebra",
       "scheme": "opaque",
-      "versions": ["legacy-api"],
+      "versions": [
+        "legacy-api"
+      ],
       "requirement": "^1.0",
-      "expect": { "error": "invalid_requirement" }
+      "expect": {
+        "error": "invalid_requirement"
+      }
     },
     {
       "name": "an unknown opaque tag is unsatisfied, not invalid",
       "scheme": "opaque",
-      "versions": ["legacy-api"],
+      "versions": [
+        "legacy-api"
+      ],
       "requirement": "nope",
-      "expect": { "error": "unsatisfied" }
+      "expect": {
+        "error": "unsatisfied"
+      }
     },
     {
       "name": "a range-shaped typo is a requirement error",
       "scheme": "semver",
-      "versions": ["1.0.0"],
+      "versions": [
+        "1.0.0"
+      ],
       "requirement": "^1.x.y",
-      "expect": { "error": "invalid_requirement" }
+      "expect": {
+        "error": "invalid_requirement"
+      }
     },
     {
       "name": "an explicit wildcard binds tighter than an omitted segment",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.2.0", "1.2.9", "1.9.0", "2.0.0"],
+      "versions": [
+        "1.0.0",
+        "1.2.0",
+        "1.2.9",
+        "1.9.0",
+        "2.0.0"
+      ],
       "requirement": "1.2.*",
-      "expect": { "version": "1.2.9" }
+      "expect": {
+        "version": "1.2.9"
+      }
     },
     {
       "name": "the same requirement with the segment omitted is a caret range",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.2.0", "1.2.9", "1.9.0", "2.0.0"],
+      "versions": [
+        "1.0.0",
+        "1.2.0",
+        "1.2.9",
+        "1.9.0",
+        "2.0.0"
+      ],
       "requirement": "1.2",
-      "expect": { "version": "1.9.0" }
+      "expect": {
+        "version": "1.9.0"
+      }
     },
     {
       "name": "`x` and `X` are wildcards too, not opaque tags",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.9.0", "2.0.0"],
+      "versions": [
+        "1.0.0",
+        "1.9.0",
+        "2.0.0"
+      ],
       "requirement": "1.x",
-      "expect": { "version": "1.9.0" }
+      "expect": {
+        "version": "1.9.0"
+      }
     },
     {
       "name": "a bare wildcard matches the newest stable version",
       "scheme": "semver",
-      "versions": ["1.0.0", "2.0.0", "2.1.0-rc.1"],
+      "versions": [
+        "1.0.0",
+        "2.0.0",
+        "2.1.0-rc.1"
+      ],
       "requirement": "*",
-      "expect": { "version": "2.0.0" }
+      "expect": {
+        "version": "2.0.0"
+      }
     },
     {
       "name": "KNOWN GAP: a wildcard typo with no operator degrades to an opaque tag",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.9.0"],
+      "versions": [
+        "1.0.0",
+        "1.9.0"
+      ],
       "requirement": "1.x.y",
-      "expect": { "error": "unsatisfied" }
+      "expect": {
+        "error": "unsatisfied"
+      }
     },
     {
       "name": "a `v`-prefixed Go tag resolves through the same range",
       "scheme": "semver",
-      "versions": ["v1.0.0", "v1.4.0"],
+      "versions": [
+        "v1.0.0",
+        "v1.4.0"
+      ],
       "requirement": "^1.2",
-      "expect": { "version": "v1.4.0" }
+      "expect": {
+        "version": "v1.4.0"
+      }
     },
     {
       "name": "Go's +incompatible does not change identity",
       "scheme": "semver",
-      "versions": ["v2.0.0+incompatible"],
+      "versions": [
+        "v2.0.0+incompatible"
+      ],
       "requirement": "^2",
-      "expect": { "version": "v2.0.0+incompatible" }
+      "expect": {
+        "version": "v2.0.0+incompatible"
+      }
     },
     {
       "name": "a PEP 440 prerelease is still a prerelease",
       "scheme": "semver",
-      "versions": ["1.2.3rc1", "1.2.2"],
+      "versions": [
+        "1.2.3rc1",
+        "1.2.2"
+      ],
       "requirement": "^1.2",
-      "expect": { "version": "1.2.2" }
+      "expect": {
+        "version": "1.2.2"
+      }
     },
     {
       "name": "npm-style whitespace ranges are accepted",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.9.0", "2.0.0"],
+      "versions": [
+        "1.0.0",
+        "1.9.0",
+        "2.0.0"
+      ],
       "requirement": ">=1.2 <2",
-      "expect": { "version": "1.9.0" }
+      "expect": {
+        "version": "1.9.0"
+      }
     },
     {
       "name": "a bare semver requirement is a caret range, not an exact pin",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.0.1"],
+      "versions": [
+        "1.0.0",
+        "1.0.1"
+      ],
       "requirement": "1.0.0",
-      "expect": { "version": "1.0.1" }
+      "expect": {
+        "version": "1.0.1"
+      }
     },
     {
       "name": "`=` is how a semver requirement pins one version",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.0.1"],
+      "versions": [
+        "1.0.0",
+        "1.0.1"
+      ],
       "requirement": "=1.0.0",
-      "expect": { "version": "1.0.0" }
+      "expect": {
+        "version": "1.0.0"
+      }
     },
     {
       "name": "nothing published is its own failure",
       "scheme": "semver",
       "versions": [],
       "requirement": "^1.0",
-      "expect": { "error": "no_versions" }
+      "expect": {
+        "error": "no_versions"
+      }
     },
     {
       "name": "a requirement no version satisfies",
       "scheme": "semver",
-      "versions": ["1.0.0", "1.1.0"],
+      "versions": [
+        "1.0.0",
+        "1.1.0"
+      ],
       "requirement": "^9",
-      "expect": { "error": "unsatisfied" }
+      "expect": {
+        "error": "unsatisfied"
+      }
+    },
+    {
+      "name": "an operator may be separated from its version by a space",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "1.9.0",
+        "2.0.0"
+      ],
+      "requirement": ">= 1.0.0, < 2.0.0",
+      "expect": {
+        "version": "1.9.0"
+      }
+    },
+    {
+      "name": "a requirement with leading zeros is an exact tag, not a range",
+      "scheme": "opaque",
+      "versions": [
+        "2026.07.24"
+      ],
+      "requirement": "2026.07.24",
+      "expect": {
+        "version": "2026.07.24"
+      }
+    },
+    {
+      "name": "when two spellings parse to the same version, the last published wins",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "v1.0.0"
+      ],
+      "requirement": "^1",
+      "expect": {
+        "version": "v1.0.0"
+      }
     }
   ]
 }

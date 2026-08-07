@@ -201,8 +201,8 @@ SemVer? parseVersion(String raw) {
 }
 
 /// One `<op><version>` bound.
-class Comparator {
-  const Comparator(this.op, this.version);
+class VersionBound {
+  const VersionBound(this.op, this.version);
 
   final String op;
   final SemVer version;
@@ -253,7 +253,7 @@ class ExactRequirement extends Requirement {
 class RangeRequirement extends Requirement {
   const RangeRequirement(this.comparators);
 
-  final List<Comparator> comparators;
+  final List<VersionBound> comparators;
 
   @override
   bool matches(String version) {
@@ -299,6 +299,11 @@ bool looksLikeRange(String input) =>
       wildcard = true;
       break;
     }
+    // Semver forbids leading zeros in numeric identifiers, and Cargo's
+    // requirement parser enforces it: `2026.07.24` is not a range at all, it is
+    // an exact tag. Accepting it here would turn a calendar tag into a caret
+    // range and, for an opaque package, into a spurious `invalid_requirement`.
+    if (segment.length > 1 && segment.startsWith('0')) return null;
     final value = int.tryParse(segment);
     if (value == null) return null;
     parts.add(value);
@@ -333,13 +338,21 @@ SemVer _tildeUpper(List<int> parts) => switch (parts.length) {
   _ => SemVer(parts[0], parts[1] + 1, 0),
 };
 
-List<Comparator>? _parseComparators(String input) {
+List<VersionBound>? _parseComparators(String input) {
   final trimmed = input.trim();
   if (trimmed.isEmpty) return null;
 
-  final comparators = <Comparator>[];
+  // `>= 1.0.0, < 2.0.0` is legal — Cargo allows space between an operator and
+  // its version. Glue them back together before splitting, or the operator
+  // becomes its own token and the whole requirement reads as an opaque tag.
+  final glued = trimmed.replaceAllMapped(
+    RegExp(r'(\^|~|>=|<=|>|<|=)\s+'),
+    (match) => match[1]!,
+  );
+
+  final comparators = <VersionBound>[];
   var sawToken = false;
-  for (final token in trimmed.split(RegExp(r'\s*,\s*|\s+'))) {
+  for (final token in glued.split(RegExp(r'\s*,\s*|\s+'))) {
     if (token.isEmpty) continue;
     final expanded = _expand(token);
     if (expanded == null) return null;
@@ -351,7 +364,7 @@ List<Comparator>? _parseComparators(String input) {
   return sawToken ? comparators : null;
 }
 
-List<Comparator>? _expand(String token) {
+List<VersionBound>? _expand(String token) {
   final match = RegExp(r'^(\^|~|>=|<=|>|<|=)?\s*(.+)$').firstMatch(token);
   if (match == null) return null;
   final explicitOp = match.group(1);
@@ -369,38 +382,38 @@ List<Comparator>? _expand(String token) {
   // the wildcard is just the segments the author left off (`^1.*` == `^1`).
   if (partial.wildcard && explicitOp == null) {
     return [
-      Comparator('>=', _atLeast(parts, pre)),
-      Comparator('<', _tildeUpper(parts)),
+      VersionBound('>=', _atLeast(parts, pre)),
+      VersionBound('<', _tildeUpper(parts)),
     ];
   }
 
   switch (op) {
     case '^':
       return [
-        Comparator('>=', _atLeast(parts, pre)),
-        Comparator('<', _caretUpper(parts)),
+        VersionBound('>=', _atLeast(parts, pre)),
+        VersionBound('<', _caretUpper(parts)),
       ];
     case '~':
       return [
-        Comparator('>=', _atLeast(parts, pre)),
-        Comparator('<', _tildeUpper(parts)),
+        VersionBound('>=', _atLeast(parts, pre)),
+        VersionBound('<', _tildeUpper(parts)),
       ];
     case '=':
       // `=1.2` is not "exactly 1.2.0" in Cargo, it is the 1.2 line.
-      if (parts.length == 3) return [Comparator('=', _atLeast(parts, pre))];
+      if (parts.length == 3) return [VersionBound('=', _atLeast(parts, pre))];
       return [
-        Comparator('>=', _atLeast(parts, pre)),
-        Comparator('<', _tildeUpper(parts)),
+        VersionBound('>=', _atLeast(parts, pre)),
+        VersionBound('<', _tildeUpper(parts)),
       ];
     default:
-      return [Comparator(op, _atLeast(parts, pre))];
+      return [VersionBound(op, _atLeast(parts, pre))];
   }
 }
 
 /// Pick the version satisfying `requirement`, returned in its **published
 /// spelling** so the store address and VCS tag stay faithful to the tag the
 /// publisher pushed. Prereleases never satisfy a range.
-String? resolve(Requirement requirement, List<String> versions) {
+String? resolveRequirement(Requirement requirement, List<String> versions) {
   switch (requirement) {
     case ExactRequirement(:final tag):
       for (final version in versions) {
@@ -414,7 +427,11 @@ String? resolve(Requirement requirement, List<String> versions) {
         final parsed = parseVersion(version);
         if (parsed == null || !parsed.isStable) continue;
         if (!requirement.matches(version)) continue;
-        if (bestParsed == null || parsed.compareTo(bestParsed) > 0) {
+        // `>= 0`, not `> 0`: Rust resolves with `Iterator::max_by`, which
+        // returns the LAST maximum. Distinct spellings can parse to the same
+        // version (`1.2.3` and `1.2.3.post1`, `1.0.0` and `v1.0.0`), so the
+        // tie-break decides which spelling is installed.
+        if (bestParsed == null || parsed.compareTo(bestParsed) >= 0) {
           best = version;
           bestParsed = parsed;
         }

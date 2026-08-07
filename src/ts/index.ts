@@ -17,6 +17,6 @@ export {
   parseRequirement,
   parseVersion,
   requirementMatches,
-  resolve,
+  resolveRequirement,
 } from "./version.ts";
-export type { Comparator, Op, Requirement, SemVer } from "./version.ts";
+export type { Op, Requirement, SemVer, VersionBound } from "./version.ts";
