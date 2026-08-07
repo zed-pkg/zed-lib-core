@@ -1,0 +1,19 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # This package is one of three implementations of the same behavior.
+    # Anything that can silently change behavior is an error, not a hint.
+    unused_import: error
+    unused_local_variable: error
+    dead_code: error
+
+linter:
+  rules:
+    - always_declare_return_types
+    - prefer_final_locals
+    - unnecessary_parenthesis

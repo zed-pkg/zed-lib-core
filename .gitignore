@@ -12,3 +12,7 @@ temp
 node_modules/
 .dart_tool/
 .DS_Store
+
+# Slice tooling state
+src/dart/pubspec.lock
+src/ts/package-lock.json

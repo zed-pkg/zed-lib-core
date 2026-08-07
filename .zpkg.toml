@@ -57,11 +57,30 @@ dir = "conformance"
 name = "zed-lib-conformance"
 adapter = "none"
 
-# Dart and TypeScript implementations land under src/dart and src/ts, mirroring
-# the slices in zed-interfaces. They are not scaffolded until there is real
-# behavior to put in them — an empty package is a promise, not a package.
+# Front-end implementations of the same behavior. Not thin bindings — each is a
+# native implementation held to `conformance/cases/*.json`, so a browser or
+# Flutter client resolves a requirement exactly the way zed-cli does.
+[targets.dart]
+dir = "src/dart"
+adapter = "dart"
+
+[targets.dart.native]
+registry = "pub.dev"
+package = "zed_lib"
+tag_format = "dart/v{version}"
+
+[targets.typescript]
+dir = "src/ts"
+name = "zed-lib-typescript"
+adapter = "node"
+
+[targets.typescript.native]
+registry = "npm"
+package = "@zed-pkg/zed-lib"
+tag_format = "ts/v{version}"
 
 [scripts]
 test = "cargo test --all-targets --locked"
 lint = "cargo clippy --all-targets --locked -- -D warnings"
 format = "cargo fmt --all -- --check"
+conformance = "cargo test --locked --test conformance"

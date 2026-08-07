@@ -16,6 +16,8 @@ This repository implements the contract defined by `zed-pkg/zed-interfaces`. Int
 - Moving behavior out of `zed-interfaces` is a breaking change for that crate. Land each move as its own change with its consumers updated in contract-first order, not as a batch.
 - Cross-language behavior is specified by `conformance/cases/*.json` before it is implemented. Add the case, watch it fail, then write the code; a case written afterwards tests the code's opinion rather than the contract.
 - Every implementation slice runs the same corpus. A case that only one language can satisfy is a bug in the case.
+- The slices are native implementations, not bindings, and they take no semver dependency. `pub_semver` and npm's `semver` implement a different dialect from Cargo's — a bare `1.0.0` is exact there and a caret range here — so a wrapper would smuggle in disagreements the corpus was built to prevent. When behavior is ambiguous, the Rust `semver` crate is the reference: probe it, then pin the answer as a case.
+- A new corpus case must be verified against Rust *first*. Rust is the slice consumers already run through `zed-cli`, so a case Rust fails is a case that mis-states the contract.
 - Errors carry a stable `kind()` string shared with the corpus. Renaming one is a breaking change for every implementation and every consumer that matches on it.
 - Resolution returns versions in their **published spelling**. Normalizing is for comparison only — the store address and the VCS tag must stay faithful to what the publisher tagged.
 - Keep `Cargo.lock` committed; do not allow CI to update it implicitly.

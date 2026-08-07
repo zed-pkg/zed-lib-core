@@ -59,6 +59,62 @@
       "expect": { "error": "invalid_requirement" }
     },
     {
+      "name": "an explicit wildcard binds tighter than an omitted segment",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.2.0", "1.2.9", "1.9.0", "2.0.0"],
+      "requirement": "1.2.*",
+      "expect": { "version": "1.2.9" }
+    },
+    {
+      "name": "the same requirement with the segment omitted is a caret range",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.2.0", "1.2.9", "1.9.0", "2.0.0"],
+      "requirement": "1.2",
+      "expect": { "version": "1.9.0" }
+    },
+    {
+      "name": "`x` and `X` are wildcards too, not opaque tags",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.9.0", "2.0.0"],
+      "requirement": "1.x",
+      "expect": { "version": "1.9.0" }
+    },
+    {
+      "name": "a bare wildcard matches the newest stable version",
+      "scheme": "semver",
+      "versions": ["1.0.0", "2.0.0", "2.1.0-rc.1"],
+      "requirement": "*",
+      "expect": { "version": "2.0.0" }
+    },
+    {
+      "name": "KNOWN GAP: a wildcard typo with no operator degrades to an opaque tag",
+      "scheme": "semver",
+      "versions": ["1.0.0", "1.9.0"],
+      "requirement": "1.x.y",
+      "expect": { "error": "unsatisfied" }
+    },
+    {
+      "name": "a `v`-prefixed Go tag resolves through the same range",
+      "scheme": "semver",
+      "versions": ["v1.0.0", "v1.4.0"],
+      "requirement": "^1.2",
+      "expect": { "version": "v1.4.0" }
+    },
+    {
+      "name": "Go's +incompatible does not change identity",
+      "scheme": "semver",
+      "versions": ["v2.0.0+incompatible"],
+      "requirement": "^2",
+      "expect": { "version": "v2.0.0+incompatible" }
+    },
+    {
+      "name": "a PEP 440 prerelease is still a prerelease",
+      "scheme": "semver",
+      "versions": ["1.2.3rc1", "1.2.2"],
+      "requirement": "^1.2",
+      "expect": { "version": "1.2.2" }
+    },
+    {
       "name": "npm-style whitespace ranges are accepted",
       "scheme": "semver",
       "versions": ["1.0.0", "1.9.0", "2.0.0"],

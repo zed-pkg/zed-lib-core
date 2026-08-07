@@ -43,21 +43,37 @@ let newest = latest_stable(&metadata);               // ignores prereleases
 | `invalid_requirement` | the requirement cannot mean anything here (`^1.x.y`, or a range against an opaque package) |
 | `unsatisfied`         | a good requirement nothing published satisfies      |
 
-## Layout
+## Three implementations, one corpus
 
 ```
 zed-lib/
   src/rust/            the crate (Cargo.toml lives here)
-  conformance/cases/   language-neutral corpus every implementation must pass
+  src/dart/            native Dart implementation (package:zed_lib)
+  src/ts/              native TypeScript implementation (@zed-pkg/zed-lib)
+  conformance/cases/   language-neutral corpus all three must pass
   Cargo.toml           virtual workspace, members = ["src/rust"]
   .zpkg.toml           one package, one slice per language + the corpus
 ```
 
-Rust is the first slice. Dart and TypeScript implementations will sit beside it
-under `src/`, mirroring the slice layout of `zed-interfaces` and verified
-against the same `conformance/` corpus — so the CLI and a web UI cannot
-disagree about what `^1.2` resolves to. They are not scaffolded yet: an empty
-package is a promise, not a package.
+The Dart and TypeScript slices are **not bindings**. Each is a native
+implementation of the same algebra, and each runs
+[`conformance/cases/*.json`](conformance) — so "the CLI resolved 1.4.0 but the
+web UI offered 2.0.0" is a failing test in one of them rather than a support
+ticket.
+
+All three are dependency-free on purpose. `pub_semver` and npm's `semver` each
+implement a *different dialect* from Cargo's, and they disagree exactly where
+it hurts:
+
+| requirement | Cargo (and zed) | npm `semver` | `pub_semver` |
+| ----------- | --------------- | ------------ | ------------ |
+| `1.0.0`     | `>=1.0.0 <2.0.0` | exactly `1.0.0` | exactly `1.0.0` |
+| `1.2`       | `>=1.2.0 <2.0.0` | `>=1.2.0 <1.3.0` | — |
+| `1.2.*`     | `>=1.2.0 <1.3.0` | same | — |
+
+Three implementations of one contract cannot afford a translation layer whose
+edge cases nobody reads, so the algebra is written out in each language and the
+corpus proves they agree.
 
 ## Migrating behavior out of zed-interfaces
 
@@ -74,12 +90,16 @@ Sibling checkouts, like the rest of the org:
 ```sh
 git clone https://github.com/zed-pkg/zed-interfaces
 git clone https://github.com/zed-pkg/zed-lib
-cd zed-lib && cargo test
+cd zed-lib
+
+cargo test                                        # Rust slice + corpus
+(cd src/dart && dart pub get && dart test)        # Dart slice + corpus
+(cd src/ts   && npm install && npm test)          # TypeScript slice + corpus
 ```
 
-The crate depends on `../zed-interfaces/src/rust` by path until
-`zed-interfaces` publishes `0.1.0` to the registry, at which point this becomes
-a plain version requirement.
+Every slice depends on its `zed-interfaces` counterpart by path until
+`zed-interfaces` publishes `0.1.0`, at which point each becomes a plain version
+requirement.
 
 ## License
 

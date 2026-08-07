@@ -1,0 +1,23 @@
+name: zed_lib
+description: >-
+  Implementations of the zed-pkg interfaces in Dart — resolution and policy over
+  the shared contract types, verified against the cross-language corpus.
+version: 0.1.0
+# Published as a zed-package ([targets.dart] in ../../.zpkg.toml) and mirrored
+# to pub.dev from there.
+publish_to: none
+repository: https://github.com/zed-pkg/zed-lib
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  # Shapes come from the generated interfaces slice; this package adds only
+  # behavior. A sibling checkout until zed-interfaces publishes to pub.dev,
+  # matching how the Rust slice depends on it.
+  zed_interfaces:
+    path: ../../../zed-interfaces/src/dart
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.25.0

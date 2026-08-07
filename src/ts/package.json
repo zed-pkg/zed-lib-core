@@ -1,0 +1,32 @@
+{
+  "name": "@zed-pkg/zed-lib",
+  "version": "0.1.0",
+  "description": "Implementations of the zed-pkg interfaces in TypeScript — resolution and policy over the shared contract types, verified against the cross-language corpus.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zed-pkg/zed-lib.git",
+    "directory": "src/ts"
+  },
+  "type": "module",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./*": "./*.ts"
+  },
+  "files": [
+    "*.ts",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@zed-pkg/zed-interfaces": "file:../../../zed-interfaces/src/ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test conformance.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
