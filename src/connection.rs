@@ -1,9 +1,7 @@
 use std::{fmt, time::Duration};
 
 use sea_orm::sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sea_orm::{
-    ConnectionTrait, DatabaseConnection, SqlxPostgresConnector, Statement,
-};
+use sea_orm::{ConnectionTrait, DatabaseConnection, SqlxPostgresConnector, Statement};
 
 use crate::{error::OrmError, schema::ORG_SCHEMA};
 
@@ -234,10 +232,7 @@ mod tests {
     fn read_only_startup_options_pin_schema_and_transaction_policy() {
         let options = startup_options(Role::ReadOnly);
         assert!(options.contains(&("search_path", ORG_SCHEMA.to_owned())));
-        assert!(options.contains(&(
-            "default_transaction_read_only",
-            "on".to_owned()
-        )));
+        assert!(options.contains(&("default_transaction_read_only", "on".to_owned())));
     }
 
     #[cfg(feature = "read-write")]
