@@ -26,7 +26,9 @@ impl fmt::Display for OrmError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Database(message) => write!(formatter, "database error: {message}"),
-            Self::PolicyViolation(message) => write!(formatter, "database policy violation: {message}"),
+            Self::PolicyViolation(message) => {
+                write!(formatter, "database policy violation: {message}")
+            }
         }
     }
 }
