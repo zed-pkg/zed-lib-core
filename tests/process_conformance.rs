@@ -295,9 +295,8 @@ fn spawned_process_does_not_inherit_lock_descriptor_or_handle() -> Result<()> {
         "post-spawn waiter",
     )?;
     waiter.wait_for_marker(&waiter_acquired)?;
-    idle.assert_running().context(
-        "spawned child retained the parent's lock descriptor/handle until it exited",
-    )?;
+    idle.assert_running()
+        .context("spawned child retained the parent's lock descriptor/handle until it exited")?;
     waiter.wait_success()?;
     let _ = idle.kill_and_wait()?;
     Ok(())
