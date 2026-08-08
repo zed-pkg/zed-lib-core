@@ -43,6 +43,32 @@ class ResolveException implements Exception {
 VersionScheme schemeOf(PackageMetadata metadata) =>
     metadata.versionScheme ?? VersionScheme.semver;
 
+/// Detect only malformed dotted numeric requirements that the parser demotes
+/// to exact tags. A wildcard followed by another segment is a typo, and more
+/// than three all-numeric components are not semver. `2026.07.24`, `1.nginx`,
+/// and `1.x86_64` remain exact tags.
+bool _looksLikeMalformedDottedNumericRequirement(String input) {
+  final segments = input.split('.');
+  if (segments.length < 2 || !RegExp(r'^\d+$').hasMatch(segments.first)) {
+    return false;
+  }
+
+  var allNumeric = true;
+  var sawWildcard = false;
+  for (final segment in segments.skip(1)) {
+    if (sawWildcard) return true;
+    if (segment == 'x' || segment == 'X' || segment == '*') {
+      sawWildcard = true;
+      allNumeric = false;
+      continue;
+    }
+    if (segment.isEmpty) return false;
+    if (RegExp(r'^\d+$').hasMatch(segment)) continue;
+    return false;
+  }
+  return allNumeric && segments.length > 3;
+}
+
 /// Resolve `requirement` against what the registry says a package published.
 ///
 /// Returns the version in its published spelling. Under [VersionScheme.opaque]
@@ -70,15 +96,17 @@ String resolveVersion(PackageMetadata metadata, String requirement) {
     );
   }
 
-  // A range that *looks* like one but does not parse (`^1.x.y`) would degrade
-  // into an exact tag and never match. Catch it as the typo it is.
+  // A range that looks like one but does not parse (`^1.x.y`, `1.x.y`, or
+  // `1.2.3.4`) would degrade into an exact tag and never match. Catch only the
+  // malformed range shapes, without reclassifying calendar or opaque tags.
   if (scheme != VersionScheme.opaque &&
       parsed is ExactRequirement &&
-      looksLikeRange(requirement)) {
+      (looksLikeRange(requirement) ||
+          _looksLikeMalformedDottedNumericRequirement(requirement))) {
     throw ResolveException(
       ResolveErrorKind.invalidRequirement,
       '`$requirement` is not a valid requirement for $id: looks like a version '
-      'range but is not a valid one',
+      'range but has an invalid wildcard or segment shape',
     );
   }
 

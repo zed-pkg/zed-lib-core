@@ -154,7 +154,7 @@
       }
     },
     {
-      "name": "KNOWN GAP: a wildcard typo with no operator degrades to an opaque tag",
+      "name": "a wildcard typo with no operator is a requirement error",
       "scheme": "semver",
       "versions": [
         "1.0.0",
@@ -162,7 +162,64 @@
       ],
       "requirement": "1.x.y",
       "expect": {
-        "error": "unsatisfied"
+        "error": "invalid_requirement"
+      }
+    },
+    {
+      "name": "an uppercase wildcard typo is also a requirement error",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "1.9.0"
+      ],
+      "requirement": "1.X.y",
+      "expect": {
+        "error": "invalid_requirement"
+      }
+    },
+    {
+      "name": "a star wildcard followed by another segment is invalid",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "1.9.0"
+      ],
+      "requirement": "1.*.y",
+      "expect": {
+        "error": "invalid_requirement"
+      }
+    },
+    {
+      "name": "a four-segment numeric requirement is invalid",
+      "scheme": "semver",
+      "versions": [
+        "1.2.3"
+      ],
+      "requirement": "1.2.3.4",
+      "expect": {
+        "error": "invalid_requirement"
+      }
+    },
+    {
+      "name": "a numeric-prefixed opaque word remains an exact tag",
+      "scheme": "semver",
+      "versions": [
+        "1.nginx"
+      ],
+      "requirement": "1.nginx",
+      "expect": {
+        "version": "1.nginx"
+      }
+    },
+    {
+      "name": "a numeric-prefixed architecture tag remains exact",
+      "scheme": "semver",
+      "versions": [
+        "1.x86_64"
+      ],
+      "requirement": "1.x86_64",
+      "expect": {
+        "version": "1.x86_64"
       }
     },
     {

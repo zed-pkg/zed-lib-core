@@ -55,6 +55,45 @@ impl ResolveError {
     }
 }
 
+/// Detect only malformed dotted numeric requirements that the semver parser
+/// demotes to exact tags. A wildcard followed by any additional segment is a
+/// typo, and more than three all-numeric components are not semver. Valid
+/// calendar-like exact tags such as `2026.07.24` and ordinary opaque tags such
+/// as `1.nginx` and `1.x86_64` remain exact.
+fn looks_like_malformed_dotted_numeric_requirement(input: &str) -> bool {
+    let mut segments = input.split('.');
+    let Some(first) = segments.next() else {
+        return false;
+    };
+    if first.is_empty() || !first.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+
+    let mut segment_count = 1;
+    let mut all_numeric = true;
+    let mut saw_wildcard = false;
+    for segment in segments {
+        segment_count += 1;
+        if saw_wildcard {
+            return true;
+        }
+        if matches!(segment, "x" | "X" | "*") {
+            saw_wildcard = true;
+            all_numeric = false;
+            continue;
+        }
+        if segment.is_empty() {
+            return false;
+        }
+        if segment.bytes().all(|byte| byte.is_ascii_digit()) {
+            continue;
+        }
+        return false;
+    }
+
+    all_numeric && segment_count > 3
+}
+
 /// Resolve `requirement` against what the registry says a package published.
 ///
 /// Returns the version in its **original spelling** — the store address and
@@ -87,17 +126,32 @@ pub fn resolve_version<'a>(
         });
     }
 
-    // A range that *looks* like one but does not parse (`^1.x.y`) would degrade
-    // into an exact tag and never match. Catch it as the typo it is.
-    if scheme != VersionScheme::Opaque
-        && let Err(reason) = Requirement::validate(requirement)
-    {
-        return Err(ResolveError::InvalidRequirement {
-            org,
-            name,
-            requirement: requirement.to_string(),
-            reason,
-        });
+    // A range that looks like one but does not parse (`^1.x.y`, `1.x.y`, or
+    // `1.2.3.4`) would degrade into an exact tag and never match. The pinned
+    // polyglot interfaces baseline predates bare dotted-wildcard validation, so
+    // retain the same narrowly scoped guard locally until all generated clients
+    // move to the current contract.
+    if scheme != VersionScheme::Opaque {
+        if let Err(reason) = Requirement::validate(requirement) {
+            return Err(ResolveError::InvalidRequirement {
+                org,
+                name,
+                requirement: requirement.to_string(),
+                reason,
+            });
+        }
+        if matches!(&parsed, Requirement::Exact(_))
+            && looks_like_malformed_dotted_numeric_requirement(requirement)
+        {
+            return Err(ResolveError::InvalidRequirement {
+                org,
+                name,
+                requirement: requirement.to_string(),
+                reason:
+                    "looks like a dotted semver range but has an invalid wildcard or segment shape"
+                        .to_string(),
+            });
+        }
     }
 
     resolve(&parsed, &metadata.versions).ok_or_else(|| ResolveError::Unsatisfied {
@@ -172,12 +226,22 @@ mod tests {
     }
 
     #[test]
-    fn a_malformed_range_is_a_requirement_error_not_a_missing_version() {
-        let meta = metadata(VersionScheme::Semver, &["1.0.0"]);
-        assert_eq!(
-            resolve_version(&meta, "^1.x.y").unwrap_err().kind(),
-            "invalid_requirement"
+    fn malformed_dotted_ranges_are_requirement_errors_without_false_positives() {
+        let meta = metadata(
+            VersionScheme::Semver,
+            &["1.0.0", "1.9.0", "1.nginx", "1.x86_64", "2026.07.24"],
         );
+        for requirement in ["^1.x.y", "1.x.y", "1.X.y", "1.*.y", "1.2.3.4"] {
+            assert_eq!(
+                resolve_version(&meta, requirement).unwrap_err().kind(),
+                "invalid_requirement",
+                "{requirement}"
+            );
+        }
+        assert_eq!(resolve_version(&meta, "1.x").unwrap(), "1.9.0");
+        assert_eq!(resolve_version(&meta, "1.nginx").unwrap(), "1.nginx");
+        assert_eq!(resolve_version(&meta, "1.x86_64").unwrap(), "1.x86_64");
+        assert_eq!(resolve_version(&meta, "2026.07.24").unwrap(), "2026.07.24");
         assert_eq!(
             resolve_version(&meta, "^9.0").unwrap_err().kind(),
             "unsatisfied"
