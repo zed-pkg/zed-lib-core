@@ -292,6 +292,25 @@ impl Default for LockManager {
     }
 }
 
+fn is_lock_contention(error: &std::io::Error) -> bool {
+    if error.kind() == std::io::ErrorKind::WouldBlock {
+        return true;
+    }
+
+    #[cfg(windows)]
+    {
+        // LockFileEx reports ordinary nonblocking contention through
+        // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
+        // `Other` rather than `WouldBlock`.
+        error.raw_os_error() == Some(33)
+    }
+
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 impl LockManager {
     pub fn builder() -> LockManagerBuilder {
         LockManagerBuilder::default()
@@ -425,7 +444,7 @@ impl LockManager {
                     order_registration: Some(order_registration),
                 }))
             }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(error) if is_lock_contention(&error) => {
                 self.remove_reservation(reserved.as_ref());
                 self.emit(
                     &request,
@@ -1072,6 +1091,25 @@ mod tests {
     use anyhow::{Result, anyhow};
 
     use super::{LockClass, LockEventKind, LockManager, LockRequest, LockWaiter, lock_unpoison};
+
+    #[test]
+    fn would_block_is_classified_as_lock_contention() {
+        let error = std::io::Error::from(std::io::ErrorKind::WouldBlock);
+        assert!(super::is_lock_contention(&error));
+    }
+
+    #[test]
+    fn unrelated_io_errors_are_not_lock_contention() {
+        let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert!(!super::is_lock_contention(&error));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_lock_violation_is_classified_as_contention() {
+        let error = std::io::Error::from_raw_os_error(33);
+        assert!(super::is_lock_contention(&error));
+    }
 
     #[test]
     fn repeated_timeouts_keep_one_acquisition_request() -> Result<()> {
