@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Classify Windows `LockFileEx` error 33 (`ERROR_LOCK_VIOLATION`) as
+  ordinary nonblocking contention, returning `Ok(None)` from
+  `LockManager::try_acquire` instead of a hard I/O error.
+- Retain `WouldBlock` behavior on every platform and continue to surface
+  unrelated I/O failures.
+
 ## 0.1.1 — 2026-08-05
 
 Repository and release-contract hardening for the standalone locking crate.
