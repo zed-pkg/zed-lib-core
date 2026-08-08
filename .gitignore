@@ -1,3 +1,7 @@
 /target/
 **/*.rs.bk
 .DS_Store
+tmp
+temp
+tmp/worktrees
+temp/worktrees
