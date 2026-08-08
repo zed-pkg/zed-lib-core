@@ -155,6 +155,10 @@ fn process_helper() -> Result<()> {
     };
 
     match role.as_str() {
+        "idle" => {
+            fs::write(&acquired, b"ready")?;
+            thread::sleep(Duration::from_millis(hold_ms));
+        }
         "hold" | "wait" => {
             let guard = manager.acquire_blocking(request())?;
             fs::write(&acquired, b"acquired")?;
@@ -250,6 +254,52 @@ fn forced_owner_exit_releases_the_kernel_lock() -> Result<()> {
     )?;
     waiter.wait_success()?;
     anyhow::ensure!(waiter_acquired.is_file());
+    Ok(())
+}
+
+#[test]
+fn spawned_process_does_not_inherit_lock_descriptor_or_handle() -> Result<()> {
+    let temp = tempfile::tempdir()?;
+    let lock_path = temp.path().join("non-inherited.lock");
+    let owner = LockManager::default().acquire_blocking(
+        LockRequest::exclusive(&lock_path).operation("non-inheritance parent owner"),
+    )?;
+
+    let idle_attempting = temp.path().join("idle-attempting");
+    let idle_ready = temp.path().join("idle-ready");
+    let mut idle = ManagedChild::spawn(
+        "idle",
+        &lock_path,
+        &idle_attempting,
+        &idle_ready,
+        Duration::from_secs(60),
+        None,
+        None,
+        "long-lived spawned child",
+    )?;
+    idle.wait_for_marker(&idle_ready)?;
+    idle.assert_running()?;
+
+    drop(owner);
+
+    let waiter_attempting = temp.path().join("inheritance-waiter-attempting");
+    let waiter_acquired = temp.path().join("inheritance-waiter-acquired");
+    let mut waiter = ManagedChild::spawn(
+        "wait",
+        &lock_path,
+        &waiter_attempting,
+        &waiter_acquired,
+        Duration::ZERO,
+        None,
+        None,
+        "post-spawn waiter",
+    )?;
+    waiter.wait_for_marker(&waiter_acquired)?;
+    idle.assert_running().context(
+        "spawned child retained the parent's lock descriptor/handle until it exited",
+    )?;
+    waiter.wait_success()?;
+    let _ = idle.kill_and_wait()?;
     Ok(())
 }
 
