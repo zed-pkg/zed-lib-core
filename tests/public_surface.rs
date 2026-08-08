@@ -17,7 +17,10 @@ fn raw_orm_types_are_not_reexported() {
         "pub type ReadContext = DatabaseConnection",
         "pub type WriteContext = DatabaseConnection",
     ] {
-        assert!(!library.contains(forbidden), "public surface leaked {forbidden}");
+        assert!(
+            !library.contains(forbidden),
+            "public surface leaked {forbidden}"
+        );
     }
 
     let connection = read("src/connection.rs");
@@ -57,7 +60,8 @@ fn shared_schema_source_is_exact_and_external() {
 #[test]
 fn live_denial_probe_remains_available_but_opt_in() {
     let connection = read("src/connection.rs");
-    assert!(connection.contains("#[ignore = \"requires a dedicated ORM_CORE_TEST_DATABASE_URL database\"]"));
+    assert!(connection
+        .contains("#[ignore = \"requires a dedicated ORM_CORE_TEST_DATABASE_URL database\"]"));
     assert!(connection.contains("live_read_only_context_rejects_schema_ddl"));
     assert!(connection.contains("read-only context unexpectedly executed DDL"));
 }
