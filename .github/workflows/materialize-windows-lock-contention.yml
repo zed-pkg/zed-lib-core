@@ -47,50 +47,52 @@ jobs:
           path = Path('src/lib.rs')
           text = path.read_text()
 
-          impl_anchor = '''impl Default for LockManager {
-              fn default() -> Self {
-                  LockManagerBuilder::default().build()
-              }
-          }
-
-          impl LockManager {
-          '''
-          helper = '''impl Default for LockManager {
-              fn default() -> Self {
-                  LockManagerBuilder::default().build()
-              }
-          }
-
-          fn is_lock_contention(error: &std::io::Error) -> bool {
-              if error.kind() == std::io::ErrorKind::WouldBlock {
-                  return true;
+          if 'fn is_lock_contention(error: &std::io::Error) -> bool {' not in text:
+              impl_anchor = '''impl Default for LockManager {
+                  fn default() -> Self {
+                      LockManagerBuilder::default().build()
+                  }
               }
 
-              #[cfg(windows)]
-              {
-                  // LockFileEx reports ordinary nonblocking contention through
-                  // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
-                  // `Other` rather than `WouldBlock`.
-                  return error.raw_os_error() == Some(33);
+              impl LockManager {
+              '''
+              helper = '''impl Default for LockManager {
+                  fn default() -> Self {
+                      LockManagerBuilder::default().build()
+                  }
               }
 
-              #[cfg(not(windows))]
-              {
-                  false
-              }
-          }
+              fn is_lock_contention(error: &std::io::Error) -> bool {
+                  if error.kind() == std::io::ErrorKind::WouldBlock {
+                      return true;
+                  }
 
-          impl LockManager {
-          '''
-          if impl_anchor not in text:
-              raise SystemExit('LockManager helper insertion anchor not found')
-          text = text.replace(impl_anchor, helper, 1)
+                  #[cfg(windows)]
+                  {
+                      // LockFileEx reports ordinary nonblocking contention through
+                      // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
+                      // `Other` rather than `WouldBlock`.
+                      return error.raw_os_error() == Some(33);
+                  }
+
+                  #[cfg(not(windows))]
+                  {
+                      false
+                  }
+              }
+
+              impl LockManager {
+              '''
+              if impl_anchor not in text:
+                  raise SystemExit('LockManager helper insertion anchor not found')
+              text = text.replace(impl_anchor, helper, 1)
 
           old_guard = '            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {'
           new_guard = '            Err(error) if is_lock_contention(&error) => {'
-          if old_guard not in text:
+          if old_guard in text:
+              text = text.replace(old_guard, new_guard, 1)
+          elif new_guard not in text:
               raise SystemExit('try_acquire contention guard not found')
-          text = text.replace(old_guard, new_guard, 1)
 
           old_import = '''    use super::{LockClass, LockEventKind, LockManager, LockRequest, LockWaiter, lock_unpoison};
           '''
@@ -99,9 +101,10 @@ jobs:
               lock_unpoison,
           };
           '''
-          if old_import not in text:
+          if old_import in text:
+              text = text.replace(old_import, new_import, 1)
+          elif 'is_lock_contention,' not in text:
               raise SystemExit('test import anchor not found')
-          text = text.replace(old_import, new_import, 1)
 
           test_anchor = '''    #[test]
               fn default_policy_rejects_same_process_reentry() -> Result<()> {
@@ -128,9 +131,11 @@ jobs:
               #[test]
               fn default_policy_rejects_same_process_reentry() -> Result<()> {
           '''
-          if test_anchor not in text:
-              raise SystemExit('contention test insertion anchor not found')
-          path.write_text(text.replace(test_anchor, tests, 1))
+          if 'fn would_block_is_classified_as_lock_contention()' not in text:
+              if test_anchor not in text:
+                  raise SystemExit('contention test insertion anchor not found')
+              text = text.replace(test_anchor, tests, 1)
+          path.write_text(text)
 
           changelog = Path('CHANGELOG.md')
           text = changelog.read_text()
@@ -155,10 +160,12 @@ jobs:
       - name: Validate ordinary source
         run: |
           set -euo pipefail
+          # zed-lock intentionally does not commit Cargo.lock; validate exactly
+          # as the permanent package CI does rather than manufacturing one.
           cargo fmt --all
           cargo fmt --all --check
-          cargo test --locked
-          cargo clippy --locked --all-targets -- -D warnings
+          cargo test
+          cargo clippy --all-targets -- -D warnings
 
       - name: Commit product patch and remove carrier
         run: |
