@@ -4,7 +4,9 @@
 
 - Classify Windows `LockFileEx` error 33 (`ERROR_LOCK_VIOLATION`) as
   ordinary nonblocking contention, returning `Ok(None)` from
-  `LockManager::try_acquire` instead of a hard I/O error.
+  `LockManager::try_acquire` instead of a hard I/O error. This matches the
+  existing cross-platform meaning of a failed nonblocking acquisition: another
+  descriptor remains authoritative and the caller may retry or wait.
 - Retain `WouldBlock` behavior on every platform and continue to surface
   unrelated I/O failures.
 
