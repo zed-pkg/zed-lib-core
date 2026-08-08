@@ -2,7 +2,9 @@
 //!
 //! This module is the default consumer's entire view of the database. Business
 //! reads added here must carry tenant/user scope and apply redaction. Generated
-//! entities and raw query builders stay private to this crate.
+//! entities and raw query builders stay private to this crate. Prefer
+//! `get_published_items_for_tenant(tenant_id)`-style named contracts over
+//! anything that hands a caller a query builder.
 
 use crate::{
     connection::{inspect_connection, InternalConnectionState},

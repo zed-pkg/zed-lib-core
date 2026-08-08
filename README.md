@@ -11,13 +11,15 @@ Governed by [`zed-pkg/.github/SERVICE_AND_DATA_ARCHITECTURE.md`](https://github.
 | Web/default consumer | `read-only` (default) | `ReadContext`, role-aware connection, and named functions under `read` |
 | API server | `read-write` | Adds `WriteContext` and named functions under `write` |
 
-Raw SeaORM/SQLx connections, entity managers, query builders, and backend error types stay private. A default consumer cannot import `WriteContext`, `connect_read_write`, or the `write` module; a compile-fail doctest enforces that boundary.
+Raw SeaORM/SQLx connections, entity managers, query builders, and backend error types stay private. A default consumer cannot import `WriteContext`, `connect_read_write`, or the `write` module; a compile-fail doctest enforces that. Note this is an intent-and-ergonomics boundary, not a security one: Cargo feature resolution is additive, so any crate in a consumer's graph that enables `read-write` turns those symbols on. The authoritative control is the SELECT-only database role.
 
 `connect_read_only` pins `search_path=zed_pkg`, sets `default_transaction_read_only=on` in the PostgreSQL startup packet, and verifies both settings before returning an opaque context. `connect_read_write` is compiled only with `read-write` and rejects a transaction-read-only session.
 
 ## Shared schema source
 
 Schema definitions come from [`ORESoftware/k8s-libs-and-shared-defs`](https://github.com/ORESoftware/k8s-libs-and-shared-defs), never from independently authored entities here. [`shared-defs.lock.json`](shared-defs.lock.json) pins revision `c8bdc06d74746acc6439f9527ebd02697fdf028b`, organization slice `zed-pkg`, schema `zed_pkg`, and the generated Rust SeaORM adapter path.
+
+Each release pins the exact shared-definition revision/digest it was generated against; a major version bump is treated as a schema event and participates in the expand/contract compatibility window. The crate targets PostgreSQL and CockroachDB (postgres wire protocol) through SeaORM's `sqlx-postgres` backend, but a shared codebase does not make the engines behave identically — engine-specific behavior, notably retryable serialization errors, must be tested per engine.
 
 The connection and feature boundary is implemented now. Importing the generated Zed entity slice and replacing the generic connection-state reads with business-specific named queries remains a merge gate; do not expose the generated crate wholesale to consumers.
 

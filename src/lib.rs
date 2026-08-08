@@ -7,6 +7,12 @@
 //! raw ORM sessions. Web/default consumers receive only [`ReadContext`] and
 //! named functions under [`read`]. API consumers must explicitly enable the
 //! `read-write` feature to compile [`WriteContext`] and [`write`].
+//!
+//! This crate never defines an independent schema and carries no migration
+//! tooling: migrations belong exclusively to the owning API server via
+//! `declarative-migrations`. The feature split expresses intent — the
+//! authoritative boundary is the web tier's SELECT-only database identity,
+//! because Cargo feature resolution is additive across a dependency graph.
 
 #[cfg(not(feature = "read-only"))]
 compile_error!("zed-orm-core requires the read-only feature; read-write includes it");

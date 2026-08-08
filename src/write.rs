@@ -3,6 +3,8 @@
 //! Every symbol in this module disappears from default builds. Add only named
 //! mutations that preserve API-owned authorization, validation, invariants,
 //! audit behavior, and transaction boundaries; never expose a raw ORM session.
+//! The feature gate expresses intent; the authoritative control is the
+//! database principal, whose grants deny web identities all DML.
 
 use crate::{connection::inspect_connection, read::ConnectionState, OrmError, WriteContext};
 
