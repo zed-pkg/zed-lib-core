@@ -1,25 +1,43 @@
 //! # zed-orm-core
 //!
-//! Shared SeaORM entity and query layer for the `zed-pkg` organization.
+//! Canonical, opaque SeaORM boundary for the `zed-pkg` organization.
 //!
-//! Schema definitions are imported from
-//! `oresoftware/k8s-libs-and-shared-defs`, namespaced by GitHub org and
-//! project per the org-wide service & data architecture policy
-//! (`zed-pkg/.github/SERVICE_AND_DATA_ARCHITECTURE.md`). This crate never
-//! defines an independent schema, and it carries no migration tooling —
-//! migrations belong exclusively to the owning API server via
-//! `declarative-migrations`.
-//!
-//! ## Consumer contract
-//!
-//! - **API servers** enable the `read-write` feature for the full surface.
-//! - **Web servers** use the default `read-only` feature and get named,
-//!   policy-aware query functions only. No raw `DatabaseConnection`,
-//!   unrestricted query builder, or entity manager is exported to
-//!   request handlers, and the web tier connects with its SELECT-only
-//!   database identity.
+//! The crate consumes the Zed schema slice generated from
+//! `ORESoftware/k8s-libs-and-shared-defs`; it does not own migrations or expose
+//! raw ORM sessions. Web/default consumers receive only [`ReadContext`] and
+//! named functions under [`read`]. API consumers must explicitly enable the
+//! `read-write` feature to compile [`WriteContext`] and [`write`].
 
+#[cfg(not(feature = "read-only"))]
+compile_error!("zed-orm-core requires the read-only feature; read-write includes it");
+
+mod connection;
+mod error;
 pub mod read;
+mod schema;
 
 #[cfg(feature = "read-write")]
 pub mod write;
+
+pub use connection::{
+    ConnectPolicy, ReadContext, connect_read_only, connect_read_only_with_policy,
+};
+#[cfg(feature = "read-write")]
+pub use connection::{
+    WriteContext, connect_read_write, connect_read_write_with_policy,
+};
+pub use error::OrmError;
+pub use schema::{
+    ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REVISION,
+    SHARED_DEFS_SEA_ORM_ADAPTER,
+};
+
+/// Default consumers cannot import write symbols. This doctest is compiled only
+/// for the default/read-only surface; all-feature API builds omit it.
+#[cfg(not(feature = "read-write"))]
+#[doc = r#"
+```compile_fail
+use zed_orm_core::{WriteContext, connect_read_write, write};
+```
+"#]
+pub mod default_surface_compile_fail {}
