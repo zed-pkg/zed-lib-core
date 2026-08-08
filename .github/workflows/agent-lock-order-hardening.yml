@@ -1,0 +1,86 @@
+name: agent lock-order hardening
+
+on:
+  push:
+    branches: [agent/lock-order-inversion-detection]
+    paths: [.github/workflows/agent-lock-order-hardening.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/lock-order-inversion-detection
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+      - name: Patch lock-order tracking
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/lib.rs')
+          s = p.read_text()
+          s = s.replace('use std::collections::HashSet;\n', 'use std::cell::RefCell;\nuse std::collections::HashSet;\n')
+          anchor = '''const DEFAULT_MAX_WAITERS: usize = 128;\n'''
+          insert = '''const DEFAULT_MAX_WAITERS: usize = 128;\n\nthread_local! {\n    static HELD_LOCK_ORDER: RefCell<Vec<(u16, PathBuf)>> = const { RefCell::new(Vec::new()) };\n}\n\nfn check_lock_order(class: LockClass, identity: &Path, operation: &str) -> Result<()> {\n    let candidate_rank = class.rank();\n    let candidate_path = path_sort_key(identity);\n    HELD_LOCK_ORDER.with(|held| {\n        if let Some((held_rank, held_path)) = held.borrow().iter().max_by(|left, right| {\n            left.0\n                .cmp(&right.0)\n                .then_with(|| path_sort_key(&left.1).cmp(&path_sort_key(&right.1)))\n        }) {\n            let held_path_key = path_sort_key(held_path);\n            if (candidate_rank, &candidate_path) < (*held_rank, &held_path_key) {\n                bail!(\n                    "lock-order inversion while starting `{operation}`: requested class rank {candidate_rank} at {} while this thread already holds class rank {} at {}; acquire locks in ascending class/path order or use acquire_many_blocking",\n                    identity.display(),\n                    held_rank,\n                    held_path.display()\n                );\n            }\n        }\n        Ok(())\n    })\n}\n\nstruct HeldOrderRegistration {\n    rank: u16,\n    path: PathBuf,\n}\n\nimpl HeldOrderRegistration {\n    fn register(class: LockClass, path: &Path) -> Self {\n        let registration = Self {\n            rank: class.rank(),\n            path: path.to_path_buf(),\n        };\n        HELD_LOCK_ORDER.with(|held| {\n            held.borrow_mut()\n                .push((registration.rank, registration.path.clone()));\n        });\n        registration\n    }\n}\n\nimpl Drop for HeldOrderRegistration {\n    fn drop(&mut self) {\n        HELD_LOCK_ORDER.with(|held| {\n            let mut held = held.borrow_mut();\n            if let Some(index) = held\n                .iter()\n                .rposition(|(rank, path)| *rank == self.rank && path == &self.path)\n            {\n                held.remove(index);\n            }\n        });\n    }\n}\n'''
+          assert anchor in s
+          s = s.replace(anchor, insert, 1)
+          old = '''        let reserved = match self.reserve_if_required(&request, &identity) {\n'''
+          new = '''        if let Err(error) = check_lock_order(request.class, &identity, &request.operation) {\n            self.emit(\n                &request,\n                LockEventKind::Failed,\n                Some(started.elapsed()),\n                None,\n                Some(error.to_string()),\n            );\n            return Err(error);\n        }\n\n        let reserved = match self.reserve_if_required(&request, &identity) {\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''        let owner = OwnerInfo::current(&request.operation);\n        let _ = write_owner_diagnostics(&mut file, &owner);\n'''
+          new = '''        let order_registration = HeldOrderRegistration::register(request.class, &identity);\n        let owner = OwnerInfo::current(&request.operation);\n        let _ = write_owner_diagnostics(&mut file, &owner);\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''            reservation: reserved,\n        })\n    }\n\n    /// Attempt acquisition without waiting.'''
+          new = '''            reservation: reserved,\n            order_registration: Some(order_registration),\n        })\n    }\n\n    /// Attempt acquisition without waiting.'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''        let (mut file, identity) = open_lock_file(&request.path)?;\n        let reserved = self.reserve_if_required(&request, &identity)?;\n\n        match FileExt::try_lock_exclusive(&file) {\n'''
+          new = '''        let (mut file, identity) = open_lock_file(&request.path)?;\n        check_lock_order(request.class, &identity, &request.operation)?;\n        let reserved = self.reserve_if_required(&request, &identity)?;\n\n        match FileExt::try_lock_exclusive(&file) {\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''            Ok(()) => {\n                let owner = OwnerInfo::current(&request.operation);\n'''
+          new = '''            Ok(()) => {\n                let order_registration = HeldOrderRegistration::register(request.class, &identity);\n                let owner = OwnerInfo::current(&request.operation);\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''                    reservation: reserved,\n                }))\n'''
+          new = '''                    reservation: reserved,\n                    order_registration: Some(order_registration),\n                }))\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''    reservation: Option<PathBuf>,\n}\n'''
+          new = '''    reservation: Option<PathBuf>,\n    order_registration: Option<HeldOrderRegistration>,\n}\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''    fn finish_release(&mut self) {\n        if let Some(identity) = self.reservation.take() {\n'''
+          new = '''    fn finish_release(&mut self) {\n        drop(self.order_registration.take());\n        if let Some(identity) = self.reservation.take() {\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          test_anchor = '''    #[test]\n    fn dropped_waiter_releases_an_eventual_guard() -> Result<()> {\n'''
+          tests = '''    #[test]\n    fn nested_lock_order_rejects_descending_classes() -> Result<()> {\n        let temp = tempfile::tempdir()?;\n        let manager = LockManager::default();\n        let _build = manager.acquire_blocking(\n            LockRequest::exclusive(temp.path().join("build.lock"))\n                .operation("outer build")\n                .class(LockClass::Build),\n        )?;\n        let error = manager\n            .try_acquire(\n                LockRequest::exclusive(temp.path().join("artifact.lock"))\n                    .operation("inner artifact")\n                    .class(LockClass::Artifact),\n            )\n            .expect_err("descending lock classes must fail before a kernel wait");\n        assert!(format!("{error:#}").contains("lock-order inversion"));\n        Ok(())\n    }\n\n    #[test]\n    fn nested_lock_order_rejects_descending_paths_within_a_class() -> Result<()> {\n        let temp = tempfile::tempdir()?;\n        let manager = LockManager::default();\n        let _z = manager.acquire_blocking(\n            LockRequest::exclusive(temp.path().join("z.lock"))\n                .operation("outer z")\n                .class(LockClass::Build),\n        )?;\n        let error = manager\n            .try_acquire(\n                LockRequest::exclusive(temp.path().join("a.lock"))\n                    .operation("inner a")\n                    .class(LockClass::Build),\n            )\n            .expect_err("descending paths within one class must fail");\n        assert!(format!("{error:#}").contains("lock-order inversion"));\n        Ok(())\n    }\n\n    #[test]\n    fn nested_lock_order_allows_ascending_acquisition() -> Result<()> {\n        let temp = tempfile::tempdir()?;\n        let manager = LockManager::default();\n        let _project = manager.acquire_blocking(\n            LockRequest::exclusive(temp.path().join("project.lock"))\n                .operation("outer project")\n                .class(LockClass::ProjectMutation),\n        )?;\n        let _artifact = manager.acquire_blocking(\n            LockRequest::exclusive(temp.path().join("artifact.lock"))\n                .operation("inner artifact")\n                .class(LockClass::Artifact),\n        )?;\n        Ok(())\n    }\n\n'''
+          assert test_anchor in s
+          s = s.replace(test_anchor, tests + test_anchor, 1)
+          p.write_text(s)
+          PY
+      - name: Validate
+        run: |
+          cargo fmt --all --check
+          cargo test --all-targets -- --nocapture
+          cargo clippy --all-targets -- -D warnings
+      - name: Commit validated patch and remove bootstrap workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/agent-lock-order-hardening.yml
+          git add src/lib.rs
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'feat: reject nested lock-order inversions'
+          git push origin HEAD:agent/lock-order-inversion-detection
