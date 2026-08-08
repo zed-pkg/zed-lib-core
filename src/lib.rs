@@ -302,7 +302,7 @@ fn is_lock_contention(error: &std::io::Error) -> bool {
         // LockFileEx reports ordinary nonblocking contention through
         // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
         // `Other` rather than `WouldBlock`.
-        return error.raw_os_error() == Some(33);
+        error.raw_os_error() == Some(33)
     }
 
     #[cfg(not(windows))]
