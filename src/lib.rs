@@ -20,16 +20,13 @@ mod schema;
 pub mod write;
 
 pub use connection::{
-    ConnectPolicy, ReadContext, connect_read_only, connect_read_only_with_policy,
+    connect_read_only, connect_read_only_with_policy, ConnectPolicy, ReadContext,
 };
 #[cfg(feature = "read-write")]
-pub use connection::{
-    WriteContext, connect_read_write, connect_read_write_with_policy,
-};
+pub use connection::{connect_read_write, connect_read_write_with_policy, WriteContext};
 pub use error::OrmError;
 pub use schema::{
-    ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REVISION,
-    SHARED_DEFS_SEA_ORM_ADAPTER,
+    ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REVISION, SHARED_DEFS_SEA_ORM_ADAPTER,
 };
 
 /// Default consumers cannot import write symbols. This doctest is compiled only
