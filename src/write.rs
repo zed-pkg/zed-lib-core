@@ -4,11 +4,7 @@
 //! mutations that preserve API-owned authorization, validation, invariants,
 //! audit behavior, and transaction boundaries; never expose a raw ORM session.
 
-use crate::{
-    OrmError, WriteContext,
-    connection::inspect_connection,
-    read::ConnectionState,
-};
+use crate::{connection::inspect_connection, read::ConnectionState, OrmError, WriteContext};
 
 /// Return safe policy evidence for the API's opaque write context.
 pub async fn connection_state(context: &WriteContext) -> Result<ConnectionState, OrmError> {
