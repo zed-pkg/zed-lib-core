@@ -38,9 +38,10 @@ dir = ".vendor/.zed"
 
 # Whole-repository slice: every implementation plus the shared corpus they are
 # all verified against.
+# Publishes under the canonical package name; the model rejects a divergent
+# `name` on the whole-repository slice (DEN-2960).
 [targets.repository]
 dir = "."
-name = "zed-lib-repository"
 
 [targets.rust]
 dir = "src/rust"
