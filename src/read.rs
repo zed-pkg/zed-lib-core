@@ -5,8 +5,8 @@
 //! entities and raw query builders stay private to this crate.
 
 use crate::{
+    connection::{inspect_connection, InternalConnectionState},
     OrmError, ReadContext,
-    connection::{InternalConnectionState, inspect_connection},
 };
 
 /// Safe, implementation-independent evidence about the active connection.
