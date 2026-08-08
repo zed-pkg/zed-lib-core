@@ -9,6 +9,9 @@
   descriptor remains authoritative and the caller may retry or wait.
 - Retain `WouldBlock` behavior on every platform and continue to surface
   unrelated I/O failures.
+- Cover the Windows native error directly in unit tests while retaining the
+  complete cross-process descriptor-release and protected-counter conformance
+  suite on Windows Server 2025.
 
 ## 0.1.1 — 2026-08-05
 
@@ -39,5 +42,5 @@ from `zed-pkg/zed-cli` source commit
 `fd3b08eb1ac170518cb795e662318ae2714b1176`.
 
 The GitHub release targets commit
-`0fc100afc3cd60b5ce091b4207f910bf08f2cfb7` and includes the original crate and
+`0fc100afc3cd60b5ce091f77ea9b5d25aedbf098` and includes the original crate and
 checksum assets.
