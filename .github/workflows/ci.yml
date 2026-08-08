@@ -12,9 +12,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
+
 jobs:
   rust:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out repository
@@ -24,17 +27,22 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      # The crate depends on zed-interfaces by path, the same way the other
-      # Rust repos in this org do. Checking the sibling out here keeps CI
-      # building exactly what a developer builds locally, with no vendored copy
-      # to drift.
-      - name: Check out zed-interfaces
+      # zed-lib is still a three-language contract suite. Its path dependencies
+      # require the reviewed polyglot zed-interfaces layout, while
+      # zed-interfaces/main is now the Rust-only production crate. Pin the exact
+      # compatibility baseline rather than following either mutable branch.
+      - name: Check out polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ github.repository_owner }}/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_POLYGLOT_REF }}
           path: zed-interfaces
+          fetch-depth: 1
           persist-credentials: false
           show-progress: false
+
+      - name: Verify immutable interfaces pin
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
@@ -69,7 +77,7 @@ jobs:
   # Each implementation slice runs the same corpus. These jobs are what turn
   # "three implementations of one contract" from a claim into a check.
   dart:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -79,13 +87,18 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Check out zed-interfaces
+      - name: Check out polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ github.repository_owner }}/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_POLYGLOT_REF }}
           path: zed-interfaces
+          fetch-depth: 1
           persist-credentials: false
           show-progress: false
+
+      - name: Verify immutable interfaces pin
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
 
       - name: Install Dart SDK
         uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
@@ -103,7 +116,7 @@ jobs:
         run: dart test
 
   typescript:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -113,13 +126,18 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Check out zed-interfaces
+      - name: Check out polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ github.repository_owner }}/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_POLYGLOT_REF }}
           path: zed-interfaces
+          fetch-depth: 1
           persist-credentials: false
           show-progress: false
+
+      - name: Verify immutable interfaces pin
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
 
       - name: Install dependencies
         working-directory: zed-lib/src/ts
