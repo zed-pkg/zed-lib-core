@@ -44,103 +44,87 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('src/lib.rs')
-          text = path.read_text()
+          source = Path('src/lib.rs')
+          text = source.read_text()
 
+          helper = '''
+          fn is_lock_contention(error: &std::io::Error) -> bool {
+              if error.kind() == std::io::ErrorKind::WouldBlock {
+                  return true;
+              }
+
+              #[cfg(windows)]
+              {
+                  // LockFileEx reports ordinary nonblocking contention through
+                  // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
+                  // `Other` rather than `WouldBlock`.
+                  return error.raw_os_error() == Some(33);
+              }
+
+              #[cfg(not(windows))]
+              {
+                  false
+              }
+          }
+
+          '''
           if 'fn is_lock_contention(error: &std::io::Error) -> bool {' not in text:
-              impl_anchor = '''impl Default for LockManager {
-                  fn default() -> Self {
-                      LockManagerBuilder::default().build()
-                  }
-              }
+              default_start = text.find('impl Default for LockManager {')
+              if default_start < 0:
+                  raise SystemExit('LockManager Default implementation not found')
+              manager_impl = text.find('\nimpl LockManager {', default_start)
+              if manager_impl < 0:
+                  raise SystemExit('LockManager implementation following Default not found')
+              text = text[: manager_impl + 1] + helper + text[manager_impl + 1 :]
 
-              impl LockManager {
-              '''
-              helper = '''impl Default for LockManager {
-                  fn default() -> Self {
-                      LockManagerBuilder::default().build()
-                  }
-              }
-
-              fn is_lock_contention(error: &std::io::Error) -> bool {
-                  if error.kind() == std::io::ErrorKind::WouldBlock {
-                      return true;
-                  }
-
-                  #[cfg(windows)]
-                  {
-                      // LockFileEx reports ordinary nonblocking contention through
-                      // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
-                      // `Other` rather than `WouldBlock`.
-                      return error.raw_os_error() == Some(33);
-                  }
-
-                  #[cfg(not(windows))]
-                  {
-                      false
-                  }
-              }
-
-              impl LockManager {
-              '''
-              if impl_anchor not in text:
-                  raise SystemExit('LockManager helper insertion anchor not found')
-              text = text.replace(impl_anchor, helper, 1)
-
-          old_guard = '            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {'
-          new_guard = '            Err(error) if is_lock_contention(&error) => {'
+          old_guard = 'Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {'
+          new_guard = 'Err(error) if is_lock_contention(&error) => {'
           if old_guard in text:
               text = text.replace(old_guard, new_guard, 1)
           elif new_guard not in text:
               raise SystemExit('try_acquire contention guard not found')
 
-          old_import = '''    use super::{LockClass, LockEventKind, LockManager, LockRequest, LockWaiter, lock_unpoison};
-          '''
-          new_import = '''    use super::{
-              LockClass, LockEventKind, LockManager, LockRequest, LockWaiter, is_lock_contention,
-              lock_unpoison,
-          };
-          '''
-          if old_import in text:
-              text = text.replace(old_import, new_import, 1)
-          elif 'is_lock_contention,' not in text:
-              raise SystemExit('test import anchor not found')
-
-          test_anchor = '''    #[test]
-              fn default_policy_rejects_same_process_reentry() -> Result<()> {
-          '''
           tests = '''    #[test]
               fn would_block_is_classified_as_lock_contention() {
                   let error = std::io::Error::from(std::io::ErrorKind::WouldBlock);
-                  assert!(is_lock_contention(&error));
+                  assert!(super::is_lock_contention(&error));
               }
 
               #[test]
               fn unrelated_io_errors_are_not_lock_contention() {
                   let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
-                  assert!(!is_lock_contention(&error));
+                  assert!(!super::is_lock_contention(&error));
               }
 
               #[cfg(windows)]
               #[test]
               fn windows_lock_violation_is_classified_as_contention() {
                   let error = std::io::Error::from_raw_os_error(33);
-                  assert!(is_lock_contention(&error));
+                  assert!(super::is_lock_contention(&error));
               }
 
-              #[test]
-              fn default_policy_rejects_same_process_reentry() -> Result<()> {
           '''
           if 'fn would_block_is_classified_as_lock_contention()' not in text:
-              if test_anchor not in text:
-                  raise SystemExit('contention test insertion anchor not found')
-              text = text.replace(test_anchor, tests, 1)
-          path.write_text(text)
+              first_test = text.find('    #[test]\n    fn repeated_timeouts_keep_one_acquisition_request()')
+              if first_test < 0:
+                  raise SystemExit('first zed-lock unit test anchor not found')
+              text = text[:first_test] + tests + text[first_test:]
+
+          required = [
+              'fn is_lock_contention(error: &std::io::Error) -> bool {',
+              'Err(error) if is_lock_contention(&error) => {',
+              'fn windows_lock_violation_is_classified_as_contention()',
+          ]
+          missing = [fragment for fragment in required if fragment not in text]
+          if missing:
+              raise SystemExit(f'missing repaired fragments: {missing}')
+          source.write_text(text)
 
           changelog = Path('CHANGELOG.md')
-          text = changelog.read_text()
-          marker = '# Changelog\n\n'
-          entry = '''# Changelog
+          change_text = changelog.read_text()
+          if 'ERROR_LOCK_VIOLATION' not in change_text:
+              heading = '# Changelog\n\n'
+              entry = '''# Changelog
 
           ## Unreleased
 
@@ -151,10 +135,9 @@ jobs:
             unrelated I/O failures.
 
           '''
-          if '## Unreleased' not in text:
-              if marker not in text:
+              if heading not in change_text:
                   raise SystemExit('changelog heading not found')
-              changelog.write_text(text.replace(marker, entry, 1))
+              changelog.write_text(change_text.replace(heading, entry, 1))
           PY
 
       - name: Validate ordinary source
