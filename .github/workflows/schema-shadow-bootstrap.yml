@@ -82,6 +82,7 @@ jobs:
           target='agent/json-schema-orm-shadow-clean-20260809'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/schema-shadow.yml
           git add --all
           git diff --cached --check
           git commit -m 'feat: add JSON Schema cross-language ORM shadow contract'
