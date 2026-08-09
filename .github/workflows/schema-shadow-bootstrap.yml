@@ -35,6 +35,8 @@ jobs:
           echo '91077964b840b23fd30b467aa8a0079cb3bb7cc6fa2f390042008d949e5ae7a0  /tmp/zed-schema-shadow.tar.gz' | sha256sum -c -
           cp .schema-shadow-bootstrap/check-schema-shadow.mjs /tmp/check-schema-shadow.mjs
           echo '6d8a38946f35c9e81873949e24dfbce73369457c34c2ffab0c27e8ade4e7622e  /tmp/check-schema-shadow.mjs' | sha256sum -c -
+          cp .schema-shadow-bootstrap/trim-shared-descriptor-eof.patch /tmp/trim-shared-descriptor-eof.patch
+          echo '4f45fa661d8257e15deab46fa1b3ef2f36a37a8e7f1bebfb8281a1d5dafdbec3  /tmp/trim-shared-descriptor-eof.patch' | sha256sum -c -
 
       - name: Apply payload to clean branch
         shell: bash
@@ -45,6 +47,7 @@ jobs:
           git switch --force-create "${target}" "origin/${target}"
           tar -xzf /tmp/zed-schema-shadow.tar.gz
           install -m 0755 /tmp/check-schema-shadow.mjs tools/check-schema-shadow.mjs
+          git apply /tmp/trim-shared-descriptor-eof.patch
           test ! -e .schema-shadow-bootstrap
           test ! -e .github/workflows/schema-shadow-bootstrap.yml
 
@@ -56,6 +59,7 @@ jobs:
           node --check tools/check-schema-shadow.mjs
           node --check tests/schema-shadow.test.mjs
           node --test tests/schema-shadow.test.mjs
+          node tools/schema-shadow-codegen.mjs
           node tools/schema-shadow-codegen.mjs --check
           node tools/check-schema-shadow.mjs
           while IFS= read -r file; do
