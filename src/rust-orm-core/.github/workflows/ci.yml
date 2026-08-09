@@ -1,0 +1,42 @@
+name: orm-boundary-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main, scaffold/seaorm-crate]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zed-orm-core-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          shared-key: orm-boundary
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Lint default and write surfaces
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Test default read-only surface
+        run: cargo test --all-targets
+      - name: Test explicit read-write surface
+        run: cargo test --all-targets --all-features
+      - name: Compile documentation and compile-fail policy examples
+        run: cargo test --doc

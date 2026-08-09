@@ -1,0 +1,29 @@
+[package]
+name = "zed-orm-core"
+version = "0.1.0"
+edition = "2021"
+description = "Opaque, role-aware SeaORM query boundary for zed-pkg. Schema imported from oresoftware/k8s-libs-and-shared-defs."
+repository = "https://github.com/zed-pkg/zed-orm-core"
+publish = false
+
+[lib]
+name = "zed_orm_core"
+
+[features]
+# Browser-facing and other read consumers get only the opaque read context and
+# named read functions. API servers must opt into every write symbol.
+default = ["read-only"]
+read-only = []
+read-write = ["read-only"]
+
+[dependencies]
+sea-orm = { version = "1", default-features = false, features = [
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+  "with-chrono",
+  "with-uuid",
+] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

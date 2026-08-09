@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/ORESoftware/k8s-libs-and-shared-defs",
+  "revision": "c8bdc06d74746acc6439f9527ebd02697fdf028b",
+  "org_slice": "zed-pkg",
+  "schema": "zed_pkg",
+  "generated_adapter": "pg-defs/generated/rust/sea-orm",
+  "generated_crate": "dd-pg-defs-sea-orm",
+  "policy": "The canonical entities must be generated from this reviewed revision; do not author an independent schema in zed-orm-core."
+}
