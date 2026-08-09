@@ -30,9 +30,9 @@ jobs:
         run: |
           set -euo pipefail
           cat .schema-shadow-bootstrap/part-* > /tmp/zed-schema-shadow.b64
-          echo '3a3f13db0046932933306c0bd2f2f4831db19249b0f4a823958101bc06c85dda  /tmp/zed-schema-shadow.b64' | sha256sum -c -
+          echo 'cdfe16d17324fd40a5a4e1a3e5bc05aa966c1f15286b5f8c8ded17f402249588  /tmp/zed-schema-shadow.b64' | sha256sum -c -
           base64 --decode /tmp/zed-schema-shadow.b64 > /tmp/zed-schema-shadow.tar.gz
-          echo '7e6de609b947e8fc0c23d3beae8df56be95a938658a212d48cbbc5ec685ceb0b  /tmp/zed-schema-shadow.tar.gz' | sha256sum -c -
+          echo '91077964b840b23fd30b467aa8a0079cb3bb7cc6fa2f390042008d949e5ae7a0  /tmp/zed-schema-shadow.tar.gz' | sha256sum -c -
 
       - name: Apply payload to clean branch
         shell: bash
