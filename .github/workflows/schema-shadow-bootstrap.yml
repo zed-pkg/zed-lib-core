@@ -36,7 +36,7 @@ jobs:
           cp .schema-shadow-bootstrap/check-schema-shadow.mjs /tmp/check-schema-shadow.mjs
           echo '6d8a38946f35c9e81873949e24dfbce73369457c34c2ffab0c27e8ade4e7622e  /tmp/check-schema-shadow.mjs' | sha256sum -c -
           cp .schema-shadow-bootstrap/trim-shared-descriptor-eof.patch /tmp/trim-shared-descriptor-eof.patch
-          echo '4f45fa661d8257e15deab46fa1b3ef2f36a37a8e7f1bebfb8281a1d5dafdbec3  /tmp/trim-shared-descriptor-eof.patch' | sha256sum -c -
+          echo 'fdccf7bb46067889355c1405135f54b41964058b443f8c5d36ce093342257984  /tmp/trim-shared-descriptor-eof.patch' | sha256sum -c -
 
       - name: Apply payload to clean branch
         shell: bash
