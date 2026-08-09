@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import pathlib
 import re
 import subprocess
-import sys
 import tomllib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -67,7 +65,17 @@ def assert_package() -> None:
     identity = f"{package.get('org')}/{package.get('name')}"
     if identity != EXPECTED_PACKAGE or package.get("version") != "0.1.0":
         fail(f"unexpected package identity: {identity}@{package.get('version')}")
-    required_targets = {"whole", "rust", "rust-orm", "conformance", "dart", "typescript"}
+    # The root target follows the current zed-interfaces manifest model and is
+    # canonically named `repository`; older manifests used ad-hoc names such as
+    # `whole`, which are now rejected by the parser.
+    required_targets = {
+        "repository",
+        "rust",
+        "rust-orm",
+        "conformance",
+        "dart",
+        "typescript",
+    }
     targets = set(manifest.get("targets", {}))
     if targets != required_targets:
         fail(f"target set differs: {sorted(targets)}")
@@ -86,6 +94,16 @@ def assert_package() -> None:
                     fail(f"lock entry is missing {field}")
             if not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
                 fail("lock contains an invalid SHA-256")
+            if item["sha256"] == "0" * 64:
+                fail("lock contains an all-zero SHA-256")
+            if not isinstance(item["size"], int) or item["size"] <= 0:
+                fail("lock contains an invalid artifact size")
+            if item["format"] not in {"tar.gz", "tar.zst", "zip"}:
+                fail("lock contains an unsupported artifact format")
+            if not re.fullmatch(r"[0-9a-f]{40}", item["vcs_commit"]):
+                fail("lock contains an invalid VCS commit")
+            if not item["vcs_tag"] or not item["source"]:
+                fail("lock contains empty immutable provenance")
 
 
 def assert_shared_defs() -> None:
@@ -100,7 +118,7 @@ def assert_shared_defs() -> None:
     actual_blob = git("hash-object", str(source.relative_to(ROOT)))
     if actual_blob != EXPECTED_REGISTRY_BLOB:
         fail(f"vendored registry SQL blob differs: {actual_blob}")
-    text = source.read_text(encoding="utf-8")
+    text = source.read_text(encoding="utf-8").lower()
     required = {
         "zed_users",
         "zed_orgs",
@@ -117,7 +135,7 @@ def assert_shared_defs() -> None:
     missing = sorted(table for table in required if f"create table if not exists {table}" not in text)
     if missing:
         fail(f"vendored registry SQL is missing tables: {missing}")
-    for required_fragment in ("ZD001", "ZD002", "zed_packages_visibility_guard"):
+    for required_fragment in ("zd001", "zd002", "zed_packages_visibility_guard"):
         if required_fragment not in text:
             fail(f"registry policy is missing {required_fragment}")
 
