@@ -11,8 +11,9 @@
 //!    `shared-defs.lock.json`. [`migrations`] applies that reviewed SQL and
 //!    authors none of its own.
 //! 2. **Raw sessions do not escape.** Consumers receive an opaque
-//!    [`ReadContext`] or [`WriteContext`] and call named operations in [`read`]
-//!    and [`write`]. SeaORM entities and query builders stay private.
+//!    [`ReadContext`] or [`WriteContext`] and call named operations in [`read`],
+//!    [`write`], and the feature-gated [`invitations`] module. SeaORM entities
+//!    and query builders stay private.
 //! 3. **Writes are opt-in.** Default builds cannot compile a write symbol; API
 //!    servers must enable `read-write`, and only the discrete migration job
 //!    enables `migrate`. The feature split expresses intent — the authoritative
@@ -44,6 +45,8 @@ pub mod entities;
 pub mod models;
 
 #[cfg(feature = "read-write")]
+pub mod invitations;
+#[cfg(feature = "read-write")]
 pub mod write;
 
 #[cfg(feature = "migrate")]
@@ -66,7 +69,7 @@ pub use schema::{
 #[cfg(not(feature = "read-write"))]
 #[doc = r#"
 ```compile_fail
-use zed_orm_core::{connect_read_write, write, WriteContext};
+use zed_orm_core::{connect_read_write, invitations, write, WriteContext};
 ```
 "#]
 pub mod default_surface_compile_fail {}
