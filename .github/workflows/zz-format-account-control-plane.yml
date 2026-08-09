@@ -46,6 +46,23 @@ jobs:
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           components: rustfmt,clippy
+      - name: Apply assertion-checked Clippy repairs
+        working-directory: zed-lib
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for relative in ("src/rust-orm/account.rs", "src/rust-orm/publication.rs"):
+              path = Path(relative)
+              text = path.read_text()
+              old = "value.as_bytes().len()"
+              count = text.count(old)
+              if count != 2:
+                  raise SystemExit(f"{path}: expected two needless as_bytes calls, found {count}")
+              path.write_text(text.replace(old, "value.len()"))
+          PY
       - name: Format and validate every Rust target
         working-directory: zed-lib
         shell: bash
