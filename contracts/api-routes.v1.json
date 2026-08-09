@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "owners": {
+    "contract": "zed-pkg/zed-lib-core",
+    "database": "ORESoftware/k8s-libs-and-shared-defs",
+    "api": "zed-pkg/zed-api-server.rs",
+    "web": "zed-pkg/zed-web-server.rs"
+  },
+  "origins": {
+    "api": "https://api.zpkg.net",
+    "web": "https://app.zpkg.net"
+  },
+  "prefixes": {
+    "internalApi": "/v1",
+    "edgeApi": "/api/v1",
+    "registry": "/api/v1/registry"
+  },
+  "routes": {
+    "system": [
+      "GET /api/v1/health",
+      "GET /api/v1/version",
+      "GET /api/v1/openapi.json"
+    ],
+    "identity": [
+      "GET /api/v1/users/me",
+      "PATCH /api/v1/users/me",
+      "GET /api/v1/tokens",
+      "POST /api/v1/tokens",
+      "DELETE /api/v1/tokens/:token_id"
+    ],
+    "organizations": [
+      "GET /api/v1/orgs",
+      "POST /api/v1/orgs",
+      "GET /api/v1/orgs/:org",
+      "PATCH /api/v1/orgs/:org",
+      "GET /api/v1/orgs/:org/members",
+      "POST /api/v1/orgs/:org/invitations"
+    ],
+    "projects": [
+      "GET /api/v1/orgs/:org/projects",
+      "POST /api/v1/orgs/:org/projects",
+      "GET /api/v1/orgs/:org/projects/:project",
+      "PATCH /api/v1/orgs/:org/projects/:project",
+      "GET /api/v1/orgs/:org/projects/:project/members",
+      "POST /api/v1/orgs/:org/projects/:project/invitations"
+    ],
+    "registry": [
+      "GET /api/v1/registry/search",
+      "GET /api/v1/registry/packages/:org/:package",
+      "GET /api/v1/registry/packages/:org/:package/versions",
+      "GET /api/v1/registry/packages/:org/:package/versions/:version",
+      "POST /api/v1/registry/packages/:org/:package/uploads",
+      "PUT /api/v1/registry/uploads/:upload_id/artifact",
+      "POST /api/v1/registry/uploads/:upload_id/complete",
+      "GET /api/v1/registry/packages/:org/:package/versions/:version/download",
+      "POST /api/v1/registry/packages/:org/:package/visibility"
+    ]
+  },
+  "legacyCompatibility": {
+    "unscopedPackageOwner": "zed-pkg",
+    "aliases": [
+      "/api/v1/packages/* -> /api/v1/registry/packages/*",
+      "/v1/packages/* -> /v1/registry/packages/*"
+    ],
+    "policy": "Legacy aliases may redirect or delegate but must not become a second registry implementation."
+  },
+  "artifactStorage": {
+    "backend": "cloudflare-r2",
+    "bucketRole": "immutable-package-artifacts",
+    "keyTemplate": "zed/v1/packages/{org}/{package}/{version}/{sha256}.{extension}",
+    "allowedFormats": {
+      "tar.gz": "tar.gz",
+      "tar.zst": "tar.zst",
+      "zip": "zip"
+    },
+    "upload": {
+      "presigned": true,
+      "apiVerifiesSha256": true,
+      "apiVerifiesSize": true,
+      "postgresMetadataBeforePublish": true,
+      "overwriteExistingKey": false
+    },
+    "download": {
+      "apiAuthorizes": true,
+      "ledgerBeforeRedirect": true,
+      "status": 307,
+      "presignedR2Url": true,
+      "apiProxiesArtifactBytes": false,
+      "webProxiesArtifactBytes": false
+    },
+    "authority": {
+      "postgres": "package identity, visibility, versions, digests, sizes, formats, upload/download ledgers and authorization",
+      "r2": "immutable artifact bytes only"
+    }
+  },
+  "webPages": [
+    "GET /",
+    "GET /search",
+    "GET /packages",
+    "GET /packages/:org/:package",
+    "GET /packages/:org/:package/:version",
+    "GET /dashboard",
+    "GET /organizations/new",
+    "GET /organizations/:org/settings",
+    "GET /organizations/:org/projects/new",
+    "GET /organizations/:org/projects/:project/settings",
+    "GET /organizations/:org/packages/new",
+    "GET /organizations/:org/packages/:package/settings",
+    "GET /publish",
+    "GET /developers",
+    "GET /settings"
+  ],
+  "invariants": [
+    "Registry is a subset of the versioned API, not a parallel top-level service.",
+    "Postgres is authoritative; R2 stores immutable bytes only.",
+    "The download ledger is committed before issuing a signed R2 redirect.",
+    "Neither API nor web server proxies package artifact bytes.",
+    "Authentication remains in Supabase/shared-auth; registry authorization remains org/project scoped.",
+    "401, 403 and identity-provider outage responses remain distinct."
+  ]
+}
