@@ -6,7 +6,7 @@ version: 0.1.0
 # Published as a zed-package ([targets.dart] in ../../.zpkg.toml) and mirrored
 # to pub.dev from there.
 publish_to: none
-repository: https://github.com/zed-pkg/zed-lib
+repository: https://github.com/zed-pkg/zed-lib-core
 
 environment:
   sdk: ^3.0.0

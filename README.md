@@ -1,21 +1,26 @@
 # zed-lib-core
 
 Canonical core library for the **zed-pkg** registry. This repository is the
-merge of two predecessors — `zed-pkg/zed-lib` (resolution + registry entities)
-and `zed-pkg/zed-orm-core` (the opaque role-aware query boundary) — into one
-package, with both histories preserved.
+semantic merge of two predecessors — `zed-pkg/zed-lib` (resolution, polyglot
+behavior, and registry entities) and `zed-pkg/zed-orm-core` (the opaque
+role-aware query boundary) — with both histories preserved.
 
-`zed-lib-core` is itself a zed package: see `.zpkg.toml`.
+`zed-lib-core` is itself a zed package: see `.zpkg.toml`. Consumer migration and
+exact source commits are recorded in [`PREDECESSOR_MIGRATION.md`](PREDECESSOR_MIGRATION.md).
 
 ## Layout
 
 | Path | Package | What it is |
 | --- | --- | --- |
-| `src/rust-orm` | `zed-orm-core` | SeaORM registry entities, named read/write operations, the migration runner, and the opaque connection boundary |
+| `src/rust-orm` | `zed-orm-core` | SeaORM registry entities, named data-plane operations, migration runner, and opaque connection boundary |
 | `src/rust` | `zed-lib` | Version resolution and policy over the shared contract types |
 | `src/ts` | `@zed-pkg/zed-lib` | The same resolution behavior, natively in TypeScript |
 | `src/dart` | `zed_lib` | The same resolution behavior, natively in Dart |
 | `conformance` | `zed-lib-conformance` | The shared corpus all three are held to |
+
+The language package names remain compatible. Their repository metadata points
+to `zed-pkg/zed-lib-core`; the predecessor repositories are no longer release
+authorities.
 
 ## The data plane (`src/rust-orm`)
 
@@ -28,13 +33,29 @@ Three rules define the crate:
    `src/rust-orm/sql/registry.sql` and applied verbatim; this crate authors no
    DDL of its own.
 2. **Raw sessions do not escape.** Consumers get an opaque `ReadContext` or
-   `WriteContext` and call named operations in `read`/`write`. SeaORM
-   connections and query builders stay private to the crate.
+   `WriteContext` and call named operations in `read`, `registry`, `write`, and
+   the feature-gated `invitations` module. SeaORM connections and query builders
+   stay private to the crate.
 3. **Writes are opt-in.** Default builds cannot compile a write symbol
    (`compile_fail` doctests prove it). API servers enable `read-write`; only the
    discrete DPM migration job enables `migrate`. The feature split expresses
    intent — the authoritative control is the database principal, because Cargo
    features are additive across a dependency graph.
+
+### Named operation groups
+
+- `read`: users, organizations, projects, packages, versions, licenses, and
+  package search through the default read-only surface.
+- `write`: identity projection, org/project/package creation, visibility
+  transition, compatibility download recording, and invitation creation.
+- `registry`: cross-entity text/semantic search plus read-write-gated upload,
+  full download evidence, package licenses, and embedding upserts.
+- `invitations`: atomic one-time organization/project invitation acceptance,
+  compiled only for API write builds.
+
+The API tier owns authentication and authorization. These operations own input
+validation, schema relationships, transaction boundaries, source redaction,
+and fail-closed persistence behavior.
 
 ### Where the tables live
 
@@ -73,6 +94,14 @@ The limits are read from `zed_public_conversion_max_age_days()` and
 `zed_public_conversion_max_downloads()` rather than hardcoded, so the policy
 changes in one place. Both layers use `>` rather than `>=`: a package sitting
 exactly on a boundary still promotes.
+
+### Search vectors
+
+The canonical contract deliberately does not require the PostgreSQL `vector`
+extension. Embeddings are JSONB arrays with exact dimensions and content
+SHA-256 evidence. `registry::semantic_search` computes visibility-aware cosine
+scores from those arrays, while a future runtime-owned ANN index may accelerate
+the same contract without changing stored data or package interfaces.
 
 ## Development
 

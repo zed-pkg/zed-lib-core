@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zed-pkg/zed-lib.git",
+    "url": "git+https://github.com/zed-pkg/zed-lib-core.git",
     "directory": "src/ts"
   },
   "type": "module",
