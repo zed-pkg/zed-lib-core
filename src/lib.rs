@@ -7,6 +7,7 @@
 //! lock-file polling, filesystem-watcher protocol, PID-file ownership, or
 //! network dependency in the local path.
 
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
 use std::future::Future;
@@ -23,6 +24,66 @@ use anyhow::{Context as AnyhowContext, Result, anyhow, bail};
 use fs2::FileExt;
 
 const DEFAULT_MAX_WAITERS: usize = 128;
+
+thread_local! {
+    static HELD_LOCK_ORDER: RefCell<Vec<(u16, PathBuf)>> = const { RefCell::new(Vec::new()) };
+}
+
+fn check_lock_order(class: LockClass, identity: &Path, operation: &str) -> Result<()> {
+    let candidate_rank = class.rank();
+    let candidate_path = path_sort_key(identity);
+    HELD_LOCK_ORDER.with(|held| {
+        if let Some((held_rank, held_path)) = held.borrow().iter().max_by(|left, right| {
+            left.0
+                .cmp(&right.0)
+                .then_with(|| path_sort_key(&left.1).cmp(&path_sort_key(&right.1)))
+        }) {
+            let held_path_key = path_sort_key(held_path);
+            if (candidate_rank, &candidate_path) < (*held_rank, &held_path_key) {
+                bail!(
+                    "lock-order inversion while starting `{operation}`: requested class rank {candidate_rank} at {} while this thread already holds class rank {} at {}; acquire locks in ascending class/path order or use acquire_many_blocking",
+                    identity.display(),
+                    held_rank,
+                    held_path.display()
+                );
+            }
+        }
+        Ok(())
+    })
+}
+
+struct HeldOrderRegistration {
+    rank: u16,
+    path: PathBuf,
+}
+
+impl HeldOrderRegistration {
+    fn register(class: LockClass, path: &Path) -> Self {
+        let registration = Self {
+            rank: class.rank(),
+            path: path.to_path_buf(),
+        };
+        HELD_LOCK_ORDER.with(|held| {
+            held.borrow_mut()
+                .push((registration.rank, registration.path.clone()));
+        });
+        registration
+    }
+}
+
+impl Drop for HeldOrderRegistration {
+    fn drop(&mut self) {
+        HELD_LOCK_ORDER.with(|held| {
+            let mut held = held.borrow_mut();
+            if let Some(index) = held
+                .iter()
+                .rposition(|(rank, path)| *rank == self.rank && path == &self.path)
+            {
+                held.remove(index);
+            }
+        });
+    }
+}
 
 /// A deterministic lock hierarchy used when acquiring a set of locks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -231,6 +292,25 @@ impl Default for LockManager {
     }
 }
 
+fn is_lock_contention(error: &std::io::Error) -> bool {
+    if error.kind() == std::io::ErrorKind::WouldBlock {
+        return true;
+    }
+
+    #[cfg(windows)]
+    {
+        // LockFileEx reports ordinary nonblocking contention through
+        // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
+        // `Other` rather than `WouldBlock`.
+        error.raw_os_error() == Some(33)
+    }
+
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 impl LockManager {
     pub fn builder() -> LockManagerBuilder {
         LockManagerBuilder::default()
@@ -267,6 +347,17 @@ impl LockManager {
             }
         };
 
+        if let Err(error) = check_lock_order(request.class, &identity, &request.operation) {
+            self.emit(
+                &request,
+                LockEventKind::Failed,
+                Some(started.elapsed()),
+                None,
+                Some(error.to_string()),
+            );
+            return Err(error);
+        }
+
         let reserved = match self.reserve_if_required(&request, &identity) {
             Ok(reserved) => reserved,
             Err(error) => {
@@ -299,6 +390,7 @@ impl LockManager {
             });
         }
 
+        let order_registration = HeldOrderRegistration::register(request.class, &identity);
         let owner = OwnerInfo::current(&request.operation);
         let _ = write_owner_diagnostics(&mut file, &owner);
         self.emit(
@@ -317,6 +409,7 @@ impl LockManager {
             owner,
             manager: Arc::clone(&self.inner),
             reservation: reserved,
+            order_registration: Some(order_registration),
         })
     }
 
@@ -325,10 +418,12 @@ impl LockManager {
     pub fn try_acquire(&self, request: LockRequest) -> Result<Option<LockGuard>> {
         let started = Instant::now();
         let (mut file, identity) = open_lock_file(&request.path)?;
+        check_lock_order(request.class, &identity, &request.operation)?;
         let reserved = self.reserve_if_required(&request, &identity)?;
 
         match FileExt::try_lock_exclusive(&file) {
             Ok(()) => {
+                let order_registration = HeldOrderRegistration::register(request.class, &identity);
                 let owner = OwnerInfo::current(&request.operation);
                 let _ = write_owner_diagnostics(&mut file, &owner);
                 self.emit(
@@ -346,9 +441,10 @@ impl LockManager {
                     owner,
                     manager: Arc::clone(&self.inner),
                     reservation: reserved,
+                    order_registration: Some(order_registration),
                 }))
             }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(error) if is_lock_contention(&error) => {
                 self.remove_reservation(reserved.as_ref());
                 self.emit(
                     &request,
@@ -526,6 +622,7 @@ pub struct LockGuard {
     owner: OwnerInfo,
     manager: Arc<ManagerInner>,
     reservation: Option<PathBuf>,
+    order_registration: Option<HeldOrderRegistration>,
 }
 
 impl LockGuard {
@@ -561,6 +658,7 @@ impl LockGuard {
     }
 
     fn finish_release(&mut self) {
+        drop(self.order_registration.take());
         if let Some(identity) = self.reservation.take() {
             lock_unpoison(&self.manager.reserved_in_process).remove(&identity);
         }
@@ -995,6 +1093,25 @@ mod tests {
     use super::{LockClass, LockEventKind, LockManager, LockRequest, LockWaiter, lock_unpoison};
 
     #[test]
+    fn would_block_is_classified_as_lock_contention() {
+        let error = std::io::Error::from(std::io::ErrorKind::WouldBlock);
+        assert!(super::is_lock_contention(&error));
+    }
+
+    #[test]
+    fn unrelated_io_errors_are_not_lock_contention() {
+        let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert!(!super::is_lock_contention(&error));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_lock_violation_is_classified_as_contention() {
+        let error = std::io::Error::from_raw_os_error(33);
+        assert!(super::is_lock_contention(&error));
+    }
+
+    #[test]
     fn repeated_timeouts_keep_one_acquisition_request() -> Result<()> {
         let attempts = Arc::new(AtomicUsize::new(0));
         let worker_attempts = Arc::clone(&attempts);
@@ -1106,6 +1223,65 @@ mod tests {
         assert!(acquired[1].1 < acquired[2].1);
         drop(acquired);
         drop(guards);
+        Ok(())
+    }
+
+    #[test]
+    fn nested_lock_order_rejects_descending_classes() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let manager = LockManager::default();
+        let _build = manager.acquire_blocking(
+            LockRequest::exclusive(temp.path().join("build.lock"))
+                .operation("outer build")
+                .class(LockClass::Build),
+        )?;
+        let error = match manager.try_acquire(
+            LockRequest::exclusive(temp.path().join("artifact.lock"))
+                .operation("inner artifact")
+                .class(LockClass::Artifact),
+        ) {
+            Ok(_) => panic!("descending lock classes must fail before a kernel wait"),
+            Err(error) => error,
+        };
+        assert!(format!("{error:#}").contains("lock-order inversion"));
+        Ok(())
+    }
+
+    #[test]
+    fn nested_lock_order_rejects_descending_paths_within_a_class() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let manager = LockManager::default();
+        let _z = manager.acquire_blocking(
+            LockRequest::exclusive(temp.path().join("z.lock"))
+                .operation("outer z")
+                .class(LockClass::Build),
+        )?;
+        let error = match manager.try_acquire(
+            LockRequest::exclusive(temp.path().join("a.lock"))
+                .operation("inner a")
+                .class(LockClass::Build),
+        ) {
+            Ok(_) => panic!("descending paths within one class must fail"),
+            Err(error) => error,
+        };
+        assert!(format!("{error:#}").contains("lock-order inversion"));
+        Ok(())
+    }
+
+    #[test]
+    fn nested_lock_order_allows_ascending_acquisition() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let manager = LockManager::default();
+        let _project = manager.acquire_blocking(
+            LockRequest::exclusive(temp.path().join("project.lock"))
+                .operation("outer project")
+                .class(LockClass::ProjectMutation),
+        )?;
+        let _artifact = manager.acquire_blocking(
+            LockRequest::exclusive(temp.path().join("artifact.lock"))
+                .operation("inner artifact")
+                .class(LockClass::Artifact),
+        )?;
         Ok(())
     }
 

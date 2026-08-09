@@ -27,13 +27,12 @@ exclude = [
   ".DS_Store",
 ]
 
+# Keep the repository's required Rust target. Because it spans the repository
+# root, Zed canonicalizes it to zed-pkg/zed-lock; crates.io publication remains
+# an independent release operation and must not be declared on this target.
 [targets.rust]
 dir = "."
 adapter = "rust"
-
-[targets.rust.native]
-registry = "crates-io"
-package = "zed-lock"
 
 [scripts]
 test = "cargo test --all-targets"
