@@ -17,6 +17,7 @@ pub(crate) fn required_text(
     }
 }
 
+#[cfg(feature = "read-write")]
 pub(crate) fn optional_text(
     field: &str,
     value: Option<&str>,
@@ -32,6 +33,7 @@ pub(crate) fn optional_text(
     Ok(())
 }
 
+#[cfg(feature = "read-write")]
 pub(crate) fn one_of(field: &str, value: &str, allowed: &[&str]) -> Result<(), OrmError> {
     if allowed.contains(&value) {
         Ok(())
@@ -43,6 +45,7 @@ pub(crate) fn one_of(field: &str, value: &str, allowed: &[&str]) -> Result<(), O
     }
 }
 
+#[cfg(feature = "read-write")]
 pub(crate) fn optional_one_of(
     field: &str,
     value: Option<&str>,
@@ -54,6 +57,7 @@ pub(crate) fn optional_one_of(
     }
 }
 
+#[cfg(feature = "read-write")]
 pub(crate) fn optional_nonnegative(field: &str, value: Option<i64>) -> Result<(), OrmError> {
     if value.is_some_and(|value| value < 0) {
         Err(OrmError::policy(format!("{field} cannot be negative")))
@@ -62,6 +66,7 @@ pub(crate) fn optional_nonnegative(field: &str, value: Option<i64>) -> Result<()
     }
 }
 
+#[cfg(feature = "read-write")]
 pub(crate) fn optional_sha256(field: &str, value: Option<&str>) -> Result<(), OrmError> {
     if value.is_some_and(|value| !is_sha256(value)) {
         Err(OrmError::policy(format!(
@@ -72,6 +77,7 @@ pub(crate) fn optional_sha256(field: &str, value: Option<&str>) -> Result<(), Or
     }
 }
 
+#[cfg(feature = "read-write")]
 pub(crate) fn sha256(field: &str, value: &str) -> Result<(), OrmError> {
     optional_sha256(field, Some(value))
 }
@@ -112,6 +118,7 @@ pub(crate) fn embedding(values: &[f32]) -> Result<(), OrmError> {
     }
 }
 
+#[cfg(feature = "read-write")]
 pub(crate) fn entity_type(value: &str) -> Result<(), OrmError> {
     one_of(
         "embedding entity type",
@@ -120,6 +127,7 @@ pub(crate) fn entity_type(value: &str) -> Result<(), OrmError> {
     )
 }
 
+#[cfg(feature = "read-write")]
 fn is_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -131,6 +139,7 @@ fn is_sha256(value: &str) -> bool {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "read-write")]
     #[test]
     fn hashes_are_exact_lowercase_sha256() {
         assert!(sha256("digest", &"a".repeat(64)).is_ok());
@@ -148,9 +157,14 @@ mod tests {
     }
 
     #[test]
-    fn model_and_entity_tokens_match_the_shared_schema() {
+    fn model_tokens_match_the_shared_schema() {
         assert!(embedding_model("text-embedding/3:large").is_ok());
         assert!(embedding_model("contains spaces").is_err());
+    }
+
+    #[cfg(feature = "read-write")]
+    #[test]
+    fn entity_tokens_match_the_shared_schema() {
         assert!(entity_type("package_version").is_ok());
         assert!(entity_type("upload").is_err());
     }
