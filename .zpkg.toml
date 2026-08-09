@@ -12,6 +12,7 @@ url = "https://github.com/zed-pkg/zed-lib"
 
 [dependencies]
 "zed-pkg/zed-interfaces" = "^0.1.0"
+"oresoftware/k8s-libs-and-shared-defs" = "^0.1.0"
 
 [publish]
 include_readme = true
@@ -50,6 +51,14 @@ adapter = "rust"
 [targets.rust.native]
 registry = "crates-io"
 package = "zed-lib"
+
+# Shared SeaORM data-access crate: role-aware connections and named query
+# functions over the org's `zed_pkg` schema. See src/rust-orm/lib.rs and
+# SERVICE_AND_DATA_ARCHITECTURE.md.
+[targets.rust-orm]
+dir = "src/rust-orm"
+name = "zed-orm"
+adapter = "rust"
 
 # The corpus is consumable on its own: an implementation in a language zed-lib
 # does not ship yet still has something to be correct against.

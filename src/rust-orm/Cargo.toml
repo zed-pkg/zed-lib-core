@@ -1,0 +1,19 @@
+[package]
+name = "zed-orm"
+version = "0.1.0"
+edition = "2024"
+description = "Canonical SeaORM entities, queries, and migrations for the zed-pkg registry"
+license = "MIT"
+repository = "https://github.com/zed-pkg/zed-lib"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# SeaORM is the only direct data-layer dependency. Its default model-type
+# features provide UUID, JSON, and timestamp support through the prelude.
+sea-orm = { version = "1", features = [
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+] }
