@@ -76,11 +76,17 @@ Predecessor head:
 f6f240a72eb100b858ae74f2c633d09528b61805
 ```
 
-The canonical implementation is reviewed in
-[`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3) and is tested
-under both the default read-only crate surface and the explicit `read-write`
-surface. The old branch was based on a transitional schema and raw SeaORM
-sessions. Its substantive requirements map as follows.
+The canonical implementation merged through
+[`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3) as:
+
+```text
+d9a1f72baad87a0bbe256ad892d61d7a4fdd9135
+```
+
+It passed Rust, TypeScript, Dart, default/read-only ORM, explicit `read-write`
+ORM, Clippy, conformance-corpus, source-history, schema, API/R2, and provenance
+checks on its exact head. The old branch was based on a transitional schema and
+raw SeaORM sessions. Its substantive requirements map as follows.
 
 | Predecessor item | Canonical disposition |
 | --- | --- |
@@ -122,17 +128,20 @@ Change the Git repository to `zed-pkg/zed-lib-core`; the crate lives at
 Default builds remain read-only. API servers opt into `read-write`; only the
 discrete migration job opts into `migrate`.
 
-## Predecessor repository policy
+## Predecessor repository cutover
 
-After every open predecessor pull request is either mapped to a merged canonical
-commit or migrated into a canonical follow-up:
+The historical repositories now carry merged migration notices:
 
-1. predecessor READMEs become prominent migration notices;
-2. no new package or repository-level releases originate there;
-3. open issues and PRs link their canonical replacement;
-4. branches and Git history remain available for audit; and
-5. repositories may be archived only after the migration pointers are merged
-   and no unique work remains.
+```text
+zed-pkg/zed-lib#8       12071278e728100cc80b8ba60297ebff8e0914cb
+zed-pkg/zed-orm-core#4  a78baf355e8ba3b98fa09780af9f67e8b7c12b85
+```
 
-No predecessor history is deleted, force-pushed, or replaced with an unrelated
-root commit.
+Those notices preserve package/import compatibility, exact merge and salvage
+commits, consumer instructions, and links back to this ledger. Neither
+predecessor repository should originate new feature or release work.
+
+Both repositories are ready to be archived as read-only historical entry
+points. Archival must preserve all branches, tags, issues, pull requests, and
+commit URLs; no predecessor history is deleted, force-pushed, or replaced with
+an unrelated root commit.
