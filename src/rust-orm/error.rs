@@ -97,10 +97,9 @@ impl fmt::Display for OrmError {
             Self::PolicyViolation(message) => {
                 write!(formatter, "database policy violation: {message}")
             }
-            Self::VisibilityWindowExpired(message) => write!(
-                formatter,
-                "package is too old to be made public: {message}"
-            ),
+            Self::VisibilityWindowExpired(message) => {
+                write!(formatter, "package is too old to be made public: {message}")
+            }
             Self::VisibilityDownloadLimitExceeded(message) => write!(
                 formatter,
                 "package has too many downloads to be made public: {message}"
