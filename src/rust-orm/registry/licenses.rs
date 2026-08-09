@@ -1,7 +1,6 @@
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, TransactionTrait,
-    prelude::Uuid,
-    sea_query::Expr,
+    prelude::Uuid, sea_query::Expr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait,
+    QueryFilter, TransactionTrait,
 };
 
 use crate::{
@@ -50,9 +49,9 @@ pub async fn add_package_license(
             .filter(package_license::Column::PackageId.eq(input.package_id))
             .filter(package_license::Column::IsPrimary.eq(true));
         demote = match input.package_version_id {
-            Some(package_version_id) => demote.filter(
-                package_license::Column::PackageVersionId.eq(package_version_id),
-            ),
+            Some(package_version_id) => {
+                demote.filter(package_license::Column::PackageVersionId.eq(package_version_id))
+            }
             None => demote.filter(package_license::Column::PackageVersionId.is_null()),
         };
         demote
@@ -98,8 +97,7 @@ fn validate_license(input: &PackageLicenseInput) -> Result<(), OrmError> {
             if spdx.is_empty()
                 || spdx.len() > 120
                 || !spdx.bytes().all(|byte| {
-                    byte.is_ascii_alphanumeric()
-                        || matches!(byte, b'.' | b'+' | b'(' | b')' | b'-')
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'+' | b'(' | b')' | b'-')
                 })
             {
                 return Err(OrmError::policy("SPDX identifier has an invalid format"));

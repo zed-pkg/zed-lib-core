@@ -9,9 +9,9 @@
 mod search;
 mod validation;
 
-pub use search::{EmbeddingInput, RegistrySearchHit, search_registry, semantic_search};
 #[cfg(feature = "read-write")]
 pub use search::upsert_embedding;
+pub use search::{search_registry, semantic_search, EmbeddingInput, RegistrySearchHit};
 
 #[cfg(feature = "read-write")]
 mod artifacts;
@@ -20,7 +20,7 @@ mod licenses;
 
 #[cfg(feature = "read-write")]
 pub use artifacts::{
-    PackageDownloadInput, PackageUploadInput, record_package_download, register_package_upload,
+    record_package_download, register_package_upload, PackageDownloadInput, PackageUploadInput,
 };
 #[cfg(feature = "read-write")]
-pub use licenses::{PackageLicenseInput, add_package_license};
+pub use licenses::{add_package_license, PackageLicenseInput};

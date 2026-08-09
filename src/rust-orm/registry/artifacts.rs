@@ -1,6 +1,8 @@
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, EntityTrait,
     prelude::{DateTimeWithTimeZone, Uuid},
+    ActiveModelTrait,
+    ActiveValue::Set,
+    EntityTrait,
 };
 
 use crate::{

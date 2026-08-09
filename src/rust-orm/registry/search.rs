@@ -1,14 +1,13 @@
-use sea_orm::{
-    ConnectionTrait, Statement, Value,
-    prelude::Uuid,
-};
+use sea_orm::{prelude::Uuid, ConnectionTrait, Statement, Value};
 use serde_json::{Number, Value as Json};
 
-use crate::{OrmError, ReadContext};
 #[cfg(feature = "read-write")]
 use crate::WriteContext;
+use crate::{OrmError, ReadContext};
 
-use super::validation::{embedding, embedding_model, entity_type, optional_text, sha256};
+use super::validation::{embedding, embedding_model};
+#[cfg(feature = "read-write")]
+use super::validation::{entity_type, optional_text, sha256};
 
 const TEXT_SEARCH_SQL: &str = r#"
 WITH visible_orgs AS (

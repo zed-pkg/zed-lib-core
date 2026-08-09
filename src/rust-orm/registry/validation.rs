@@ -2,11 +2,7 @@ use crate::OrmError;
 
 pub(crate) const MAX_EMBEDDING_DIMENSIONS: usize = 8_192;
 
-pub(crate) fn required_text(
-    field: &str,
-    value: &str,
-    max_bytes: usize,
-) -> Result<(), OrmError> {
+pub(crate) fn required_text(field: &str, value: &str, max_bytes: usize) -> Result<(), OrmError> {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.len() > max_bytes {
         Err(OrmError::policy(format!(
@@ -84,10 +80,9 @@ pub(crate) fn sha256(field: &str, value: &str) -> Result<(), OrmError> {
 
 pub(crate) fn embedding_model(value: &str) -> Result<(), OrmError> {
     required_text("embedding model", value, 120)?;
-    if value
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'/' | b'-'))
-    {
+    if value.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'/' | b'-')
+    }) {
         Ok(())
     } else {
         Err(OrmError::policy(
@@ -103,9 +98,7 @@ pub(crate) fn embedding(values: &[f32]) -> Result<(), OrmError> {
         )));
     }
     if values.iter().any(|value| !value.is_finite()) {
-        return Err(OrmError::policy(
-            "embedding values must all be finite",
-        ));
+        return Err(OrmError::policy("embedding values must all be finite"));
     }
     let norm_squared = values
         .iter()
