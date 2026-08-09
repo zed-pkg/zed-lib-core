@@ -42,18 +42,19 @@ class PackageContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("contracts are consistent", result.stdout)
 
-    def test_invalid_native_registry_is_rejected(self) -> None:
+    def test_root_target_native_release_route_is_rejected(self) -> None:
         fixture = self.fixture()
         manifest = fixture / ".zpkg.toml"
         manifest.write_text(
-            manifest.read_text(encoding="utf-8").replace(
-                'registry = "crates-io"', 'registry = "crates.io"'
-            ),
+            manifest.read_text(encoding="utf-8")
+            + "\n[targets.rust.native]\n"
+            + 'registry = "crates-io"\n'
+            + 'package = "zed-lock"\n',
             encoding="utf-8",
         )
         result = self.run_checker(fixture)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("native.registry", result.stderr)
+        self.assertIn("must not declare native release metadata", result.stderr)
 
     def test_empty_zed_lock_placeholder_is_rejected(self) -> None:
         fixture = self.fixture()

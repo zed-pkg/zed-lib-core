@@ -86,11 +86,12 @@ def main() -> int:
             errors.append("targets.rust.dir must be the repository root")
         if rust_target.get("adapter") != "rust":
             errors.append("targets.rust.adapter must be 'rust'")
-        native = rust_target.get("native", {})
-        if native.get("registry") != "crates-io":
-            errors.append("targets.rust.native.registry must be 'crates-io'")
-        if native.get("package") != "zed-lock":
-            errors.append("targets.rust.native.package must be 'zed-lock'")
+        if "native" in rust_target:
+            errors.append(
+                "targets.rust must not declare native release metadata: a dir='.' "
+                "target is the canonical Zed repository package, while cargo publish "
+                "remains an independent crates.io release operation"
+            )
 
     placeholder_lock = ROOT / ".zpkg.lock"
     if placeholder_lock.exists():
