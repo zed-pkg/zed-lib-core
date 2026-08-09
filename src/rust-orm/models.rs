@@ -4,7 +4,10 @@ use sea_orm::prelude::{Json, Uuid};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionIdentity {
-    pub subject: String,
+    /// `shared_auth.principals.shared_user_id` on the realm's auth instance.
+    pub subject: Uuid,
+    /// Which auth instance that principal lives on: `customer` or `admin`.
+    pub realm: String,
     pub email: Option<String>,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
@@ -13,7 +16,8 @@ pub struct SessionIdentity {
 #[derive(Clone, Debug, PartialEq)]
 pub struct UserSummary {
     pub id: Uuid,
-    pub subject: String,
+    pub subject: Uuid,
+    pub realm: String,
     pub email: Option<String>,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
@@ -52,6 +56,9 @@ pub struct PackageSummary {
     pub visibility: String,
     pub repo_url: String,
     pub config: Json,
+    pub latest_version: Option<String>,
+    pub download_count: i64,
+    pub version_count: i32,
 }
 
 #[derive(Clone, Debug, PartialEq)]

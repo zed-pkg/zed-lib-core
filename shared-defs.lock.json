@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/ORESoftware/k8s-libs-and-shared-defs",
+  "revision": "c8bdc06d74746acc6439f9527ebd02697fdf028b",
+  "org_slice": "zed-pkg",
+  "schema": "public",
+  "table_prefix": "zed_",
+  "registry_segment": "pg-defs/schema/orgs/zed-pkg/registry.sql",
+  "vendored_copy": "src/rust-orm/sql/registry.sql",
+  "generated_adapter": "pg-defs/generated/rust/sea-orm",
+  "generated_crate": "dd-pg-defs-sea-orm",
+  "policy": "The registry tables are defined by the reviewed segment above and applied verbatim by src/rust-orm/migrations.rs. Do not author an independent schema in this crate. The registry lives in `public` behind the zed_ prefix rather than a dedicated schema because the pg-defs contract tooling keys tables by bare name; see the segment README."
+}

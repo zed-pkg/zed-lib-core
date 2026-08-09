@@ -1,106 +1,87 @@
-# zed-lib
+# zed-lib-core
 
-Implementations of the [zed-pkg](https://github.com/zed-pkg) contract defined
-in [zed-interfaces](https://github.com/zed-pkg/zed-interfaces).
+Canonical core library for the **zed-pkg** registry. This repository is the
+merge of two predecessors — `zed-pkg/zed-lib` (resolution + registry entities)
+and `zed-pkg/zed-orm-core` (the opaque role-aware query boundary) — into one
+package, with both histories preserved.
 
-```
-zed-interfaces   shape     types, serialization, validation
-      ▲
-      │ depends on
-      │
-zed-lib          behavior  resolution, planning, policy
-      ▲
-      │ depends on
-      │
-zed-cli, zed-api-server, zed-web-server, the front ends
-```
+`zed-lib-core` is itself a zed package: see `.zpkg.toml`.
 
-`zed-interfaces` answers *is this document well-formed?* — it is on the compile
-path of every service and client, so it stays cheap and free of opinion.
-`zed-lib` answers *what does it mean?* — the logic that composes those types
-into decisions.
+## Layout
 
-## What is here today
+| Path | Package | What it is |
+| --- | --- | --- |
+| `src/rust-orm` | `zed-orm-core` | SeaORM registry entities, named read/write operations, the migration runner, and the opaque connection boundary |
+| `src/rust` | `zed-lib` | Version resolution and policy over the shared contract types |
+| `src/ts` | `@zed-pkg/zed-lib` | The same resolution behavior, natively in TypeScript |
+| `src/dart` | `zed_lib` | The same resolution behavior, natively in Dart |
+| `conformance` | `zed-lib-conformance` | The shared corpus all three are held to |
 
-`resolve` — scheme-aware version resolution against registry metadata.
-`zed_interfaces::version::resolve` takes a bare list of version strings and so
-cannot know that a package declared itself `opaque`; resolving one of those
-through semver range algebra installs something its publisher never promised.
-This takes the whole `PackageMetadata`, lets the package's own `VersionScheme`
-decide how the requirement is read, and distinguishes the three ways resolution
-fails instead of collapsing them into `None`:
+## The data plane (`src/rust-orm`)
 
-```rust
-use zed_lib::{ResolveError, latest_stable, resolve_version};
+Three rules define the crate:
 
-let version = resolve_version(&metadata, "^1.2")?;   // "1.4.0", as published
-let newest = latest_stable(&metadata);               // ignores prereleases
-```
+1. **The schema is not ours.** Every table is defined in
+   `pg-defs/schema/orgs/zed-pkg/registry.sql` in
+   [`k8s-libs-and-shared-defs`](https://github.com/ORESoftware/k8s-libs-and-shared-defs)
+   at the revision pinned in `shared-defs.lock.json`. That file is vendored to
+   `src/rust-orm/sql/registry.sql` and applied verbatim; this crate authors no
+   DDL of its own.
+2. **Raw sessions do not escape.** Consumers get an opaque `ReadContext` or
+   `WriteContext` and call named operations in `read`/`write`. SeaORM
+   connections and query builders stay private to the crate.
+3. **Writes are opt-in.** Default builds cannot compile a write symbol
+   (`compile_fail` doctests prove it). API servers enable `read-write`; only the
+   discrete DPM migration job enables `migrate`. The feature split expresses
+   intent — the authoritative control is the database principal, because Cargo
+   features are additive across a dependency graph.
 
-| failure               | means                                              |
-| --------------------- | -------------------------------------------------- |
-| `no_versions`         | the package exists but has nothing installable      |
-| `invalid_requirement` | the requirement cannot mean anything here (`^1.x.y`, or a range against an opaque package) |
-| `unsatisfied`         | a good requirement nothing published satisfies      |
+### Where the tables live
 
-## Three implementations, one corpus
+`public`, behind a `zed_` prefix — not a dedicated schema. The pg-defs contract
+tooling keys tables by **bare** name (`sql-contract.mjs` rejects duplicates;
+`generate.mjs` derives every generated identifier from it), so a `zed` schema
+would produce `orgs`/`users`/`projects` that collide with the `fiducia` schema
+across the generated adapters. Use `schema::qualified()` rather than
+interpolating table names.
 
-```
-zed-lib/
-  src/rust/            the crate (Cargo.toml lives here)
-  src/dart/            native Dart implementation (package:zed_lib)
-  src/ts/              native TypeScript implementation (@zed-pkg/zed-lib)
-  conformance/cases/   language-neutral corpus all three must pass
-  Cargo.toml           virtual workspace, members = ["src/rust"]
-  .zpkg.toml           one package, one slice per language + the corpus
-```
+### Identity
 
-The Dart and TypeScript slices are **not bindings**. Each is a native
-implementation of the same algebra, and each runs
-[`conformance/cases/*.json`](conformance) — so "the CLI resolved 1.4.0 but the
-web UI offered 2.0.0" is a failing test in one of them rather than a support
-ticket.
+Supabase Auth is the identity provider. `shared-auth-server.rs` verifies the
+Supabase JWT, owns the principal, and issues the session cookie — customer
+principals on the `customer-auth` RDS instance, operator/admin principals on
+`admin-auth`. **No session state lives in the registry.**
 
-All three are dependency-free on purpose. `pub_semver` and npm's `semver` each
-implement a *different dialect* from Cargo's, and they disagree exactly where
-it hurts:
+A principal maps to exactly one registry user through
+`zed_users.shared_auth_subject` + `zed_users.auth_realm`. Those instances are
+separate databases, so there is deliberately no foreign key;
+`write::upsert_user_from_session` is what keeps the two planes consistent.
 
-| requirement | Cargo (and zed) | npm `semver` | `pub_semver` |
-| ----------- | --------------- | ------------ | ------------ |
-| `1.0.0`     | `>=1.0.0 <2.0.0` | exactly `1.0.0` | exactly `1.0.0` |
-| `1.2`       | `>=1.2.0 <2.0.0` | `>=1.2.0 <1.3.0` | — |
-| `1.2.*`     | `>=1.2.0 <1.3.0` | same | — |
+### The private → public promotion rule
 
-Three implementations of one contract cannot afford a translation layer whose
-edge cases nobody reads, so the algebra is written out in each language and the
-corpus proves they agree.
+A private package may be made public only while it is at most **10 days old**
+and has at most **50 recorded downloads**.
 
-## Migrating behavior out of zed-interfaces
+Enforcement is in the database: `zed_packages_visibility_guard` re-evaluates the
+rule inside the UPDATE and raises the dedicated SQLSTATEs `ZD001` (too old) and
+`ZD002` (too many downloads). `write::set_package_visibility` pre-checks the
+same limits so a user gets a clear message instead of a raw exception, and
+`OrmError::from_db_err` maps those SQLSTATEs to typed variants so a promotion
+that races past the pre-check still surfaces as the same client error.
 
-Behavior that lives in `zed-interfaces` today — `version` parsing, `excludes`
-matching, `language` detection — moves here one module at a time. Each move is
-a breaking change for the interface crate, so it is tracked as its own ticket
-and lands with its consumers updated. **Do not copy a module here while it still
-exists there**; depend on it until it moves, so the two can never disagree.
+The limits are read from `zed_public_conversion_max_age_days()` and
+`zed_public_conversion_max_downloads()` rather than hardcoded, so the policy
+changes in one place. Both layers use `>` rather than `>=`: a package sitting
+exactly on a boundary still promotes.
 
 ## Development
 
-Sibling checkouts, like the rest of the org:
-
 ```sh
-git clone https://github.com/zed-pkg/zed-interfaces
-git clone https://github.com/zed-pkg/zed-lib
-cd zed-lib
-
-cargo test                                        # Rust slice + corpus
-(cd src/dart && dart pub get && dart test)        # Dart slice + corpus
-(cd src/ts   && npm install && npm test)          # TypeScript slice + corpus
+cargo test  -p zed-orm-core --all-features   # entities, policy, public surface
+cargo test  -p zed-orm-core                  # default read-only surface
+cargo clippy -p zed-orm-core --all-features -- -D warnings
 ```
 
-Every slice depends on its `zed-interfaces` counterpart by path until
-`zed-interfaces` publishes `0.1.0`, at which point each becomes a plain version
-requirement.
-
-## License
-
-MIT
+The live database probes (`ORM_CORE_TEST_DATABASE_URL`) are `#[ignore]` by
+default and must point at a disposable database — one of them attempts DDL to
+prove the read-only identity is denied.

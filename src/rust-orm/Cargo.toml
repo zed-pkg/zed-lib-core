@@ -1,19 +1,38 @@
 [package]
-name = "zed-orm"
+name = "zed-orm-core"
 version = "0.1.0"
-edition = "2024"
-description = "Canonical SeaORM entities, queries, and migrations for the zed-pkg registry"
+edition = "2021"
+description = "Canonical opaque SeaORM boundary, registry entities, and migrations for zed-pkg"
 license = "MIT"
-repository = "https://github.com/zed-pkg/zed-lib"
+repository = "https://github.com/zed-pkg/zed-lib-core"
 
 [lib]
+name = "zed_orm_core"
 path = "lib.rs"
 
+[features]
+# Browser-facing and other read consumers get only the opaque read context and
+# named read functions. API servers must opt into every write symbol.
+default = ["read-only"]
+read-only = []
+read-write = ["read-only"]
+# The migration runner is a separate opt-in on top of write access: only the
+# discrete DPM job should be able to compile it.
+migrate = ["read-write"]
+
 [dependencies]
-# SeaORM is the only direct data-layer dependency. Its default model-type
-# features provide UUID, JSON, and timestamp support through the prelude.
-sea-orm = { version = "1", features = [
+sea-orm = { version = "1", default-features = false, features = [
   "sqlx-postgres",
   "runtime-tokio-rustls",
   "macros",
+  "with-chrono",
+  "with-uuid",
+  "with-json",
 ] }
+
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

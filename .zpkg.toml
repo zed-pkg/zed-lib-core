@@ -1,14 +1,14 @@
 [package]
 org = "zed-pkg"
-name = "zed-lib"
+name = "zed-lib-core"
 version = "0.1.0"
-description = "Implementations of the zed-pkg interfaces: resolution and policy over the shared contract types"
+description = "Canonical zed-pkg core: SeaORM registry entities, migrations, and the role-aware query boundary, plus the polyglot resolution slices"
 license = "MIT"
-keywords = ["package-manager", "resolution", "implementation", "polyglot"]
+keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot"]
 
 [package.repository]
 vcs = "git"
-url = "https://github.com/zed-pkg/zed-lib"
+url = "https://github.com/zed-pkg/zed-lib-core"
 
 [dependencies]
 "zed-pkg/zed-interfaces" = "^0.1.0"
@@ -52,12 +52,13 @@ adapter = "rust"
 registry = "crates-io"
 package = "zed-lib"
 
-# Shared SeaORM data-access crate: role-aware connections and named query
-# functions over the org's `zed_pkg` schema. See src/rust-orm/lib.rs and
-# SERVICE_AND_DATA_ARCHITECTURE.md.
+# Canonical SeaORM data plane: opaque role-aware contexts, the registry
+# entities, and the migration runner. Merged from the former zed-orm-core repo.
+# Writes are feature-gated (`read-write`) and migrations doubly so (`migrate`);
+# see src/rust-orm/lib.rs and SERVICE_AND_DATA_ARCHITECTURE.md.
 [targets.rust-orm]
 dir = "src/rust-orm"
-name = "zed-orm"
+name = "zed-orm-core"
 adapter = "rust"
 
 # The corpus is consumable on its own: an implementation in a language zed-lib
