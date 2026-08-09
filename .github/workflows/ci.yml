@@ -44,6 +44,29 @@ jobs:
       - name: Run all Rust tests
         run: cargo test --all-targets -- --nocapture
 
+      - name: Prove local lock acquisition performs zero network syscalls
+        if: matrix.os == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v strace >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y strace
+          fi
+
+          # Compile before tracing so Cargo's registry/network behavior is not
+          # confused with zed-lock's production runtime behavior.
+          cargo build --example basic
+          trace="$RUNNER_TEMP/zed-lock-network.trace"
+          : > "$trace"
+          strace -f -qq -e trace=network -o "$trace" target/debug/examples/basic
+
+          if test -s "$trace"; then
+            echo "zed-lock local acquisition unexpectedly performed network syscalls:" >&2
+            cat "$trace" >&2
+            exit 1
+          fi
+
       - name: Deny Clippy warnings
         run: cargo clippy --all-targets -- -D warnings
 

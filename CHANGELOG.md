@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Classify Windows `LockFileEx` error 33 (`ERROR_LOCK_VIOLATION`) as
+  ordinary nonblocking contention, returning `Ok(None)` from
+  `LockManager::try_acquire` instead of a hard I/O error. This matches the
+  existing cross-platform meaning of a failed nonblocking acquisition: another
+  descriptor remains authoritative and the caller may retry or wait.
+- Retain `WouldBlock` behavior on every platform and continue to surface
+  unrelated I/O failures.
+- Cover the Windows native error directly in unit tests while retaining the
+  complete cross-process descriptor-release and protected-counter conformance
+  suite on Windows Server 2025.
+
 ## 0.1.1 — 2026-08-05
 
 Repository and release-contract hardening for the standalone locking crate.
