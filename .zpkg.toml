@@ -27,13 +27,9 @@ exclude = [
   ".DS_Store",
 ]
 
-[targets.rust]
-dir = "."
-adapter = "rust"
-
-[targets.rust.native]
-registry = "crates-io"
-package = "zed-lock"
+# This repository is already the canonical Rust package. A whole-repository
+# target must not also declare a native registry release route; crates.io
+# publication remains an independent release operation.
 
 [scripts]
 test = "cargo test --all-targets"
