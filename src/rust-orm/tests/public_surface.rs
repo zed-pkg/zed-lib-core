@@ -70,7 +70,7 @@ fn organization_invitations_use_one_typed_write_command() {
 fn shared_schema_source_is_exact_and_external() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
-        "c8bdc06d74746acc6439f9527ebd02697fdf028b",
+        "d8fb884023a26de79d4f5d533f486a2d3dbec7cc",
         "\"org_slice\": \"zed-pkg\"",
         "\"schema\": \"public\"",
         "\"table_prefix\": \"zed_\"",
