@@ -1,0 +1,175 @@
+name: add bounded server compatibility bridge
+
+on:
+  push:
+    branches:
+      - agent/den-2788-certify-semantic-merge
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: add-bounded-server-compatibility-bridge
+  cancel-in-progress: false
+
+jobs:
+  patch-validate-and-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact core head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Add the explicitly temporary compatibility surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          cargo = Path("src/rust-orm/Cargo.toml")
+          text = cargo.read_text()
+          feature_marker = 'migrate = ["read-write"]\n'
+          feature_replacement = (
+              'migrate = ["read-write"]\n'
+              '# Temporary bridge for servers that still consume the pre-merge facade.\n'
+              '# New consumers must use read/write/migrations directly.\n'
+              'legacy-api = ["read-write", "dep:zed-orm-legacy"]\n'
+          )
+          if text.count(feature_marker) != 1 or 'legacy-api =' in text:
+              raise SystemExit("src/rust-orm/Cargo.toml: feature marker is ambiguous")
+          text = text.replace(feature_marker, feature_replacement, 1)
+          dependency_marker = 'uuid = { version = "1", features = ["v4"] }\n'
+          dependency_replacement = (
+              dependency_marker
+              + 'zed-orm-legacy = { git = "https://github.com/zed-pkg/zed-lib.git", '
+                'rev = "f6f240a72eb100b858ae74f2c633d09528b61805", '
+                'package = "zed-orm", optional = true }\n'
+          )
+          if text.count(dependency_marker) != 1 or 'zed-orm-legacy' in text:
+              raise SystemExit("src/rust-orm/Cargo.toml: dependency marker is ambiguous")
+          cargo.write_text(text.replace(dependency_marker, dependency_replacement, 1))
+
+          connection = Path("src/rust-orm/connection.rs")
+          text = connection.read_text()
+          marker = '''impl WriteContext {
+              pub(crate) fn connection(&self) -> &DatabaseConnection {
+                  &self.connection
+              }
+          }'''.replace("          ", "")
+          replacement = '''impl WriteContext {
+              pub(crate) fn connection(&self) -> &DatabaseConnection {
+                  &self.connection
+              }
+
+              /// Transitional adapter for a server that already established the
+              /// role-scoped pool before calling the discrete migration command.
+              /// It remains crate-private so ordinary consumers cannot bypass the
+              /// verified `connect_read_write*` constructors.
+              pub(crate) fn from_existing_connection(connection: DatabaseConnection) -> Self {
+                  Self { connection }
+              }
+          }'''.replace("          ", "")
+          if text.count(marker) != 1 or 'from_existing_connection' in text:
+              raise SystemExit("src/rust-orm/connection.rs: WriteContext marker is ambiguous")
+          connection.write_text(text.replace(marker, replacement, 1))
+
+          lib = Path("src/rust-orm/lib.rs")
+          text = lib.read_text()
+          export_marker = '''#[cfg(feature = "migrate")]
+          pub mod migrations;
+          '''.replace("          ", "")
+          compatibility = r'''
+          /// Transitional facade for the API/web branches that predate the
+          /// history-preserving zed-lib + zed-orm-core merge. Keeping it behind
+          /// an explicit feature makes the dependency visible and removable;
+          /// new consumers must use `read`, `write`, and `migrations` directly.
+          #[cfg(feature = "legacy-api")]
+          #[doc(hidden)]
+          pub use zed_orm_legacy::{queries, registry};
+
+          /// Models returned by the temporary compatibility facade.
+          #[cfg(feature = "legacy-api")]
+          #[doc(hidden)]
+          pub mod legacy_models {
+              pub use zed_orm_legacy::models::*;
+          }
+
+          /// Entity models returned by the temporary compatibility facade.
+          #[cfg(feature = "legacy-api")]
+          #[doc(hidden)]
+          pub mod legacy_entities {
+              pub use zed_orm_legacy::entities::*;
+          }
+
+          /// Compatibility entry point for the existing `zed-api-server migrate`
+          /// command. Unlike the old facade, this always applies the reviewed,
+          /// vendored shared-definitions contract through the new migrator.
+          #[cfg(feature = "migrate")]
+          pub async fn migrate(
+              connection: &sea_orm::DatabaseConnection,
+          ) -> Result<migrations::MigrationReport, OrmError> {
+              let context = connection::WriteContext::from_existing_connection(connection.clone());
+              migrations::migrate(&context).await
+          }
+          '''.replace("          ", "")
+          if text.count(export_marker) != 1 or 'legacy_models' in text:
+              raise SystemExit("src/rust-orm/lib.rs: migration export marker is ambiguous")
+          lib.write_text(text.replace(export_marker, export_marker + compatibility, 1))
+
+          test = Path("src/rust-orm/tests/legacy_surface.rs")
+          if test.exists():
+              raise SystemExit("legacy compatibility compile test already exists")
+          test.write_text(r'''#![cfg(feature = "legacy-api")]
+
+          use zed_orm_core::{legacy_entities, legacy_models, queries, registry};
+
+          #[test]
+          fn transitional_server_facade_remains_compilable() {
+              let _ = std::any::type_name::<legacy_entities::package::Model>();
+              let _ = std::any::type_name::<legacy_models::HomePageData>();
+              let _ = registry::ensure_federated_user;
+              let _ = queries::read::home_for_user;
+          }
+          '''.replace("          ", ""))
+
+          Path(".github/workflows/zz-add-legacy-bridge.yml").unlink()
+          PY
+
+      - name: Resolve the exact legacy revision into the workspace lock
+        run: cargo check --workspace --all-targets --all-features
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+      - name: Test all feature surfaces
+        run: |
+          cargo test --locked --workspace --all-targets
+          cargo test --locked --workspace --all-targets --all-features
+          cargo test --locked --manifest-path src/rust-orm/Cargo.toml --doc
+
+      - name: Commit the validated bridge without overwriting concurrent work
+        shell: bash
+        run: |
+          set -euo pipefail
+          tested_head="$(git rev-parse HEAD)"
+          git fetch origin agent/den-2788-certify-semantic-merge
+          remote_head="$(git rev-parse origin/agent/den-2788-certify-semantic-merge)"
+          if test "$tested_head" != "$remote_head"; then
+            echo "The core branch advanced during validation; refusing an untested overwrite." >&2
+            exit 1
+          fi
+          git add -A
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(DEN-2788): bridge current servers through zed-lib-core"
+          git push origin HEAD:agent/den-2788-certify-semantic-merge
