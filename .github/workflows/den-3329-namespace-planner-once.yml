@@ -1,6 +1,5 @@
 name: certify registry namespace planner once
 
-# Trigger after GitHub has registered this branch-only certification workflow.
 on:
   push:
     branches:
@@ -28,7 +27,7 @@ defaults:
 env:
   TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   TARGET_BRANCH: alexanderdmills/den-3329-registry-namespace-planner-v1
-  ZED_INTERFACES_REF: 94976ad2097a9122e7ca2197f9205c127c599d7f
+  ZED_INTERFACES_REF: 2687d46b2049669b5d1183d9d2cbc69c63a78f61
 
 jobs:
   certify:
@@ -49,7 +48,7 @@ jobs:
           persist-credentials: true
           show-progress: false
 
-      - name: Check out exact namespace interface contract
+      - name: Check out exact merged namespace interface contract
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: zed-pkg/zed-interfaces
@@ -95,13 +94,12 @@ jobs:
       - name: Install Dart SDK
         uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
 
-      - name: Run Rust planner and corpus
+      - name: Run Rust planner and schema-aware shared corpus
         working-directory: zed-lib
         run: |
           set -euo pipefail
           cargo fmt --all
           cargo test --locked --all-targets
-          cargo test --locked --test namespace_plan_conformance
           cargo clippy --locked --all-targets -- -D warnings
           git diff --check
 
@@ -139,7 +137,7 @@ jobs:
           mapfile -t changed < <(git status --short | sed -E 's/^.. //')
           for path in "${changed[@]}"; do
             case "$path" in
-              .github/workflows/den-3329-namespace-planner-once.yml|src/rust/namespace_plan.rs|src/rust/lib.rs|tests/namespace_plan_conformance.rs|conformance/cases/registry-namespace-plans.json|src/ts/namespace-plan.ts|src/ts/namespace-plan.test.ts|src/ts/index.ts|src/ts/package.json|src/dart/lib/src/namespace_plan.dart|src/dart/lib/zed_lib.dart|src/dart/test/namespace_plan_test.dart|docs/registry-namespace-planning.md)
+              .github/workflows/den-3329-namespace-planner-once.yml|src/rust/namespace_plan.rs|src/rust/lib.rs|src/rust/tests/conformance.rs|conformance/cases/registry-namespace-plans.json|src/ts/namespace-plan.ts|src/ts/namespace-plan.test.ts|src/ts/index.ts|src/ts/package.json|src/dart/lib/src/namespace_plan.dart|src/dart/lib/zed_lib.dart|src/dart/test/namespace_plan_test.dart|docs/registry-namespace-planning.md)
                 ;;
               *)
                 echo "namespace planner validation changed an unexpected path: $path" >&2
