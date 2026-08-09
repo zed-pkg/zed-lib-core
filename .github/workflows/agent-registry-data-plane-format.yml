@@ -41,6 +41,24 @@ jobs:
         with:
           components: rustfmt,clippy
 
+      - name: Isolate write-only imports from the default read surface
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/rust-orm/registry/search.rs')
+          source = path.read_text(encoding='utf-8')
+          old = 'use super::validation::{embedding, embedding_model, entity_type, optional_text, sha256};'
+          new = '''use super::validation::{embedding, embedding_model};
+          #[cfg(feature = "read-write")]
+          use super::validation::{entity_type, optional_text, sha256};'''
+          if source.count(old) != 1:
+              raise SystemExit('expected one combined registry-validation import')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Format and verify all Rust surfaces
         working-directory: zed-lib
         run: |
@@ -63,5 +81,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/rust-orm/registry
           git diff --cached --check
-          git commit -m 'style(DEN-2788): format the canonical registry data plane'
+          git commit -m 'fix(DEN-2788): isolate and format the registry data plane'
           git push origin HEAD:agent/den-2788-registry-data-plane
