@@ -8,14 +8,15 @@
 //! different artifact facts is rejected.
 
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter,
-    Statement, TransactionTrait, Value,
     prelude::{Json, Uuid},
+    ActiveModelTrait,
+    ActiveValue::Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, TransactionTrait, Value,
 };
 
 use crate::{
-    OrmError, WriteContext,
     entities::{audit_log, org, package, package_upload, package_version},
+    OrmError, WriteContext,
 };
 
 const VERSION_SCHEMES: &[&str] = &["semver", "calver", "opaque"];
@@ -74,7 +75,10 @@ pub async fn adopt_machine_publish(
     // Serialize first-publish adoption by the public package coordinate. This
     // covers the partial unique indexes on active orgs/packages without relying
     // on database-error text or a find-then-insert race.
-    let lock_coordinate = format!("zed-machine-publish:{}/{}", input.org_slug, input.package_name);
+    let lock_coordinate = format!(
+        "zed-machine-publish:{}/{}",
+        input.org_slug, input.package_name
+    );
     transaction
         .execute(Statement::from_sql_and_values(
             transaction.get_database_backend(),
@@ -329,7 +333,7 @@ fn validate(input: &MachinePublishInput) -> Result<(), OrmError> {
 }
 
 fn required_text(field: &str, value: &str, maximum: usize) -> Result<(), OrmError> {
-    if value.trim().is_empty() || value.as_bytes().len() > maximum {
+    if value.trim().is_empty() || value.len() > maximum {
         Err(OrmError::policy(format!(
             "{field} is required and must be at most {maximum} bytes"
         )))
@@ -339,7 +343,7 @@ fn required_text(field: &str, value: &str, maximum: usize) -> Result<(), OrmErro
 }
 
 fn optional_text(field: &str, value: Option<&str>, maximum: usize) -> Result<(), OrmError> {
-    if value.is_some_and(|value| value.as_bytes().len() > maximum) {
+    if value.is_some_and(|value| value.len() > maximum) {
         Err(OrmError::policy(format!(
             "{field} must be at most {maximum} bytes"
         )))

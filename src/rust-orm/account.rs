@@ -7,19 +7,20 @@
 //! time-of-use gap.
 
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseTransaction,
-    EntityTrait, QueryFilter, TransactionTrait,
     prelude::{DateTimeWithTimeZone, Json, Uuid},
     sea_query::Expr,
+    ActiveModelTrait,
+    ActiveValue::Set,
+    ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, TransactionTrait,
 };
 
 use crate::{
-    OrmError, ReadContext, WriteContext,
     entities::{
-        org, org_invitation, org_member, package, package_license, package_upload,
-        package_version, project, project_invitation, project_member,
+        org, org_invitation, org_member, package, package_license, package_upload, package_version,
+        project, project_invitation, project_member,
     },
     models::InvitationReceipt,
+    OrmError, ReadContext, WriteContext,
 };
 
 const ADMIN_ROLES: &[&str] = &["owner", "admin"];
@@ -700,7 +701,11 @@ fn validate_project(input: &CreateProjectInput) -> Result<(), OrmError> {
     required_text("project slug", &input.slug, 64)?;
     required_text("project name", &input.name, 200)?;
     optional_text("project description", input.description.as_deref(), 4_096)?;
-    one_of("project visibility", &input.visibility, PROJECT_VISIBILITIES)?;
+    one_of(
+        "project visibility",
+        &input.visibility,
+        PROJECT_VISIBILITIES,
+    )?;
     json_object("project settings", &input.settings)
 }
 
@@ -846,7 +851,7 @@ fn normalize_email(value: &str) -> Result<String, OrmError> {
 }
 
 fn required_text(field: &str, value: &str, maximum: usize) -> Result<(), OrmError> {
-    if value.trim().is_empty() || value.as_bytes().len() > maximum {
+    if value.trim().is_empty() || value.len() > maximum {
         Err(OrmError::policy(format!(
             "{field} is required and must be at most {maximum} bytes"
         )))
@@ -856,7 +861,7 @@ fn required_text(field: &str, value: &str, maximum: usize) -> Result<(), OrmErro
 }
 
 fn optional_text(field: &str, value: Option<&str>, maximum: usize) -> Result<(), OrmError> {
-    if value.is_some_and(|value| value.as_bytes().len() > maximum) {
+    if value.is_some_and(|value| value.len() > maximum) {
         Err(OrmError::policy(format!(
             "{field} must be at most {maximum} bytes"
         )))
@@ -876,11 +881,7 @@ fn one_of(field: &str, value: &str, allowed: &[&str]) -> Result<(), OrmError> {
     }
 }
 
-fn optional_one_of(
-    field: &str,
-    value: Option<&str>,
-    allowed: &[&str],
-) -> Result<(), OrmError> {
+fn optional_one_of(field: &str, value: Option<&str>, allowed: &[&str]) -> Result<(), OrmError> {
     match value {
         Some(value) => one_of(field, value, allowed),
         None => Ok(()),
@@ -896,7 +897,11 @@ fn optional_nonnegative(field: &str, value: Option<i64>) -> Result<(), OrmError>
 }
 
 fn sha256(field: &str, value: &str) -> Result<(), OrmError> {
-    if value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
+    if value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
         Ok(())
     } else {
         Err(OrmError::policy(format!(

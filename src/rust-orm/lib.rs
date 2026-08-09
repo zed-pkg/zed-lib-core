@@ -59,15 +59,15 @@ pub mod write;
 pub mod migrations;
 
 pub use connection::{
-    ConnectPolicy, ReadContext, connect_read_only, connect_read_only_with_policy,
+    connect_read_only, connect_read_only_with_policy, ConnectPolicy, ReadContext,
 };
 #[cfg(feature = "read-write")]
-pub use connection::{WriteContext, connect_read_write, connect_read_write_with_policy};
+pub use connection::{connect_read_write, connect_read_write_with_policy, WriteContext};
 pub use error::{OrmError, SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS, SQLSTATE_VISIBILITY_TOO_OLD};
 pub use policy::{PromotionRefusal, VisibilityLimits};
 pub use schema::{
-    ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT, SHARED_DEFS_REVISION,
-    SHARED_DEFS_SEA_ORM_ADAPTER, TABLE_PREFIX, qualified,
+    qualified, ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT,
+    SHARED_DEFS_REVISION, SHARED_DEFS_SEA_ORM_ADAPTER, TABLE_PREFIX,
 };
 
 /// Default consumers cannot import write symbols. This doctest is compiled only
