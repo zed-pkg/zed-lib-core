@@ -12,8 +12,9 @@
 //!    authors none of its own.
 //! 2. **Raw sessions do not escape.** Consumers receive an opaque
 //!    [`ReadContext`] or [`WriteContext`] and call named operations in [`read`],
-//!    [`registry`], [`write`], and the feature-gated [`invitations`] module.
-//!    SeaORM entities and query builders stay private.
+//!    [`registry`], [`write`], and the feature-gated [`account`],
+//!    [`invitations`], and [`publication`] modules. SeaORM entities and query
+//!    builders stay private.
 //! 3. **Writes are opt-in.** Default builds cannot compile a write symbol; API
 //!    servers must enable `read-write`, and only the discrete migration job
 //!    enables `migrate`. The feature split expresses intent — the authoritative
@@ -46,7 +47,11 @@ pub mod entities;
 pub mod models;
 
 #[cfg(feature = "read-write")]
+pub mod account;
+#[cfg(feature = "read-write")]
 pub mod invitations;
+#[cfg(feature = "read-write")]
+pub mod publication;
 #[cfg(feature = "read-write")]
 pub mod write;
 
@@ -54,15 +59,15 @@ pub mod write;
 pub mod migrations;
 
 pub use connection::{
-    connect_read_only, connect_read_only_with_policy, ConnectPolicy, ReadContext,
+    ConnectPolicy, ReadContext, connect_read_only, connect_read_only_with_policy,
 };
 #[cfg(feature = "read-write")]
-pub use connection::{connect_read_write, connect_read_write_with_policy, WriteContext};
+pub use connection::{WriteContext, connect_read_write, connect_read_write_with_policy};
 pub use error::{OrmError, SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS, SQLSTATE_VISIBILITY_TOO_OLD};
 pub use policy::{PromotionRefusal, VisibilityLimits};
 pub use schema::{
-    qualified, ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT,
-    SHARED_DEFS_REVISION, SHARED_DEFS_SEA_ORM_ADAPTER, TABLE_PREFIX,
+    ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT, SHARED_DEFS_REVISION,
+    SHARED_DEFS_SEA_ORM_ADAPTER, TABLE_PREFIX, qualified,
 };
 
 /// Default consumers cannot import write symbols. This doctest is compiled only
@@ -70,7 +75,7 @@ pub use schema::{
 #[cfg(not(feature = "read-write"))]
 #[doc = r#"
 ```compile_fail
-use zed_orm_core::{connect_read_write, invitations, write, WriteContext};
+use zed_orm_core::{account, connect_read_write, invitations, publication, write, WriteContext};
 ```
 "#]
 pub mod default_surface_compile_fail {}
