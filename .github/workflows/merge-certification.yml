@@ -37,26 +37,44 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
+
 jobs:
   certify:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check out canonical core with full merge history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          path: zed-lib
           fetch-depth: 0
           persist-credentials: false
+      - name: Check out the immutable interfaces dependency as a sibling
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_POLYGLOT_REF }}
+          path: zed-interfaces
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify immutable interfaces pin
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
         with:
           toolchain: stable
           components: rustfmt, clippy
       - name: Certify source histories, shared schema, Zed package, API routes and R2 boundary
+        working-directory: zed-lib
         run: |
           python3 -m py_compile scripts/check-merge-contract.py
           python3 scripts/check-merge-contract.py
       - name: Validate route contract JSON
+        working-directory: zed-lib
         run: python3 -m json.tool contracts/api-routes.v1.json >/dev/null
       - name: Validate both ORM feature surfaces
+        working-directory: zed-lib
         run: |
           cargo fmt --manifest-path src/rust-orm/Cargo.toml --all -- --check
           cargo clippy --locked --manifest-path src/rust-orm/Cargo.toml --all-targets --all-features -- -D warnings
@@ -64,6 +82,7 @@ jobs:
           cargo test --locked --manifest-path src/rust-orm/Cargo.toml --all-targets --all-features
           cargo test --locked --manifest-path src/rust-orm/Cargo.toml --doc
       - name: Ensure release provenance is never fabricated
+        working-directory: zed-lib
         shell: bash
         run: |
           set -euo pipefail
