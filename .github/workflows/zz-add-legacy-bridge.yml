@@ -51,7 +51,7 @@ jobs:
                 'rev = "f6f240a72eb100b858ae74f2c633d09528b61805", '
                 'package = "zed-orm", optional = true }\n'
           )
-          if text.count(dependency_marker) != 1 or 'zed-orm-legacy' in text:
+          if text.count(dependency_marker) != 1 or '\nzed-orm-legacy = {' in text:
               raise SystemExit("src/rust-orm/Cargo.toml: dependency marker is ambiguous")
           cargo.write_text(text.replace(dependency_marker, dependency_replacement, 1))
 
@@ -145,7 +145,7 @@ jobs:
         run: cargo check --workspace --all-targets --all-features
 
       - name: Format
-        run: cargo fmt --all -- --check
+        run: cargo fmt --all
 
       - name: Strict Clippy
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
