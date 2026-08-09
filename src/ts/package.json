@@ -24,7 +24,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test conformance.test.ts"
+    "test": "node --test *.test.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0"
