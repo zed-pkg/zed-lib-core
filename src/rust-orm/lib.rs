@@ -54,9 +54,7 @@ pub use connection::{
 };
 #[cfg(feature = "read-write")]
 pub use connection::{connect_read_write, connect_read_write_with_policy, WriteContext};
-pub use error::{
-    OrmError, SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS, SQLSTATE_VISIBILITY_TOO_OLD,
-};
+pub use error::{OrmError, SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS, SQLSTATE_VISIBILITY_TOO_OLD};
 pub use policy::{PromotionRefusal, VisibilityLimits};
 pub use schema::{
     qualified, ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT,

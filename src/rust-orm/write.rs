@@ -309,18 +309,39 @@ pub async fn record_download(
     Ok(())
 }
 
+/// Complete, validated-by-the-caller command for creating one organization
+/// invitation.
+///
+/// The one-time token and its digest deliberately travel together through a
+/// single typed boundary. The persistence layer stores only `token_hash`; the
+/// plaintext token exists solely so it can be returned once in the receipt.
+#[derive(Debug, Clone)]
+pub struct OrgInvitationInput<'a> {
+    pub org_id: uuid::Uuid,
+    pub invited_by_user_id: uuid::Uuid,
+    pub email: &'a str,
+    pub role: &'a str,
+    pub token: &'a str,
+    pub token_hash: &'a str,
+    pub expires_at: sea_orm::prelude::DateTimeWithTimeZone,
+}
+
 /// Invite someone to an org. The caller receives the one-time token; only its
 /// SHA-256 digest is stored, so a database read cannot be replayed as an invite.
 pub async fn invite_to_org(
     context: &WriteContext,
-    org_id: uuid::Uuid,
-    invited_by_user_id: uuid::Uuid,
-    email: &str,
-    role: &str,
-    token: &str,
-    token_hash: &str,
-    expires_at: sea_orm::prelude::DateTimeWithTimeZone,
+    invitation: OrgInvitationInput<'_>,
 ) -> Result<InvitationReceipt, OrmError> {
+    let OrgInvitationInput {
+        org_id,
+        invited_by_user_id,
+        email,
+        role,
+        token,
+        token_hash,
+        expires_at,
+    } = invitation;
+
     let created = org_invitation::ActiveModel {
         id: Set(uuid::Uuid::new_v4()),
         org_id: Set(org_id),

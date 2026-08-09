@@ -82,7 +82,10 @@ impl VisibilityLimits {
 /// Why a package cannot be made public, phrased for a user rather than a log.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PromotionRefusal {
-    TooOld { age_days: f64, max_age_days: i32 },
+    TooOld {
+        age_days: f64,
+        max_age_days: i32,
+    },
     TooManyDownloads {
         download_count: i64,
         max_downloads: i64,

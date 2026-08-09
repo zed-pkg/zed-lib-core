@@ -1,0 +1,109 @@
+name: semantic merge certification
+
+on:
+  pull_request:
+    paths:
+      - '.zpkg.toml'
+      - '.zpkg.lock'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'MERGE_PROVENANCE.md'
+      - 'ROUTES.md'
+      - 'contracts/api-routes.v1.json'
+      - 'shared-defs.lock.json'
+      - 'scripts/check-merge-contract.py'
+      - 'src/rust-orm/**'
+      - '.github/workflows/merge-certification.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.zpkg.toml'
+      - '.zpkg.lock'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'MERGE_PROVENANCE.md'
+      - 'ROUTES.md'
+      - 'contracts/api-routes.v1.json'
+      - 'shared-defs.lock.json'
+      - 'scripts/check-merge-contract.py'
+      - 'src/rust-orm/**'
+      - '.github/workflows/merge-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out canonical core with full merge history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: zed-lib
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the immutable interfaces dependency as a sibling
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_POLYGLOT_REF }}
+          path: zed-interfaces
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify immutable interfaces pin
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Certify source histories, shared schema, Zed package, API routes and R2 boundary
+        working-directory: zed-lib
+        run: |
+          python3 -m py_compile scripts/check-merge-contract.py
+          python3 scripts/check-merge-contract.py
+      - name: Validate route contract JSON
+        working-directory: zed-lib
+        run: python3 -m json.tool contracts/api-routes.v1.json >/dev/null
+      - name: Validate both ORM feature surfaces
+        working-directory: zed-lib
+        run: |
+          cargo fmt --manifest-path src/rust-orm/Cargo.toml --all -- --check
+          cargo clippy --locked --manifest-path src/rust-orm/Cargo.toml --all-targets --all-features -- -D warnings
+          cargo test --locked --manifest-path src/rust-orm/Cargo.toml --all-targets
+          cargo test --locked --manifest-path src/rust-orm/Cargo.toml --all-targets --all-features
+          cargo test --locked --manifest-path src/rust-orm/Cargo.toml --doc
+      - name: Ensure release provenance is never fabricated
+        working-directory: zed-lib
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f .zpkg.lock; then
+            python3 - <<'PY'
+          import pathlib
+          import re
+          import tomllib
+          lock = tomllib.loads(pathlib.Path('.zpkg.lock').read_text())
+          packages = lock.get('package', [])
+          assert packages
+          for package in packages:
+              assert re.fullmatch(r'[0-9a-f]{64}', package['sha256'])
+              assert package['sha256'] != '0' * 64
+              assert package['size'] > 0
+              assert package['format'] in {'tar.gz', 'tar.zst', 'zip'}
+              assert re.fullmatch(r'[0-9a-f]{40}', package['vcs_commit'])
+              assert package['vcs_tag']
+              assert package['source']
+          PY
+          else
+            echo 'No .zpkg.lock is committed; release remains blocked on real immutable resolution.'
+          fi
+          git diff --check

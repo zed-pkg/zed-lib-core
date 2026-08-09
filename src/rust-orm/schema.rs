@@ -76,7 +76,10 @@ mod tests {
             "zed_projects;drop",
             "zed-projects",
         ] {
-            assert!(qualified(invalid).is_err(), "{invalid:?} should be rejected");
+            assert!(
+                qualified(invalid).is_err(),
+                "{invalid:?} should be rejected"
+            );
         }
     }
 }
