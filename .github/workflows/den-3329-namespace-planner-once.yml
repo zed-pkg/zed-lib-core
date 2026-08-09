@@ -1,5 +1,6 @@
 name: certify registry namespace planner once
 
+# Trigger after GitHub has registered this branch-only certification workflow.
 on:
   push:
     branches:
@@ -86,7 +87,7 @@ jobs:
           dart.write_text(text.replace(old, new), encoding='utf-8')
           PY
 
-      - name: Install Rust, Node, and Dart toolchains
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           components: rustfmt,clippy
