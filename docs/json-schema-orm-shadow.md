@@ -35,6 +35,14 @@ The ORM files are adapters. They do not own migrations. In particular, Ent
 models use `entsql.Skip()` and composite-key tables are emitted as `ent.View`
 models so Ent cannot inject a synthetic key or mutate the schema.
 
+The relationship projection is intentionally incomplete: production SQL has
+34 foreign keys and 34 explicit `ON DELETE` actions, while the current JSON
+Schema models 13 relationships and no referential actions. The other 21
+foreign keys and all deletion behavior remain owned by `registry.sql`; the
+generated shadow DDL uses dialect defaults and must not be used as a semantic
+substitute. `schema/import.lock.json` pins these counts so the gap cannot grow
+or be described as complete accidentally.
+
 ## Interface ownership
 
 `zed-interfaces` remains the sole owner of wire contracts. The lock file binds
@@ -57,7 +65,8 @@ second API contract.
 `tools/check-schema-shadow.mjs` fails when any of these change without a
 semantic reconciliation in the same commit:
 
-1. the immutable `zed-interfaces` revision or schema-index blob;
+1. the immutable `zed-interfaces` revision, schema-index blob, bound schema
+   paths, and bound schema titles;
 2. the production SQL Git-blob identity;
 3. any of the 15 SeaORM entity source blob identities;
 4. a SeaORM table name, field, Rust type, or nullability;
@@ -75,11 +84,13 @@ the lock.
 ```bash
 node tools/schema-shadow-codegen.mjs
 node tools/schema-shadow-codegen.mjs --check
-node tools/check-schema-shadow.mjs
+node tools/check-schema-shadow.mjs . ../zed-interfaces
 node --test tests/schema-shadow.test.mjs
 ```
 
 Generation requires Node.js and `gofmt`; it has no npm dependency install step.
+The drift check also requires a sibling checkout of `zed-pkg/zed-interfaces`
+containing the locked revision. CI fetches that exact revision independently.
 
 ## Promotion gate
 

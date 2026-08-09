@@ -30,7 +30,7 @@
     "dart/stormberry/models.dart": "93424abdf1ad641120ef8867064be2dcb41416c0ceed3ab54ae3428cc6c37a74",
     "go/ent/schema/entities.go": "455fb525a17f8a4e8bbf91ad6ef745be567c6d0a1d5ca647a34fe89d702079e6",
     "go/gorm/models.go": "86aff65deb308f60cd27ae391d2beda46de21bd6fef5565a0e23b8ffac184145",
-    "node/drizzle/schema.ts": "192e286e8d02e52b32581212fb61a742a83900b3db41d0e8b52215d666d11a69",
+    "node/drizzle/schema.ts": "528f5113c1aee0e0e4a4a2e32840d0aa5c548bb90d97da847e457a3a138e0b78",
     "node/prisma/schema.prisma": "72c86f5cbd18e7c5b70a868ef366ebe709c8725c339357ccc7410eacd6d7c528",
     "node/typeorm/entities.ts": "808b05ce61b839d5a4f7411afe4b81afbd7947f6c7f7fe6cd6418673656abe03",
     "rust/sea-orm/entities.rs": "568ed2a014f626aaca13dafe51a4a91a4dd88ee1410a558772c9fded9022f40a",
@@ -44,6 +44,6 @@
   "productionSql": "src/rust-orm/sql/registry.sql",
   "productionSqlBlobSha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
-  "schemaSha256": "2b8283ab0f3ac16f29eea2e890e9d3c9ef1586317f8d16168e9e2b339a8c5f28",
+  "schemaSha256": "655843992c6b16a26496de0a0560ff538dfc62fd7451573bd8881c6e98e499c6",
   "warning": "SHADOW ONLY. Production migration authority remains src/rust-orm/sql/registry.sql."
 }
