@@ -77,9 +77,10 @@ f6f240a72eb100b858ae74f2c633d09528b61805
 ```
 
 The canonical implementation is reviewed in
-[`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3). The old branch
-was based on a transitional schema and raw SeaORM sessions. Its substantive
-requirements map as follows.
+[`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3) and is tested
+under both the default read-only crate surface and the explicit `read-write`
+surface. The old branch was based on a transitional schema and raw SeaORM
+sessions. Its substantive requirements map as follows.
 
 | Predecessor item | Canonical disposition |
 | --- | --- |
