@@ -33,6 +33,8 @@ jobs:
           echo 'cdfe16d17324fd40a5a4e1a3e5bc05aa966c1f15286b5f8c8ded17f402249588  /tmp/zed-schema-shadow.b64' | sha256sum -c -
           base64 --decode /tmp/zed-schema-shadow.b64 > /tmp/zed-schema-shadow.tar.gz
           echo '91077964b840b23fd30b467aa8a0079cb3bb7cc6fa2f390042008d949e5ae7a0  /tmp/zed-schema-shadow.tar.gz' | sha256sum -c -
+          cp .schema-shadow-bootstrap/check-schema-shadow.mjs /tmp/check-schema-shadow.mjs
+          echo '6d8a38946f35c9e81873949e24dfbce73369457c34c2ffab0c27e8ade4e7622e  /tmp/check-schema-shadow.mjs' | sha256sum -c -
 
       - name: Apply payload to clean branch
         shell: bash
@@ -42,6 +44,7 @@ jobs:
           git fetch origin "refs/heads/${target}:refs/remotes/origin/${target}"
           git switch --force-create "${target}" "origin/${target}"
           tar -xzf /tmp/zed-schema-shadow.tar.gz
+          install -m 0755 /tmp/check-schema-shadow.mjs tools/check-schema-shadow.mjs
           test ! -e .schema-shadow-bootstrap
           test ! -e .github/workflows/schema-shadow-bootstrap.yml
 
