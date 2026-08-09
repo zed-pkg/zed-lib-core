@@ -1,5 +1,6 @@
 name: certify registry namespace planner once
 
+# Exact-head rerun after pinning normal CI to the merged interface contract.
 on:
   push:
     branches:
@@ -137,7 +138,7 @@ jobs:
           mapfile -t changed < <(git status --short | sed -E 's/^.. //')
           for path in "${changed[@]}"; do
             case "$path" in
-              .github/workflows/den-3329-namespace-planner-once.yml|src/rust/namespace_plan.rs|src/rust/lib.rs|src/rust/tests/conformance.rs|conformance/cases/registry-namespace-plans.json|src/ts/namespace-plan.ts|src/ts/namespace-plan.test.ts|src/ts/index.ts|src/ts/package.json|src/dart/lib/src/namespace_plan.dart|src/dart/lib/zed_lib.dart|src/dart/test/namespace_plan_test.dart|docs/registry-namespace-planning.md)
+              .github/workflows/den-3329-namespace-planner-once.yml|src/rust/namespace_plan.rs|src/rust/lib.rs|src/rust/tests/conformance.rs|conformance/cases/registry-namespace-plans.json|src/ts/namespace-plan.ts|src/ts/namespace-plan.test.ts|src/ts/index.ts|src/ts/package.json|src/dart/lib/src/namespace_plan.dart|src/dart/lib/zed_lib.dart|src/dart/test/namespace_plan_test.dart|docs/registry-namespace-planning.md|.github/workflows/ci.yml|.github/workflows/merge-certification.yml)
                 ;;
               *)
                 echo "namespace planner validation changed an unexpected path: $path" >&2
