@@ -87,6 +87,30 @@ pub struct InvitationReceipt {
     pub role: String,
 }
 
+/// Service-neutral destination returned after one invitation is consumed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InvitationTarget {
+    Organization {
+        org_id: Uuid,
+        org_slug: String,
+    },
+    Project {
+        org_id: Uuid,
+        org_slug: String,
+        project_id: Uuid,
+        project_slug: String,
+    },
+}
+
+/// Durable result of an atomic invitation-consumption transaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InvitationAcceptance {
+    pub invitation_id: Uuid,
+    pub user_id: Uuid,
+    pub role: String,
+    pub target: InvitationTarget,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct PackageSettingsInput {
     pub description: Option<String>,
