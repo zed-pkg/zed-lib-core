@@ -13,6 +13,9 @@ on:
       - 'shared-defs.lock.json'
       - 'scripts/check-merge-contract.py'
       - 'src/rust-orm/**'
+      - 'src/rust/namespace_plan.rs'
+      - 'src/rust/tests/conformance.rs'
+      - 'conformance/cases/registry-namespace-plans.json'
       - '.github/workflows/merge-certification.yml'
   push:
     branches: [main]
@@ -27,6 +30,9 @@ on:
       - 'shared-defs.lock.json'
       - 'scripts/check-merge-contract.py'
       - 'src/rust-orm/**'
+      - 'src/rust/namespace_plan.rs'
+      - 'src/rust/tests/conformance.rs'
+      - 'conformance/cases/registry-namespace-plans.json'
       - '.github/workflows/merge-certification.yml'
   workflow_dispatch:
 
@@ -38,7 +44,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
+  ZED_INTERFACES_POLYGLOT_REF: 2687d46b2049669b5d1183d9d2cbc69c63a78f61
 
 jobs:
   certify:
@@ -51,7 +57,7 @@ jobs:
           path: zed-lib
           fetch-depth: 0
           persist-credentials: false
-      - name: Check out the immutable interfaces dependency as a sibling
+      - name: Check out the immutable merged interfaces dependency as a sibling
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: zed-pkg/zed-interfaces
@@ -59,8 +65,12 @@ jobs:
           path: zed-interfaces
           fetch-depth: 1
           persist-credentials: false
-      - name: Verify immutable interfaces pin
-        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
+      - name: Verify immutable interfaces pin and namespace surface
+        run: |
+          test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
+          test -f zed-interfaces/schemas/registry-namespace-plan.json
+          test -f zed-interfaces/schemas/registry-namespace-claim-receipt.json
+          grep -F 'github' zed-interfaces/schemas/registry-namespace-plan.json
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
         with:
           toolchain: stable
@@ -73,10 +83,11 @@ jobs:
       - name: Validate route contract JSON
         working-directory: zed-lib
         run: python3 -m json.tool contracts/api-routes.v1.json >/dev/null
-      - name: Validate both ORM feature surfaces
+      - name: Validate namespace planning and ORM feature surfaces
         working-directory: zed-lib
         run: |
-          cargo fmt --manifest-path src/rust-orm/Cargo.toml --all -- --check
+          cargo fmt --all -- --check
+          cargo test --locked --test conformance
           cargo clippy --locked --manifest-path src/rust-orm/Cargo.toml --all-targets --all-features -- -D warnings
           cargo test --locked --manifest-path src/rust-orm/Cargo.toml --all-targets
           cargo test --locked --manifest-path src/rust-orm/Cargo.toml --all-targets --all-features
