@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "repository": "zed-pkg/zed-interfaces",
+  "revision": "5394b2e7b070354ee79a4c6ac79c26d6264970cd",
+  "schemasIndex": {
+    "path": "schemas/index.json",
+    "blobSha": "6de1fc10c811b065d34472e26b8bf72be85fdd02"
+  },
+  "bindings": [
+    {
+      "entity": "Org",
+      "interfaceType": "ClaimOrgResponse",
+      "schema": "schemas/claim-org-response.json",
+      "role": "api-projection"
+    },
+    {
+      "entity": "Package",
+      "interfaceType": "PackageMetadata",
+      "schema": "schemas/package-metadata.json",
+      "role": "api-projection"
+    },
+    {
+      "entity": "PackageVersion",
+      "interfaceType": "VersionMetadata",
+      "schema": "schemas/version-metadata.json",
+      "role": "api-projection"
+    },
+    {
+      "entity": "AuditLog",
+      "interfaceType": "AuditLogResponse",
+      "schema": "schemas/audit-log-response.json",
+      "role": "api-projection"
+    },
+    {
+      "entity": "EntityEmbedding",
+      "interfaceType": "EmbeddingUpsertRequest",
+      "schema": "schemas/embedding-upsert-request.json",
+      "role": "write-contract"
+    }
+  ],
+  "internalPersistenceEntities": [
+    "User",
+    "OrgMember",
+    "OrgInvitation",
+    "Project",
+    "ProjectMember",
+    "ProjectInvitation",
+    "PackageLicense",
+    "PackageUpload",
+    "PackageDownload",
+    "ApiToken"
+  ],
+  "rule": "Wire DTOs stay owned by zed-interfaces. Persistence-only records remain internal; generated shared descriptors may reference them but must not publish competing wire contracts."
+}

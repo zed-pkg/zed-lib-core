@@ -1,0 +1,11 @@
+{
+  "name": "@zed-pkg/schema-orm-shadow-tooling",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node ../tools/schema-shadow-codegen.mjs",
+    "generate:check": "node ../tools/schema-shadow-codegen.mjs --check",
+    "drift:check": "node ../tools/check-schema-shadow.mjs",
+    "test": "node --test ../tests/schema-shadow.test.mjs"
+  }
+}

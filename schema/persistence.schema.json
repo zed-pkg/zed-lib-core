@@ -1,0 +1,2342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zed-pkg/zed-lib-core/blob/main/schema/persistence.schema.json",
+  "title": "Zed registry persistence shadow contract",
+  "description": "Imported from the existing SeaORM entities. Generated output is shadow-only until the explicit authority promotion gate passes.",
+  "type": "object",
+  "x-lib-core": {
+    "product": "zed",
+    "interfaces": {
+      "repository": "zed-pkg/zed-interfaces",
+      "revision": "5394b2e7b070354ee79a4c6ac79c26d6264970cd",
+      "schemasIndex": "schemas/index.json",
+      "schemasIndexBlobSha": "6de1fc10c811b065d34472e26b8bf72be85fdd02"
+    },
+    "authorityMode": "shadow-import",
+    "productionSql": "src/rust-orm/sql/registry.sql",
+    "productionSqlBlobSha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf",
+    "generatedSql": "generated/schema-orm-shadow/sql/postgres.sql",
+    "promotionGate": "docs/SCHEMA_AUTHORITY_MIGRATION.md",
+    "migrationPolicy": "generated shadow SQL MUST NOT be applied to any database"
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "User": {
+      "type": "object",
+      "description": "Local projection of a Shared Auth principal; no cross-database foreign key is allowed.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::UserRecord"
+      },
+      "x-db": {
+        "table": "zed_users",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/user.rs",
+        "sourceBlobSha": "777e4d3940f97374915940c10e23f316d8ce426a",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "sharedAuthSubject": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "shared_auth_subject"
+          }
+        },
+        "authRealm": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "auth_realm"
+          }
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "email"
+          }
+        },
+        "displayName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "display_name"
+          }
+        },
+        "avatarUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "avatar_url"
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "settings"
+          }
+        },
+        "isSoftDeleted": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "is_soft_deleted"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "sharedAuthSubject",
+        "authRealm",
+        "settings",
+        "isSoftDeleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Org": {
+      "type": "object",
+      "description": "Registry organization.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "ClaimOrgResponse"
+      },
+      "x-db": {
+        "table": "zed_orgs",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/org.rs",
+        "sourceBlobSha": "6709be8a30641a38db832a8a40bcaab207e3b6d8",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "slug": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "slug"
+          }
+        },
+        "name": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "name"
+          }
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "description"
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "settings"
+          }
+        },
+        "createdByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "created_by_user_id"
+          }
+        },
+        "isSoftDeleted": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "is_soft_deleted"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "settings",
+        "isSoftDeleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OrgMember": {
+      "type": "object",
+      "description": "Organization membership with the existing composite primary key.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::OrgMembership"
+      },
+      "x-db": {
+        "table": "zed_org_members",
+        "primaryKey": [
+          "orgId",
+          "userId"
+        ],
+        "source": "src/rust-orm/entities/org_member.rs",
+        "sourceBlobSha": "7aa052489fddd5caa683e0d2bd3f3f37c80a6ff8",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "orgId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "org_id",
+            "references": {
+              "entity": "Org",
+              "field": "id"
+            }
+          }
+        },
+        "userId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "user_id",
+            "references": {
+              "entity": "User",
+              "field": "id"
+            }
+          }
+        },
+        "role": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "role"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "orgId",
+        "userId",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OrgInvitation": {
+      "type": "object",
+      "description": "Organization invitation; only the invite-token hash is durable.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::OrgInvitation"
+      },
+      "x-db": {
+        "table": "zed_org_invitations",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/org_invitation.rs",
+        "sourceBlobSha": "0260ec3934de47b63a48a2fd0c9dc066038b79ac",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "orgId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "org_id",
+            "references": {
+              "entity": "Org",
+              "field": "id"
+            }
+          }
+        },
+        "invitedByUserId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "invited_by_user_id"
+          }
+        },
+        "email": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "email"
+          }
+        },
+        "role": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "role"
+          }
+        },
+        "tokenHash": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "token_hash"
+          }
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "expires_at"
+          }
+        },
+        "acceptedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "accepted_at"
+          }
+        },
+        "acceptedByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "accepted_by_user_id"
+          }
+        },
+        "revokedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "revoked_at"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "invitedByUserId",
+        "email",
+        "role",
+        "tokenHash",
+        "expiresAt",
+        "createdAt"
+      ]
+    },
+    "Project": {
+      "type": "object",
+      "description": "Project namespace inside an organization.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::ProjectRecord"
+      },
+      "x-db": {
+        "table": "zed_projects",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/project.rs",
+        "sourceBlobSha": "0201398f90f1516aca653447c1cea9d32089f9bc",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "orgId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "org_id",
+            "references": {
+              "entity": "Org",
+              "field": "id"
+            }
+          }
+        },
+        "slug": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "slug"
+          }
+        },
+        "name": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "name"
+          }
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "description"
+          }
+        },
+        "visibility": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "visibility"
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "settings"
+          }
+        },
+        "createdByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "created_by_user_id"
+          }
+        },
+        "isSoftDeleted": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "is_soft_deleted"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "slug",
+        "name",
+        "visibility",
+        "settings",
+        "isSoftDeleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ProjectMember": {
+      "type": "object",
+      "description": "Project membership with the existing composite primary key.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::ProjectMembership"
+      },
+      "x-db": {
+        "table": "zed_project_members",
+        "primaryKey": [
+          "projectId",
+          "userId"
+        ],
+        "source": "src/rust-orm/entities/project_member.rs",
+        "sourceBlobSha": "bade0e9132bd13947060691d34c7a01dbfabfd9e",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "project_id",
+            "references": {
+              "entity": "Project",
+              "field": "id"
+            }
+          }
+        },
+        "userId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "user_id",
+            "references": {
+              "entity": "User",
+              "field": "id"
+            }
+          }
+        },
+        "role": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "role"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "projectId",
+        "userId",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ProjectInvitation": {
+      "type": "object",
+      "description": "Project invitation; only the invite-token hash is durable.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::ProjectInvitation"
+      },
+      "x-db": {
+        "table": "zed_project_invitations",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/project_invitation.rs",
+        "sourceBlobSha": "f501d82e1347e9219f3dd53e9b5d8fc8b825471a",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "projectId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "project_id",
+            "references": {
+              "entity": "Project",
+              "field": "id"
+            }
+          }
+        },
+        "invitedByUserId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "invited_by_user_id"
+          }
+        },
+        "email": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "email"
+          }
+        },
+        "role": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "role"
+          }
+        },
+        "tokenHash": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "token_hash"
+          }
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "expires_at"
+          }
+        },
+        "acceptedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "accepted_at"
+          }
+        },
+        "acceptedByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "accepted_by_user_id"
+          }
+        },
+        "revokedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "revoked_at"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "invitedByUserId",
+        "email",
+        "role",
+        "tokenHash",
+        "expiresAt",
+        "createdAt"
+      ]
+    },
+    "Package": {
+      "type": "object",
+      "description": "Registry package. Download counters remain database-trigger maintained.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "PackageMetadata"
+      },
+      "x-db": {
+        "table": "zed_packages",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/package.rs",
+        "sourceBlobSha": "612103bba3d8dc7a516d8d41327f6b4af510e6a5",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "orgId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "org_id",
+            "references": {
+              "entity": "Org",
+              "field": "id"
+            }
+          }
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "project_id",
+            "references": {
+              "entity": "Project",
+              "field": "id"
+            }
+          }
+        },
+        "name": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "name"
+          }
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "description"
+          }
+        },
+        "visibility": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "visibility"
+          }
+        },
+        "vcs": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "vcs"
+          }
+        },
+        "repoUrl": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "repo_url"
+          }
+        },
+        "homepageUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "homepage_url"
+          }
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "keywords"
+          }
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "config"
+          }
+        },
+        "downloadCount": {
+          "type": "integer",
+          "format": "int64",
+          "x-import": {
+            "seaOrmType": "i64"
+          },
+          "x-db": {
+            "column": "download_count"
+          }
+        },
+        "versionCount": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "version_count"
+          }
+        },
+        "latestVersion": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "latest_version"
+          }
+        },
+        "firstPublishedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "first_published_at"
+          }
+        },
+        "visibilityChangedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "visibility_changed_at"
+          }
+        },
+        "createdByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "created_by_user_id"
+          }
+        },
+        "isSoftDeleted": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "is_soft_deleted"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "name",
+        "visibility",
+        "vcs",
+        "repoUrl",
+        "keywords",
+        "config",
+        "downloadCount",
+        "versionCount",
+        "isSoftDeleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PackageVersion": {
+      "type": "object",
+      "description": "Immutable package-version metadata and R2 artifact address.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "VersionMetadata"
+      },
+      "x-db": {
+        "table": "zed_package_versions",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/package_version.rs",
+        "sourceBlobSha": "8d873d435d97592742254683dbef5beadf3c76d3",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "packageId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "package_id",
+            "references": {
+              "entity": "Package",
+              "field": "id"
+            }
+          }
+        },
+        "version": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "version"
+          }
+        },
+        "versionScheme": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "version_scheme"
+          }
+        },
+        "sha256": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "sha256"
+          }
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "format": "int64",
+          "x-import": {
+            "seaOrmType": "i64"
+          },
+          "x-db": {
+            "column": "size_bytes"
+          }
+        },
+        "format": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "format"
+          }
+        },
+        "vcsTag": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "vcs_tag"
+          }
+        },
+        "vcsCommit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "vcs_commit"
+          }
+        },
+        "artifactKey": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "artifact_key"
+          }
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "manifest"
+          }
+        },
+        "downloadCount": {
+          "type": "integer",
+          "format": "int64",
+          "x-import": {
+            "seaOrmType": "i64"
+          },
+          "x-db": {
+            "column": "download_count"
+          }
+        },
+        "yanked": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "yanked"
+          }
+        },
+        "yankedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "yanked_at"
+          }
+        },
+        "yankedReason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "yanked_reason"
+          }
+        },
+        "publishedByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "published_by_user_id"
+          }
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "published_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "packageId",
+        "version",
+        "versionScheme",
+        "sha256",
+        "sizeBytes",
+        "format",
+        "artifactKey",
+        "manifest",
+        "downloadCount",
+        "yanked",
+        "publishedAt"
+      ]
+    },
+    "PackageLicense": {
+      "type": "object",
+      "description": "Package-level or version-level license metadata.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::PackageLicense"
+      },
+      "x-db": {
+        "table": "zed_package_licenses",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/package_license.rs",
+        "sourceBlobSha": "e62f0c172693665a690a9d9c63821e4f712d32c2",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "packageId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "package_id",
+            "references": {
+              "entity": "Package",
+              "field": "id"
+            }
+          }
+        },
+        "packageVersionId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "package_version_id"
+          }
+        },
+        "kind": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "kind"
+          }
+        },
+        "spdxId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "spdx_id"
+          }
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "name"
+          }
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "url"
+          }
+        },
+        "textBody": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "text_body"
+          }
+        },
+        "isPrimary": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "is_primary"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "packageId",
+        "kind",
+        "isPrimary",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PackageUpload": {
+      "type": "object",
+      "description": "Publish-attempt record retained for completed, failed, and aborted uploads.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::PublishAttempt"
+      },
+      "x-db": {
+        "table": "zed_package_uploads",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/package_upload.rs",
+        "sourceBlobSha": "ac15ec87daed81d9d4b07fe88f147e731ff4987a",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "packageId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "package_id",
+            "references": {
+              "entity": "Package",
+              "field": "id"
+            }
+          }
+        },
+        "packageVersionId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "package_version_id"
+          }
+        },
+        "requestedVersion": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "requested_version"
+          }
+        },
+        "status": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "status"
+          }
+        },
+        "storageBackend": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "storage_backend"
+          }
+        },
+        "storageKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "storage_key"
+          }
+        },
+        "format": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "format"
+          }
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "x-import": {
+            "seaOrmType": "Option<i64>"
+          },
+          "x-db": {
+            "column": "size_bytes"
+          }
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "sha256"
+          }
+        },
+        "uploadedByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "uploaded_by_user_id"
+          }
+        },
+        "apiTokenId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "api_token_id"
+          }
+        },
+        "clientIpHash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "client_ip_hash"
+          }
+        },
+        "userAgent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "user_agent"
+          }
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "error"
+          }
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "started_at"
+          }
+        },
+        "completedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "completed_at"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "packageId",
+        "requestedVersion",
+        "status",
+        "storageBackend",
+        "startedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PackageDownload": {
+      "type": "object",
+      "description": "Append-only download event; database triggers own counter updates.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::DownloadEvent"
+      },
+      "x-db": {
+        "table": "zed_package_downloads",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/package_download.rs",
+        "sourceBlobSha": "479c392ab63ab720638ab272219018db7cb4b943",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "packageId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "package_id",
+            "references": {
+              "entity": "Package",
+              "field": "id"
+            }
+          }
+        },
+        "packageVersionId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "package_version_id"
+          }
+        },
+        "downloadedByUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "downloaded_by_user_id"
+          }
+        },
+        "apiTokenId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "api_token_id"
+          }
+        },
+        "source": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "source"
+          }
+        },
+        "format": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "format"
+          }
+        },
+        "bytesSent": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "x-import": {
+            "seaOrmType": "Option<i64>"
+          },
+          "x-db": {
+            "column": "bytes_sent"
+          }
+        },
+        "clientIpHash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "client_ip_hash"
+          }
+        },
+        "userAgent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "user_agent"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "packageId",
+        "source",
+        "createdAt"
+      ]
+    },
+    "ApiToken": {
+      "type": "object",
+      "description": "API token metadata; only token hashes are durable.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::ApiToken"
+      },
+      "x-db": {
+        "table": "zed_api_tokens",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/api_token.rs",
+        "sourceBlobSha": "984bff312d81f63327ef66f962979296417f3750",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "name": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "name"
+          }
+        },
+        "tokenHash": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "token_hash"
+          }
+        },
+        "orgId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "org_id"
+          }
+        },
+        "userId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "user_id"
+          }
+        },
+        "role": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "role"
+          }
+        },
+        "lastUsedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "last_used_at"
+          }
+        },
+        "expiresAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "expires_at"
+          }
+        },
+        "revokedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "revoked_at"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "tokenHash",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AuditLog": {
+      "type": "object",
+      "description": "Append-only governance audit record.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "AuditLogResponse"
+      },
+      "x-db": {
+        "table": "zed_audit_log",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/audit_log.rs",
+        "sourceBlobSha": "736323114f072abe13a551588912fbae08e2ad08",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "orgId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "org_id"
+          }
+        },
+        "actorUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "actor_user_id"
+          }
+        },
+        "apiTokenId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "api_token_id"
+          }
+        },
+        "action": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "action"
+          }
+        },
+        "entityType": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "entity_type"
+          }
+        },
+        "entityId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "entity_id"
+          }
+        },
+        "detail": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "detail"
+          }
+        },
+        "clientIpHash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "client_ip_hash"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "action",
+        "entityType",
+        "detail",
+        "createdAt"
+      ]
+    },
+    "EntityEmbedding": {
+      "type": "object",
+      "description": "Polymorphic entity embedding stored as jsonb plus an explicit dimension count.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "EmbeddingUpsertRequest"
+      },
+      "x-db": {
+        "table": "zed_entity_embeddings",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/entity_embedding.rs",
+        "sourceBlobSha": "8601a626a0f15ecfbb12ef3b221ce01a1b6ca0e8",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "entityType": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "entity_type"
+          }
+        },
+        "entityId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "entity_id"
+          }
+        },
+        "orgId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "org_id"
+          }
+        },
+        "embeddingModel": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "embedding_model"
+          }
+        },
+        "embedding": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "embedding"
+          }
+        },
+        "embeddingDimensions": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "embedding_dimensions"
+          }
+        },
+        "contentSha256": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "content_sha256"
+          }
+        },
+        "contentPreview": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "content_preview"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "updated_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "entityType",
+        "entityId",
+        "embeddingModel",
+        "embedding",
+        "embeddingDimensions",
+        "contentSha256",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  }
+}

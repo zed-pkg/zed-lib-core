@@ -1,0 +1,76 @@
+name: Schema ORM shadow
+
+on:
+  pull_request:
+    paths:
+      - "schema/**"
+      - "tools/schema-shadow-codegen.mjs"
+      - "tools/check-schema-shadow.mjs"
+      - "tests/schema-shadow.test.mjs"
+      - "generated/schema-orm-shadow/**"
+      - "src/rust-orm/entities/**"
+      - "src/rust-orm/sql/registry.sql"
+      - "docs/json-schema-orm-shadow.md"
+      - ".github/workflows/schema-shadow.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "schema/**"
+      - "tools/schema-shadow-codegen.mjs"
+      - "tools/check-schema-shadow.mjs"
+      - "tests/schema-shadow.test.mjs"
+      - "generated/schema-orm-shadow/**"
+      - "src/rust-orm/entities/**"
+      - "src/rust-orm/sql/registry.sql"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schema-shadow-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.24.x"
+
+      - name: Validate JavaScript entrypoints
+        run: |
+          node --check tools/schema-shadow-codegen.mjs
+          node --check tools/check-schema-shadow.mjs
+          node --check tests/schema-shadow.test.mjs
+
+      - name: Run schema and adapter tests
+        run: node --test tests/schema-shadow.test.mjs
+
+      - name: Verify committed generated output
+        run: node tools/schema-shadow-codegen.mjs --check
+
+      - name: Verify SeaORM, SQL, and interface import locks
+        run: node tools/check-schema-shadow.mjs
+
+      - name: Verify canonical Go formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            diff -u "$file" <(gofmt "$file")
+          done < <(find generated/schema-orm-shadow -type f -name '*.go' -print | sort)
+
+      - name: Refuse generator drift
+        run: |
+          node tools/schema-shadow-codegen.mjs
+          git diff --exit-code -- generated/schema-orm-shadow

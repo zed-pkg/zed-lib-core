@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "mode": "shadow-import",
+  "baseRevision": "9fdc5fed96b707b99b3b02e6541060831c3d70fd",
+  "productionSql": {
+    "path": "src/rust-orm/sql/registry.sql",
+    "blobSha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf"
+  },
+  "entities": [
+    {
+      "entity": "User",
+      "table": "zed_users",
+      "source": "src/rust-orm/entities/user.rs",
+      "blobSha": "777e4d3940f97374915940c10e23f316d8ce426a"
+    },
+    {
+      "entity": "Org",
+      "table": "zed_orgs",
+      "source": "src/rust-orm/entities/org.rs",
+      "blobSha": "6709be8a30641a38db832a8a40bcaab207e3b6d8"
+    },
+    {
+      "entity": "OrgMember",
+      "table": "zed_org_members",
+      "source": "src/rust-orm/entities/org_member.rs",
+      "blobSha": "7aa052489fddd5caa683e0d2bd3f3f37c80a6ff8"
+    },
+    {
+      "entity": "OrgInvitation",
+      "table": "zed_org_invitations",
+      "source": "src/rust-orm/entities/org_invitation.rs",
+      "blobSha": "0260ec3934de47b63a48a2fd0c9dc066038b79ac"
+    },
+    {
+      "entity": "Project",
+      "table": "zed_projects",
+      "source": "src/rust-orm/entities/project.rs",
+      "blobSha": "0201398f90f1516aca653447c1cea9d32089f9bc"
+    },
+    {
+      "entity": "ProjectMember",
+      "table": "zed_project_members",
+      "source": "src/rust-orm/entities/project_member.rs",
+      "blobSha": "bade0e9132bd13947060691d34c7a01dbfabfd9e"
+    },
+    {
+      "entity": "ProjectInvitation",
+      "table": "zed_project_invitations",
+      "source": "src/rust-orm/entities/project_invitation.rs",
+      "blobSha": "f501d82e1347e9219f3dd53e9b5d8fc8b825471a"
+    },
+    {
+      "entity": "Package",
+      "table": "zed_packages",
+      "source": "src/rust-orm/entities/package.rs",
+      "blobSha": "612103bba3d8dc7a516d8d41327f6b4af510e6a5"
+    },
+    {
+      "entity": "PackageVersion",
+      "table": "zed_package_versions",
+      "source": "src/rust-orm/entities/package_version.rs",
+      "blobSha": "8d873d435d97592742254683dbef5beadf3c76d3"
+    },
+    {
+      "entity": "PackageLicense",
+      "table": "zed_package_licenses",
+      "source": "src/rust-orm/entities/package_license.rs",
+      "blobSha": "e62f0c172693665a690a9d9c63821e4f712d32c2"
+    },
+    {
+      "entity": "PackageUpload",
+      "table": "zed_package_uploads",
+      "source": "src/rust-orm/entities/package_upload.rs",
+      "blobSha": "ac15ec87daed81d9d4b07fe88f147e731ff4987a"
+    },
+    {
+      "entity": "PackageDownload",
+      "table": "zed_package_downloads",
+      "source": "src/rust-orm/entities/package_download.rs",
+      "blobSha": "479c392ab63ab720638ab272219018db7cb4b943"
+    },
+    {
+      "entity": "ApiToken",
+      "table": "zed_api_tokens",
+      "source": "src/rust-orm/entities/api_token.rs",
+      "blobSha": "984bff312d81f63327ef66f962979296417f3750"
+    },
+    {
+      "entity": "AuditLog",
+      "table": "zed_audit_log",
+      "source": "src/rust-orm/entities/audit_log.rs",
+      "blobSha": "736323114f072abe13a551588912fbae08e2ad08"
+    },
+    {
+      "entity": "EntityEmbedding",
+      "table": "zed_entity_embeddings",
+      "source": "src/rust-orm/entities/entity_embedding.rs",
+      "blobSha": "8601a626a0f15ecfbb12ef3b221ce01a1b6ca0e8"
+    }
+  ],
+  "unmodeledProductionFeatures": [
+    "database extensions and enum/check constraints",
+    "defaults and generated values",
+    "unique, partial, expression, and search indexes",
+    "triggers and counter-maintenance functions",
+    "row-level security, grants, and ownership",
+    "migration ledger identity and irreversible data transforms"
+  ],
+  "promotionRule": "Do not replace src/rust-orm/sql/registry.sql or run generated SQL until every unmodeled feature is represented, drift is zero, a real-Postgres migration rehearsal passes, and an explicit authority-promotion PR is merged."
+}
