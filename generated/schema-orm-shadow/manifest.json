@@ -1,0 +1,49 @@
+{
+  "authorityMode": "shadow-import",
+  "entityCount": 15,
+  "entityNames": [
+    "User",
+    "Org",
+    "OrgMember",
+    "OrgInvitation",
+    "Project",
+    "ProjectMember",
+    "ProjectInvitation",
+    "Package",
+    "PackageVersion",
+    "PackageLicense",
+    "PackageUpload",
+    "PackageDownload",
+    "ApiToken",
+    "AuditLog",
+    "EntityEmbedding"
+  ],
+  "generator": "tools/schema-shadow-codegen.mjs",
+  "interfaces": {
+    "repository": "zed-pkg/zed-interfaces",
+    "revision": "5394b2e7b070354ee79a4c6ac79c26d6264970cd",
+    "schemasIndex": "schemas/index.json",
+    "schemasIndexBlobSha": "6de1fc10c811b065d34472e26b8bf72be85fdd02"
+  },
+  "outputs": {
+    "dart/drift/tables.dart": "bc4b860140e1eecca9bb64050d21b5232c28303433ad72f180678a74d4e15be3",
+    "dart/stormberry/models.dart": "93424abdf1ad641120ef8867064be2dcb41416c0ceed3ab54ae3428cc6c37a74",
+    "go/ent/schema/entities.go": "455fb525a17f8a4e8bbf91ad6ef745be567c6d0a1d5ca647a34fe89d702079e6",
+    "go/gorm/models.go": "86aff65deb308f60cd27ae391d2beda46de21bd6fef5565a0e23b8ffac184145",
+    "node/drizzle/schema.ts": "192e286e8d02e52b32581212fb61a742a83900b3db41d0e8b52215d666d11a69",
+    "node/prisma/schema.prisma": "72c86f5cbd18e7c5b70a868ef366ebe709c8725c339357ccc7410eacd6d7c528",
+    "node/typeorm/entities.ts": "808b05ce61b839d5a4f7411afe4b81afbd7947f6c7f7fe6cd6418673656abe03",
+    "rust/sea-orm/entities.rs": "568ed2a014f626aaca13dafe51a4a91a4dd88ee1410a558772c9fded9022f40a",
+    "shared/dart/entity_descriptors.dart": "1acfc163f44ea5faad806cfcf1354343314f4d0c4ee38c72dc98a80902215f9b",
+    "shared/go/entity_descriptors.go": "14219f2d02e910d578dcd238c1af2074abc7c1ab234d0c14fafa29243974024b",
+    "shared/rust/entity_descriptors.rs": "e51601f4aa7d3a4f208ca37f5ede1bf6ef0cfaecca506899d946de28959c48e0",
+    "shared/typescript/entity-descriptors.ts": "0a414070c8365368b709aceb2754429c8155f52ec35736519b99a9b68f00752b",
+    "sql/postgres.sql": "c906ea1049727f9d214aa8bc712e312140e8e15ae887f9855dc9a4d645d3960d",
+    "sql/sqlite.sql": "f5e00ff4617d5d766ddc793eeec5ef87de3f9ce9d7d5152a4c1b8f3ba152af28"
+  },
+  "productionSql": "src/rust-orm/sql/registry.sql",
+  "productionSqlBlobSha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "schemaSha256": "2b8283ab0f3ac16f29eea2e890e9d3c9ef1586317f8d16168e9e2b339a8c5f28",
+  "warning": "SHADOW ONLY. Production migration authority remains src/rust-orm/sql/registry.sql."
+}
