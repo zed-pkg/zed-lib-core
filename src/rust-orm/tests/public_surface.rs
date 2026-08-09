@@ -58,6 +58,15 @@ fn every_write_symbol_is_feature_gated() {
 }
 
 #[test]
+fn organization_invitations_use_one_typed_write_command() {
+    let write = read("write.rs");
+    assert!(write.contains("pub struct OrgInvitationInput<'a>"));
+    assert!(write.contains("invitation: OrgInvitationInput<'_>"));
+    assert!(write.contains("let OrgInvitationInput {"));
+    assert!(!write.contains("allow(clippy::too_many_arguments)"));
+}
+
+#[test]
 fn shared_schema_source_is_exact_and_external() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
