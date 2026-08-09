@@ -35,8 +35,6 @@ jobs:
           echo '91077964b840b23fd30b467aa8a0079cb3bb7cc6fa2f390042008d949e5ae7a0  /tmp/zed-schema-shadow.tar.gz' | sha256sum -c -
           cp .schema-shadow-bootstrap/check-schema-shadow.mjs /tmp/check-schema-shadow.mjs
           echo '6d8a38946f35c9e81873949e24dfbce73369457c34c2ffab0c27e8ade4e7622e  /tmp/check-schema-shadow.mjs' | sha256sum -c -
-          cp .schema-shadow-bootstrap/trim-shared-descriptor-eof.patch /tmp/trim-shared-descriptor-eof.patch
-          echo 'fdccf7bb46067889355c1405135f54b41964058b443f8c5d36ce093342257984  /tmp/trim-shared-descriptor-eof.patch' | sha256sum -c -
 
       - name: Apply payload to clean branch
         shell: bash
@@ -47,7 +45,18 @@ jobs:
           git switch --force-create "${target}" "origin/${target}"
           tar -xzf /tmp/zed-schema-shadow.tar.gz
           install -m 0755 /tmp/check-schema-shadow.mjs tools/check-schema-shadow.mjs
-          git apply /tmp/trim-shared-descriptor-eof.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tools/schema-shadow-codegen.mjs')
+          source = path.read_text(encoding='utf-8')
+          old = "  lines.push('];', '');"
+          replacement = "  lines.push('];');"
+          count = source.count(old)
+          if count != 2:
+              raise SystemExit(f'expected exactly two descriptor EOF patterns, found {count}')
+          path.write_text(source.replace(old, replacement), encoding='utf-8')
+          PY
           test ! -e .schema-shadow-bootstrap
           test ! -e .github/workflows/schema-shadow-bootstrap.yml
 
