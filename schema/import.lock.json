@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "mode": "shadow-import",
-  "baseRevision": "2e651281969ff9584312f2dd555a9e878678ae6a",
+  "baseRevision": "9fdc5fed96b707b99b3b02e6541060831c3d70fd",
   "productionSql": {
     "path": "src/rust-orm/sql/registry.sql",
     "blobSha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf"

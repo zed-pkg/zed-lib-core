@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,15 @@ function fail(message) {
 function gitBlobSha(content) {
   const bytes = Buffer.from(content, 'utf8');
   return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+}
+
+function gitRevisionBlobSha(root, revision, path) {
+  const result = spawnSync('git', ['-C', root, 'rev-parse', `${revision}:${path}`], { encoding: 'utf8' });
+  if (result.error?.code === 'ENOENT') fail('git is required to verify the shadow import revision');
+  if (result.status !== 0) {
+    fail(`cannot resolve ${path} at import revision ${revision}: ${(result.stderr || result.error || 'unknown error').toString().trim()}`);
+  }
+  return result.stdout.trim();
 }
 
 function snakeCase(value) {
@@ -148,6 +158,11 @@ function main() {
   if (!Array.isArray(importLock.unmodeledProductionFeatures) || importLock.unmodeledProductionFeatures.length < 5) {
     fail('the shadow contract must explicitly retain unmodeled production features');
   }
+  if (!/^[0-9a-f]{40}$/.test(importLock.baseRevision)) fail('the shadow import must pin a full Git revision');
+  const importedSqlSha = gitRevisionBlobSha(root, importLock.baseRevision, contract.productionSql);
+  if (importedSqlSha !== contract.productionSqlBlobSha) {
+    fail(`import revision ${importLock.baseRevision} has ${contract.productionSql} at ${importedSqlSha}, expected ${contract.productionSqlBlobSha}`);
+  }
 
   const sqlPath = resolve(root, contract.productionSql);
   const productionSql = readFileSync(sqlPath, 'utf8');
@@ -167,6 +182,10 @@ function main() {
     if (!locked) fail(`${name} is not present in the import lock`);
     if (locked.table !== db.table || locked.source !== db.source || locked.blobSha !== db.sourceBlobSha) {
       fail(`${name} import metadata differs between schema and lock`);
+    }
+    const importedSourceSha = gitRevisionBlobSha(root, importLock.baseRevision, db.source);
+    if (importedSourceSha !== db.sourceBlobSha) {
+      fail(`import revision ${importLock.baseRevision} has ${db.source} at ${importedSourceSha}, expected ${db.sourceBlobSha}`);
     }
 
     const sourcePath = resolve(root, db.source);
