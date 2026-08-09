@@ -11,6 +11,7 @@ pub struct ConnectPolicy {
     min_connections: u32,
     acquire_timeout: Duration,
     idle_timeout: Duration,
+    statement_timeout_ms: u32,
 }
 
 impl Default for ConnectPolicy {
@@ -20,6 +21,10 @@ impl Default for ConnectPolicy {
             min_connections: 1,
             acquire_timeout: Duration::from_secs(10),
             idle_timeout: Duration::from_secs(300),
+            // A page render that has not returned in eight seconds is not going
+            // to; cap it server-side so one pathological query cannot hold a
+            // pool slot indefinitely.
+            statement_timeout_ms: 8_000,
         }
     }
 }
@@ -47,6 +52,13 @@ impl ConnectPolicy {
     #[must_use]
     pub fn with_idle_timeout(mut self, value: Duration) -> Self {
         self.idle_timeout = value;
+        self
+    }
+
+    /// Server-side `statement_timeout`, in milliseconds. Zero disables it.
+    #[must_use]
+    pub fn with_statement_timeout_ms(mut self, value: u32) -> Self {
+        self.statement_timeout_ms = value;
         self
     }
 }
@@ -146,7 +158,7 @@ async fn connect(
     let options = database_url
         .parse::<PgConnectOptions>()
         .map_err(OrmError::database)?
-        .options(startup_options(role));
+        .options(startup_options(role, policy.statement_timeout_ms));
 
     let pool = PgPoolOptions::new()
         .max_connections(policy.max_connections)
@@ -184,10 +196,13 @@ async fn connect(
     Ok(connection)
 }
 
-fn startup_options(role: Role) -> Vec<(&'static str, String)> {
+fn startup_options(role: Role, statement_timeout_ms: u32) -> Vec<(&'static str, String)> {
     let mut options = vec![("search_path", ORG_SCHEMA.to_owned())];
     if role == Role::ReadOnly {
         options.push(("default_transaction_read_only", "on".to_owned()));
+    }
+    if statement_timeout_ms > 0 {
+        options.push(("statement_timeout", statement_timeout_ms.to_string()));
     }
     options
 }
@@ -230,7 +245,7 @@ mod tests {
 
     #[test]
     fn read_only_startup_options_pin_schema_and_transaction_policy() {
-        let options = startup_options(Role::ReadOnly);
+        let options = startup_options(Role::ReadOnly, 8_000);
         assert!(options.contains(&("search_path", ORG_SCHEMA.to_owned())));
         assert!(options.contains(&("default_transaction_read_only", "on".to_owned())));
     }
@@ -238,11 +253,19 @@ mod tests {
     #[cfg(feature = "read-write")]
     #[test]
     fn read_write_startup_options_do_not_claim_read_only() {
-        let options = startup_options(Role::ReadWrite);
+        let options = startup_options(Role::ReadWrite, 8_000);
         assert!(options.contains(&("search_path", ORG_SCHEMA.to_owned())));
         assert!(!options
             .iter()
             .any(|(key, _)| *key == "default_transaction_read_only"));
+    }
+
+    #[test]
+    fn a_zero_statement_timeout_omits_the_option_entirely() {
+        // Passing "0" through would set an unlimited timeout explicitly; the
+        // caller means "leave the server default alone".
+        let options = startup_options(Role::ReadOnly, 0);
+        assert!(!options.iter().any(|(key, _)| *key == "statement_timeout"));
     }
 
     #[tokio::test]
