@@ -38,6 +38,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -60,7 +61,19 @@ jobs:
         run: node tools/schema-shadow-codegen.mjs --check
 
       - name: Verify SeaORM, SQL, and interface import locks
-        run: node tools/check-schema-shadow.mjs
+        env:
+          INTERFACE_REPOSITORY: zed-pkg/zed-interfaces
+        run: |
+          set -euo pipefail
+          revision="$(node -p "JSON.parse(require('node:fs').readFileSync('schema/interfaces.lock.json', 'utf8')).revision")"
+          if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "interface lock must contain a full Git revision" >&2
+            exit 1
+          fi
+          git init "$RUNNER_TEMP/zed-interfaces"
+          git -C "$RUNNER_TEMP/zed-interfaces" remote add origin "https://github.com/$INTERFACE_REPOSITORY.git"
+          git -C "$RUNNER_TEMP/zed-interfaces" fetch --depth=1 origin "$revision"
+          node tools/check-schema-shadow.mjs . "$RUNNER_TEMP/zed-interfaces"
 
       - name: Verify canonical Go formatting
         shell: bash

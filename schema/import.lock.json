@@ -98,9 +98,18 @@
       "blobSha": "8601a626a0f15ecfbb12ef3b221ce01a1b6ca0e8"
     }
   ],
+  "relationshipCoverage": {
+    "productionForeignKeys": 34,
+    "modeledReferences": 13,
+    "unmodeledForeignKeys": 21,
+    "productionDeleteActions": 34,
+    "modeledReferentialActions": 0
+  },
   "unmodeledProductionFeatures": [
     "database extensions and enum/check constraints",
     "defaults and generated values",
+    "21 of 34 production foreign keys are not represented by x-db.references",
+    "all 34 production ON DELETE actions are unmodeled; generated foreign keys use dialect defaults",
     "unique, partial, expression, and search indexes",
     "triggers and counter-maintenance functions",
     "row-level security, grants, and ownership",

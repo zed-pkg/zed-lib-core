@@ -284,7 +284,9 @@ function generateDrizzle(model) {
     `import { pgTable, uuid, text, integer, bigint, boolean, timestamp, jsonb, doublePrecision, primaryKey } from 'drizzle-orm/pg-core';`,
     '',
   ];
-  const variables = new Map(model.entities.map((entity) => [entity.name, camelCase(entity.name)]));
+  // Prefix every top-level binding so entity names such as `Package` cannot
+  // become strict-mode reserved words such as `package` in the emitted ESM.
+  const variables = new Map(model.entities.map((entity) => [entity.name, `zed${entity.className}`]));
   for (const entity of topologicalEntities(model)) {
     lines.push(`export const ${variables.get(entity.name)} = pgTable(${JSON.stringify(entity.table)}, {`);
     for (const field of entity.fields) {

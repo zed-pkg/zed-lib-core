@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
@@ -41,6 +42,17 @@ test('emits every requested ORM family without migration authority', () => {
   assert.match(files.get('sql/postgres.sql'), /src\/rust-orm\/sql\/registry\.sql/);
   assert.match(files.get('go/ent/schema/entities.go'), /ent\.View/);
   assert.match(files.get('go/ent/schema/entities.go'), /entsql\.Skip/);
+
+  const drizzle = files.get('node/drizzle/schema.ts');
+  const parsed = spawnSync(process.execPath, [
+    '--experimental-vm-modules',
+    '--input-type=module',
+    '--eval',
+    "import { readFileSync } from 'node:fs'; import { SourceTextModule } from 'node:vm'; new SourceTextModule(readFileSync(0, 'utf8'));",
+  ], { input: drizzle, encoding: 'utf8' });
+  assert.equal(parsed.status, 0, parsed.stderr);
+  assert.match(drizzle, /export const zedPackage =/);
+  assert.doesNotMatch(drizzle, /export const package\b/);
 });
 
 test('pins public interface projections instead of redefining wire DTOs', () => {

@@ -17,11 +17,47 @@ function gitBlobSha(content) {
 
 function gitRevisionBlobSha(root, revision, path) {
   const result = spawnSync('git', ['-C', root, 'rev-parse', `${revision}:${path}`], { encoding: 'utf8' });
-  if (result.error?.code === 'ENOENT') fail('git is required to verify the shadow import revision');
+  if (result.error?.code === 'ENOENT') fail('git is required to verify immutable import revisions');
   if (result.status !== 0) {
     fail(`cannot resolve ${path} at import revision ${revision}: ${(result.stderr || result.error || 'unknown error').toString().trim()}`);
   }
   return result.stdout.trim();
+}
+
+function gitRevisionFile(root, revision, path) {
+  const result = spawnSync('git', ['-C', root, 'show', `${revision}:${path}`], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  if (result.error?.code === 'ENOENT') fail('git is required to verify immutable import revisions');
+  if (result.status !== 0) {
+    fail(`cannot read ${path} at import revision ${revision}: ${(result.stderr || result.error || 'unknown error').toString().trim()}`);
+  }
+  return result.stdout;
+}
+
+function verifyInterfaceLock(root, schema, interfaceLock) {
+  if (interfaceLock.repository !== 'zed-pkg/zed-interfaces') fail('interface lock points outside zed-pkg/zed-interfaces');
+  if (!/^[0-9a-f]{40}$/.test(interfaceLock.revision)) fail('interface lock must pin a full Git revision');
+
+  const indexSha = gitRevisionBlobSha(root, interfaceLock.revision, interfaceLock.schemasIndex.path);
+  if (indexSha !== interfaceLock.schemasIndex.blobSha) {
+    fail(`interface schema index is ${indexSha} at ${interfaceLock.revision}, expected ${interfaceLock.schemasIndex.blobSha}`);
+  }
+  const index = JSON.parse(gitRevisionFile(root, interfaceLock.revision, interfaceLock.schemasIndex.path));
+  const indexedSchemas = new Set((index.schemas ?? []).map((entry) => `schemas/${entry.file}`));
+  const boundEntities = new Set();
+
+  for (const binding of interfaceLock.bindings ?? []) {
+    if (boundEntities.has(binding.entity)) fail(`duplicate interface binding for ${binding.entity}`);
+    boundEntities.add(binding.entity);
+    if (!binding.schema.startsWith('schemas/') || binding.schema.includes('..')) fail(`${binding.entity}: invalid interface schema path`);
+    if (!indexedSchemas.has(binding.schema)) fail(`${binding.entity}: ${binding.schema} is absent from the locked schema index`);
+    const boundSchema = JSON.parse(gitRevisionFile(root, interfaceLock.revision, binding.schema));
+    if (boundSchema.title !== binding.interfaceType) {
+      fail(`${binding.entity}: ${binding.schema} title is ${boundSchema.title}, expected ${binding.interfaceType}`);
+    }
+    if (schema.$defs[binding.entity]?.['x-interface']?.type !== binding.interfaceType) {
+      fail(`${binding.entity}: persistence projection differs from the locked interface type ${binding.interfaceType}`);
+    }
+  }
 }
 
 function snakeCase(value) {
@@ -141,6 +177,7 @@ function assertColumnInSql(block, table, column) {
 
 function main() {
   const root = resolve(process.argv[2] ?? '.');
+  const interfaceRoot = resolve(process.argv[3] ?? resolve(root, '../zed-interfaces'));
   const readJson = (path) => JSON.parse(readFileSync(resolve(root, path), 'utf8'));
   const schema = readJson('schema/persistence.schema.json');
   const importLock = readJson('schema/import.lock.json');
@@ -155,6 +192,8 @@ function main() {
   if (contract.interfaces.repository !== interfaceLock.repository) fail('interface repository lock mismatch');
   if (contract.interfaces.revision !== interfaceLock.revision) fail('interface revision lock mismatch');
   if (contract.interfaces.schemasIndexBlobSha !== interfaceLock.schemasIndex.blobSha) fail('interface schema-index lock mismatch');
+  const promotionPath = String(contract.promotionGate ?? '').split('#')[0];
+  if (!promotionPath || !existsSync(resolve(root, promotionPath))) fail('authority promotion gate points to a missing document');
   if (!Array.isArray(importLock.unmodeledProductionFeatures) || importLock.unmodeledProductionFeatures.length < 5) {
     fail('the shadow contract must explicitly retain unmodeled production features');
   }
@@ -163,6 +202,7 @@ function main() {
   if (importedSqlSha !== contract.productionSqlBlobSha) {
     fail(`import revision ${importLock.baseRevision} has ${contract.productionSql} at ${importedSqlSha}, expected ${contract.productionSqlBlobSha}`);
   }
+  verifyInterfaceLock(interfaceRoot, schema, interfaceLock);
 
   const sqlPath = resolve(root, contract.productionSql);
   const productionSql = readFileSync(sqlPath, 'utf8');
@@ -174,6 +214,31 @@ function main() {
   const lockedEntities = new Map(importLock.entities.map((entity) => [entity.entity, entity]));
   const schemaEntities = Object.entries(schema.$defs).filter(([, definition]) => definition['x-db']?.table);
   if (schemaEntities.length !== 15 || lockedEntities.size !== 15) fail('expected 15 imported persistence entities');
+
+  const productionForeignKeys = [...productionSql.matchAll(/\breferences\s+zed_[a-z0-9_]+/gi)].length;
+  const productionDeleteActions = [...productionSql.matchAll(/\bon\s+delete\s+(?:cascade|set\s+null|restrict|no\s+action|set\s+default)\b/gi)].length;
+  const modeledReferences = schemaEntities.reduce((count, [, definition]) =>
+    count + Object.values(definition.properties).filter((property) => property['x-db']?.references).length, 0);
+  const modeledReferentialActions = schemaEntities.reduce((count, [, definition]) =>
+    count + Object.values(definition.properties).filter((property) => property['x-db']?.onDelete || property['x-db']?.onUpdate).length, 0);
+  const coverage = importLock.relationshipCoverage ?? {};
+  const expectedCoverage = {
+    productionForeignKeys,
+    modeledReferences,
+    unmodeledForeignKeys: productionForeignKeys - modeledReferences,
+    productionDeleteActions,
+    modeledReferentialActions,
+  };
+  for (const [key, value] of Object.entries(expectedCoverage)) {
+    if (coverage[key] !== value) fail(`relationship coverage ${key} is ${coverage[key]}, expected ${value}`);
+  }
+  const unmodeledSummary = importLock.unmodeledProductionFeatures.join('\n').toLowerCase();
+  if (expectedCoverage.unmodeledForeignKeys > 0 && !unmodeledSummary.includes('foreign key')) {
+    fail('unmodeled production foreign keys are not declared');
+  }
+  if (productionDeleteActions > modeledReferentialActions && !unmodeledSummary.includes('on delete')) {
+    fail('unmodeled production referential actions are not declared');
+  }
 
   let fieldCount = 0;
   for (const [name, definition] of schemaEntities) {
@@ -233,7 +298,7 @@ function main() {
   if (!generatedSql.includes('SHADOW ONLY') || !generatedSql.includes(contract.productionSql)) fail('generated SQL lacks the non-executable shadow warning');
   if (existsSync(resolve(root, 'generated/sql/postgres.sql'))) fail('shadow output escaped into the canonical migration path');
 
-  console.log(`verified ${schemaEntities.length} SeaORM entities, ${fieldCount} columns, production SQL blob ${actualSqlSha}, and isolated shadow adapters`);
+  console.log(`verified ${schemaEntities.length} SeaORM entities, ${fieldCount} columns, ${modeledReferences}/${productionForeignKeys} relationships, interface revision ${interfaceLock.revision}, production SQL blob ${actualSqlSha}, and isolated shadow adapters`);
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);

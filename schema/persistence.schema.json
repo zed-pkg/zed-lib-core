@@ -16,7 +16,7 @@
     "productionSql": "src/rust-orm/sql/registry.sql",
     "productionSqlBlobSha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf",
     "generatedSql": "generated/schema-orm-shadow/sql/postgres.sql",
-    "promotionGate": "docs/SCHEMA_AUTHORITY_MIGRATION.md",
+    "promotionGate": "docs/json-schema-orm-shadow.md#promotion-gate",
     "migrationPolicy": "generated shadow SQL MUST NOT be applied to any database"
   },
   "additionalProperties": false,

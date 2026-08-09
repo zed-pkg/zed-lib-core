@@ -2,7 +2,7 @@
 // SHADOW ONLY. Production migration authority remains src/rust-orm/sql/registry.sql.
 import { pgTable, uuid, text, integer, bigint, boolean, timestamp, jsonb, doublePrecision, primaryKey } from 'drizzle-orm/pg-core';
 
-export const apiToken = pgTable("zed_api_tokens", {
+export const zedApiToken = pgTable("zed_api_tokens", {
   id: uuid("id").notNull().primaryKey(),
   name: text("name").notNull(),
   tokenHash: text("token_hash").notNull(),
@@ -16,7 +16,7 @@ export const apiToken = pgTable("zed_api_tokens", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const auditLog = pgTable("zed_audit_log", {
+export const zedAuditLog = pgTable("zed_audit_log", {
   id: uuid("id").notNull().primaryKey(),
   orgId: uuid("org_id"),
   actorUserId: uuid("actor_user_id"),
@@ -29,7 +29,7 @@ export const auditLog = pgTable("zed_audit_log", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const entityEmbedding = pgTable("zed_entity_embeddings", {
+export const zedEntityEmbedding = pgTable("zed_entity_embeddings", {
   id: uuid("id").notNull().primaryKey(),
   entityType: text("entity_type").notNull(),
   entityId: uuid("entity_id").notNull(),
@@ -43,7 +43,7 @@ export const entityEmbedding = pgTable("zed_entity_embeddings", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const org = pgTable("zed_orgs", {
+export const zedOrg = pgTable("zed_orgs", {
   id: uuid("id").notNull().primaryKey(),
   slug: text("slug").notNull(),
   name: text("name").notNull(),
@@ -55,7 +55,7 @@ export const org = pgTable("zed_orgs", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const user = pgTable("zed_users", {
+export const zedUser = pgTable("zed_users", {
   id: uuid("id").notNull().primaryKey(),
   sharedAuthSubject: uuid("shared_auth_subject").notNull(),
   authRealm: text("auth_realm").notNull(),
@@ -68,9 +68,9 @@ export const user = pgTable("zed_users", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const orgInvitation = pgTable("zed_org_invitations", {
+export const zedOrgInvitation = pgTable("zed_org_invitations", {
   id: uuid("id").notNull().primaryKey(),
-  orgId: uuid("org_id").notNull().references(() => org.id),
+  orgId: uuid("org_id").notNull().references(() => zedOrg.id),
   invitedByUserId: uuid("invited_by_user_id").notNull(),
   email: text("email").notNull(),
   role: text("role").notNull(),
@@ -82,17 +82,17 @@ export const orgInvitation = pgTable("zed_org_invitations", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const orgMember = pgTable("zed_org_members", {
-  orgId: uuid("org_id").notNull().references(() => org.id),
-  userId: uuid("user_id").notNull().references(() => user.id),
+export const zedOrgMember = pgTable("zed_org_members", {
+  orgId: uuid("org_id").notNull().references(() => zedOrg.id),
+  userId: uuid("user_id").notNull().references(() => zedUser.id),
   role: text("role").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 }, (table) => [primaryKey({ columns: [table.orgId, table.userId] })]);
 
-export const project = pgTable("zed_projects", {
+export const zedProject = pgTable("zed_projects", {
   id: uuid("id").notNull().primaryKey(),
-  orgId: uuid("org_id").notNull().references(() => org.id),
+  orgId: uuid("org_id").notNull().references(() => zedOrg.id),
   slug: text("slug").notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -104,10 +104,10 @@ export const project = pgTable("zed_projects", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const package = pgTable("zed_packages", {
+export const zedPackage = pgTable("zed_packages", {
   id: uuid("id").notNull().primaryKey(),
-  orgId: uuid("org_id").notNull().references(() => org.id),
-  projectId: uuid("project_id").references(() => project.id),
+  orgId: uuid("org_id").notNull().references(() => zedOrg.id),
+  projectId: uuid("project_id").references(() => zedProject.id),
   name: text("name").notNull(),
   description: text("description"),
   visibility: text("visibility").notNull(),
@@ -127,9 +127,9 @@ export const package = pgTable("zed_packages", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const projectInvitation = pgTable("zed_project_invitations", {
+export const zedProjectInvitation = pgTable("zed_project_invitations", {
   id: uuid("id").notNull().primaryKey(),
-  projectId: uuid("project_id").notNull().references(() => project.id),
+  projectId: uuid("project_id").notNull().references(() => zedProject.id),
   invitedByUserId: uuid("invited_by_user_id").notNull(),
   email: text("email").notNull(),
   role: text("role").notNull(),
@@ -141,17 +141,17 @@ export const projectInvitation = pgTable("zed_project_invitations", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const projectMember = pgTable("zed_project_members", {
-  projectId: uuid("project_id").notNull().references(() => project.id),
-  userId: uuid("user_id").notNull().references(() => user.id),
+export const zedProjectMember = pgTable("zed_project_members", {
+  projectId: uuid("project_id").notNull().references(() => zedProject.id),
+  userId: uuid("user_id").notNull().references(() => zedUser.id),
   role: text("role").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 }, (table) => [primaryKey({ columns: [table.projectId, table.userId] })]);
 
-export const packageDownload = pgTable("zed_package_downloads", {
+export const zedPackageDownload = pgTable("zed_package_downloads", {
   id: uuid("id").notNull().primaryKey(),
-  packageId: uuid("package_id").notNull().references(() => package.id),
+  packageId: uuid("package_id").notNull().references(() => zedPackage.id),
   packageVersionId: uuid("package_version_id"),
   downloadedByUserId: uuid("downloaded_by_user_id"),
   apiTokenId: uuid("api_token_id"),
@@ -163,9 +163,9 @@ export const packageDownload = pgTable("zed_package_downloads", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const packageLicense = pgTable("zed_package_licenses", {
+export const zedPackageLicense = pgTable("zed_package_licenses", {
   id: uuid("id").notNull().primaryKey(),
-  packageId: uuid("package_id").notNull().references(() => package.id),
+  packageId: uuid("package_id").notNull().references(() => zedPackage.id),
   packageVersionId: uuid("package_version_id"),
   kind: text("kind").notNull(),
   spdxId: text("spdx_id"),
@@ -177,9 +177,9 @@ export const packageLicense = pgTable("zed_package_licenses", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const packageUpload = pgTable("zed_package_uploads", {
+export const zedPackageUpload = pgTable("zed_package_uploads", {
   id: uuid("id").notNull().primaryKey(),
-  packageId: uuid("package_id").notNull().references(() => package.id),
+  packageId: uuid("package_id").notNull().references(() => zedPackage.id),
   packageVersionId: uuid("package_version_id"),
   requestedVersion: text("requested_version").notNull(),
   status: text("status").notNull(),
@@ -199,9 +199,9 @@ export const packageUpload = pgTable("zed_package_uploads", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'date' }).notNull(),
 });
 
-export const packageVersion = pgTable("zed_package_versions", {
+export const zedPackageVersion = pgTable("zed_package_versions", {
   id: uuid("id").notNull().primaryKey(),
-  packageId: uuid("package_id").notNull().references(() => package.id),
+  packageId: uuid("package_id").notNull().references(() => zedPackage.id),
   version: text("version").notNull(),
   versionScheme: text("version_scheme").notNull(),
   sha256: text("sha256").notNull(),
