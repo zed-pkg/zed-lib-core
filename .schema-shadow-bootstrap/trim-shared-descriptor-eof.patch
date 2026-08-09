@@ -1,0 +1,19 @@
+--- a/tools/schema-shadow-codegen.mjs
++++ b/tools/schema-shadow-codegen.mjs
+@@ -622,7 +622,7 @@
+     lines.push(`        primary_key: &[${item.primaryKey.map((value) => JSON.stringify(value)).join(', ')}],`);
+     lines.push('    },');
+   }
+-  lines.push('];', '');
++  lines.push('];');
+   return `${lines.join('\n')}\n`;
+ }
+ 
+@@ -666,7 +666,7 @@
+   for (const item of descriptorData(model)) {
+     lines.push(`  EntityDescriptor(entity: ${JSON.stringify(item.entity)}, interfaceType: ${JSON.stringify(item.interfaceType)}, table: ${JSON.stringify(item.table)}, primaryKey: <String>[${item.primaryKey.map((value) => JSON.stringify(value)).join(', ')}]),`);
+   }
+-  lines.push('];', '');
++  lines.push('];');
+   return `${lines.join('\n')}\n`;
+ }
