@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Implementations of the zed-pkg interfaces: resolution and policy over the shared contract types"
 license = "MIT"
-repository = "https://github.com/zed-pkg/zed-lib"
+repository = "https://github.com/zed-pkg/zed-lib-core"
 
 # The Rust slice of a polyglot zed-package; Dart and TypeScript slices land
 # beside it under `src/`. See `docs` in zed-interfaces for why the crate
