@@ -2,10 +2,11 @@
 //! implementation. The Dart and TypeScript slices load the same directory, so a
 //! case added here is a case all three must answer identically.
 //!
-//! Rust is also the *oracle* for the generated files
-//! (`fuzz-*.json`, written by `cargo run --example generate_fuzz_corpus`), so
-//! its job here is narrower but not pointless: it catches the day a change to
-//! this crate silently rewrites what the other two are being held to.
+//! Rust is also the *oracle* for the generated version files
+//! (`fuzz-*.json`, written by `cargo run --example generate_fuzz_corpus`).
+//! Corpus documents are dispatched by their explicit schema before their
+//! schema-specific case body is deserialized; adding another behavior contract
+//! must not make an unrelated version corpus parser consume it accidentally.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -14,10 +15,20 @@ use serde::Deserialize;
 use zed_interfaces::registry::PackageMetadata;
 use zed_interfaces::vcs::Vcs;
 use zed_interfaces::version::VersionScheme;
-use zed_lib::{latest_stable, resolve_version};
+use zed_interfaces::{
+    RegistryNamespaceAction, RegistryNamespaceAutomation, RegistryNamespaceDisposition,
+    RegistryNamespaceProof, RegistryNamespaceProvider, RegistryNamespaceRequest,
+};
+use zed_lib::{latest_stable, plan_registry_namespaces, resolve_version};
 
 const RESOLUTION_SCHEMA: &str = "zed-lib/conformance/version-resolution/v1";
 const LATEST_SCHEMA: &str = "zed-lib/conformance/latest-stable/v1";
+const NAMESPACE_PLAN_SCHEMA: &str = "zed.registry-namespace-planner-cases/v1";
+
+#[derive(Debug, Deserialize)]
+struct SchemaHeader {
+    schema: String,
+}
 
 #[derive(Debug, Deserialize)]
 struct Corpus {
@@ -46,6 +57,30 @@ struct Expect {
     version: Option<String>,
     #[serde(default)]
     error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NamespaceCorpus {
+    schema: String,
+    cases: Vec<NamespaceCase>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NamespaceCase {
+    name: String,
+    request: RegistryNamespaceRequest,
+    expected: Vec<ExpectedNamespaceEntry>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+struct ExpectedNamespaceEntry {
+    provider: RegistryNamespaceProvider,
+    coordinate: Option<String>,
+    package_prefix: Option<String>,
+    automation: RegistryNamespaceAutomation,
+    disposition: RegistryNamespaceDisposition,
+    proofs: Vec<RegistryNamespaceProof>,
+    step_actions: Vec<RegistryNamespaceAction>,
 }
 
 fn cases_dir() -> PathBuf {
@@ -130,23 +165,67 @@ fn check_latest(case: &Case, file: &str) {
     );
 }
 
+fn check_namespace(case: NamespaceCase, file: &str) {
+    let plan = plan_registry_namespaces(case.request)
+        .unwrap_or_else(|error| panic!("{file}:{}: {error}", case.name));
+    let observed = plan
+        .entries
+        .iter()
+        .map(|entry| ExpectedNamespaceEntry {
+            provider: entry.provider,
+            coordinate: entry.coordinate.clone(),
+            package_prefix: entry.package_prefix.clone(),
+            automation: entry.automation,
+            disposition: entry.disposition,
+            proofs: entry.proofs.clone(),
+            step_actions: entry.steps.iter().map(|step| step.action).collect(),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(observed, case.expected, "{file}:{}", case.name);
+    assert_eq!(
+        plan.request.providers,
+        observed.iter().map(|entry| entry.provider).collect::<Vec<_>>(),
+        "{file}:{} provider order",
+        case.name
+    );
+}
+
 #[test]
 fn every_corpus_file_passes() {
     let mut total = 0;
     for path in corpus_files() {
         let file = path.file_name().unwrap().to_string_lossy().to_string();
         let raw = fs::read_to_string(&path).expect("corpus file is readable");
-        let corpus: Corpus = serde_json::from_str(&raw)
-            .unwrap_or_else(|error| panic!("{file} is not a valid corpus: {error}"));
-        assert!(!corpus.cases.is_empty(), "{file} has no cases");
+        let header: SchemaHeader = serde_json::from_str(&raw)
+            .unwrap_or_else(|error| panic!("{file} has no valid schema header: {error}"));
 
-        for case in &corpus.cases {
-            match corpus.schema.as_str() {
-                RESOLUTION_SCHEMA => check_resolution(case, &file),
-                LATEST_SCHEMA => check_latest(case, &file),
-                other => panic!("{file}: unknown corpus schema `{other}`"),
+        match header.schema.as_str() {
+            RESOLUTION_SCHEMA | LATEST_SCHEMA => {
+                let corpus: Corpus = serde_json::from_str(&raw)
+                    .unwrap_or_else(|error| panic!("{file} is not a valid version corpus: {error}"));
+                assert_eq!(corpus.schema, header.schema);
+                assert!(!corpus.cases.is_empty(), "{file} has no cases");
+                for case in &corpus.cases {
+                    if corpus.schema == RESOLUTION_SCHEMA {
+                        check_resolution(case, &file);
+                    } else {
+                        check_latest(case, &file);
+                    }
+                    total += 1;
+                }
             }
-            total += 1;
+            NAMESPACE_PLAN_SCHEMA => {
+                let corpus: NamespaceCorpus = serde_json::from_str(&raw).unwrap_or_else(|error| {
+                    panic!("{file} is not a valid namespace corpus: {error}")
+                });
+                assert_eq!(corpus.schema, header.schema);
+                assert!(!corpus.cases.is_empty(), "{file} has no cases");
+                for case in corpus.cases {
+                    check_namespace(case, &file);
+                    total += 1;
+                }
+            }
+            other => panic!("{file}: unknown corpus schema `{other}`"),
         }
     }
     // A loader bug that silently matched nothing would otherwise look like a
@@ -169,10 +248,11 @@ fn the_generated_corpus_is_present_and_deterministic() {
         "latest-stable.json",
         "fuzz-version-resolution.json",
         "fuzz-latest-stable.json",
+        "registry-namespace-plans.json",
     ] {
         assert!(
             names.iter().any(|name| name == expected),
-            "missing corpus file {expected}; run `cargo run --example generate_fuzz_corpus`"
+            "missing corpus file {expected}; run the matching corpus generator"
         );
     }
 }
