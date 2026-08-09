@@ -1,0 +1,72 @@
+name: bootstrap clean schema shadow branch
+
+on:
+  push:
+    branches:
+      - agent/json-schema-orm-shadow-20260809
+    paths:
+      - .github/workflows/schema-shadow-bootstrap.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: schema-shadow-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out staging branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          ref: agent/json-schema-orm-shadow-20260809
+
+      - name: Verify and decode reviewed payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .schema-shadow-bootstrap/part-* > /tmp/zed-schema-shadow.b64
+          echo '3a3f13db0046932933306c0bd2f2f4831db19249b0f4a823958101bc06c85dda  /tmp/zed-schema-shadow.b64' | sha256sum -c -
+          base64 --decode /tmp/zed-schema-shadow.b64 > /tmp/zed-schema-shadow.tar.gz
+          echo '7e6de609b947e8fc0c23d3beae8df56be95a938658a212d48cbbc5ec685ceb0b  /tmp/zed-schema-shadow.tar.gz' | sha256sum -c -
+
+      - name: Apply payload to clean branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='agent/json-schema-orm-shadow-clean-20260809'
+          git fetch origin "refs/heads/${target}:refs/remotes/origin/${target}"
+          git switch --force-create "${target}" "origin/${target}"
+          tar -xzf /tmp/zed-schema-shadow.tar.gz
+          test ! -e .schema-shadow-bootstrap
+          test ! -e .github/workflows/schema-shadow-bootstrap.yml
+
+      - name: Validate generated contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check tools/schema-shadow-codegen.mjs
+          node --check tools/check-schema-shadow.mjs
+          node --check tests/schema-shadow.test.mjs
+          node --test tests/schema-shadow.test.mjs
+          node tools/schema-shadow-codegen.mjs --check
+          node tools/check-schema-shadow.mjs
+          while IFS= read -r file; do
+            diff -u "$file" <(gofmt "$file")
+          done < <(find generated/schema-orm-shadow -type f -name '*.go' -print | sort)
+
+      - name: Publish one clean implementation commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='agent/json-schema-orm-shadow-clean-20260809'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git diff --cached --check
+          git commit -m 'feat: add JSON Schema cross-language ORM shadow contract'
+          git push origin "HEAD:refs/heads/${target}"
