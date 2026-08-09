@@ -76,8 +76,10 @@ Predecessor head:
 f6f240a72eb100b858ae74f2c633d09528b61805
 ```
 
-The old branch was based on a transitional schema and raw SeaORM sessions. Its
-substantive requirements map as follows.
+The canonical implementation is reviewed in
+[`zed-lib-core#3`](https://github.com/zed-pkg/zed-lib-core/pull/3). The old branch
+was based on a transitional schema and raw SeaORM sessions. Its substantive
+requirements map as follows.
 
 | Predecessor item | Canonical disposition |
 | --- | --- |
