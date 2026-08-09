@@ -1,7 +1,7 @@
 //! This repository's own `.zpkg.toml` must satisfy the rules `zed-interfaces`
-//! defines. zed-lib is a polyglot package with three implementation slices and
-//! a corpus target; nothing else in CI parses that manifest, so a mistake in it
-//! would only surface at publish time.
+//! defines. zed-lib-core is a polyglot package with three implementation slices,
+//! one ORM compatibility slice, and a corpus target; nothing else in CI parses
+//! that manifest, so a mistake in it would only surface at publish time.
 
 use std::path::Path;
 
@@ -17,7 +17,7 @@ fn own_manifest() -> Manifest {
 #[test]
 fn the_repository_manifest_is_valid() {
     let manifest = own_manifest();
-    assert_eq!(manifest.package.name, "zed-lib");
+    assert_eq!(manifest.package.name, "zed-lib-core");
     assert!(manifest.is_polyglot());
 }
 
@@ -53,7 +53,8 @@ fn the_corpus_ships_as_its_own_target() {
         .get("conformance")
         .expect("the corpus is consumable on its own");
     assert_eq!(corpus.dir, "conformance");
-    // An implementation in a language zed-lib does not ship yet still needs
-    // something to be correct against, so the corpus must not be Rust-only.
+    // An implementation in a language zed-lib-core does not ship yet still
+    // needs something to be correct against, so the corpus must not be
+    // Rust-only.
     assert_eq!(corpus.adapter.as_deref(), Some("none"));
 }
