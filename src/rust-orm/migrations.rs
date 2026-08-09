@@ -1,18 +1,24 @@
 //! Idempotent registry migrations owned by `zed-lib`.
 //!
-//! The first migration adopts the deployed `org` and `package` tables without
-//! renaming their public URLs or destructive constraints. It adds the account
-//! console graph around them and records completion under an advisory lock.
+//! The migration series adopts the deployed `org` and `package` tables without
+//! renaming their public URLs or destructively breaking older writers. New
+//! services may use richer account-console fields while the machine package
+//! API continues to insert its historical column set during the cutover.
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, Statement, TransactionTrait};
 
-/// Immutable migration identifier stored in `zed_schema_migrations`.
+/// Initial account-console expansion.
 pub const ACCOUNT_CONSOLE_MIGRATION: &str = "20260809_000001_account_console";
+/// Compatibility migration for legacy machine-token organization claims.
+pub const ORG_NAME_COMPAT_MIGRATION: &str = "20260809_000002_org_name_legacy_default";
+/// Latest migration in the canonical registry series.
+pub const LATEST_MIGRATION: &str = ORG_NAME_COMPAT_MIGRATION;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MigrationReport {
     pub version: &'static str,
     pub applied: bool,
+    pub applied_versions: Vec<&'static str>,
 }
 
 const ACCOUNT_CONSOLE_SQL: &str = r#"
@@ -142,6 +148,39 @@ CREATE INDEX IF NOT EXISTS idx_package_visibility
     ON package(visibility);
 "#;
 
+/// Keep historical org insert statements valid while the account console rolls
+/// out. The database, not each older caller, supplies a display name from the
+/// canonical slug. The trigger also repairs an explicitly blank name.
+const ORG_NAME_COMPAT_SQL: &str = r#"
+ALTER TABLE org ALTER COLUMN name SET DEFAULT '';
+UPDATE org SET name = slug WHERE name IS NULL OR btrim(name) = '';
+
+CREATE OR REPLACE FUNCTION zed_fill_org_name_from_slug()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $function$
+BEGIN
+    IF NEW.name IS NULL OR btrim(NEW.name) = '' THEN
+        NEW.name := NEW.slug;
+    END IF;
+    RETURN NEW;
+END
+$function$;
+
+DROP TRIGGER IF EXISTS zed_org_name_from_slug ON org;
+CREATE TRIGGER zed_org_name_from_slug
+BEFORE INSERT OR UPDATE OF slug, name ON org
+FOR EACH ROW
+EXECUTE FUNCTION zed_fill_org_name_from_slug();
+
+ALTER TABLE org ALTER COLUMN name SET NOT NULL;
+"#;
+
+const MIGRATIONS: &[(&str, &str)] = &[
+    (ACCOUNT_CONSOLE_MIGRATION, ACCOUNT_CONSOLE_SQL),
+    (ORG_NAME_COMPAT_MIGRATION, ORG_NAME_COMPAT_SQL),
+];
+
 /// Apply every zed-lib migration exactly once under a transaction-scoped lock.
 pub async fn migrate(conn: &DatabaseConnection) -> Result<MigrationReport, DbErr> {
     let txn = conn.begin().await?;
@@ -154,30 +193,35 @@ pub async fn migrate(conn: &DatabaseConnection) -> Result<MigrationReport, DbErr
     )
     .await?;
 
-    let already_applied = txn
-        .query_one(Statement::from_string(
-            txn.get_database_backend(),
-            format!(
-                "SELECT version FROM zed_schema_migrations WHERE version = '{}'",
-                ACCOUNT_CONSOLE_MIGRATION
-            ),
-        ))
-        .await?
-        .is_some();
+    let mut applied_versions = Vec::new();
+    for (version, sql) in MIGRATIONS {
+        let already_applied = txn
+            .query_one(Statement::from_string(
+                txn.get_database_backend(),
+                format!(
+                    "SELECT version FROM zed_schema_migrations WHERE version = '{}'",
+                    version
+                ),
+            ))
+            .await?
+            .is_some();
 
-    if !already_applied {
-        txn.execute_unprepared(ACCOUNT_CONSOLE_SQL).await?;
-        txn.execute_unprepared(&format!(
-            "INSERT INTO zed_schema_migrations(version) VALUES ('{}')",
-            ACCOUNT_CONSOLE_MIGRATION
-        ))
-        .await?;
+        if !already_applied {
+            txn.execute_unprepared(sql).await?;
+            txn.execute_unprepared(&format!(
+                "INSERT INTO zed_schema_migrations(version) VALUES ('{}')",
+                version
+            ))
+            .await?;
+            applied_versions.push(*version);
+        }
     }
 
     txn.commit().await?;
     Ok(MigrationReport {
-        version: ACCOUNT_CONSOLE_MIGRATION,
-        applied: !already_applied,
+        version: LATEST_MIGRATION,
+        applied: !applied_versions.is_empty(),
+        applied_versions,
     })
 }
 
@@ -212,5 +256,13 @@ mod tests {
     fn package_urls_remain_org_scoped() {
         assert!(ACCOUNT_CONSOLE_SQL.contains("idx_package_org_name"));
         assert!(!ACCOUNT_CONSOLE_SQL.contains("UNIQUE (project_id, name)"));
+    }
+
+    #[test]
+    fn legacy_org_claims_receive_the_slug_as_the_display_name() {
+        assert!(ORG_NAME_COMPAT_SQL.contains("SET DEFAULT ''"));
+        assert!(ORG_NAME_COMPAT_SQL.contains("NEW.name := NEW.slug"));
+        assert!(ORG_NAME_COMPAT_SQL.contains("BEFORE INSERT"));
+        assert_eq!(LATEST_MIGRATION, ORG_NAME_COMPAT_MIGRATION);
     }
 }
