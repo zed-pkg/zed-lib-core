@@ -7,18 +7,16 @@
 //! transaction.
 
 use sea_orm::{
-    ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement,
-    TransactionTrait, Value,
     prelude::{DateTimeWithTimeZone, Uuid},
     sea_query::OnConflict,
+    ActiveValue::Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, TransactionTrait, Value,
 };
 
 use crate::{
-    OrmError, WriteContext,
-    entities::{
-        org, org_invitation, org_member, project, project_invitation, project_member,
-    },
+    entities::{org, org_invitation, org_member, project, project_invitation, project_member},
     models::{InvitationAcceptance, InvitationTarget, SessionIdentity},
+    OrmError, WriteContext,
 };
 
 /// Accept exactly one unexpired, unrevoked invitation for a verified Shared
@@ -64,23 +62,11 @@ pub async fn accept(
     let acceptance = match (org_candidate, project_candidate) {
         (Some(invitation), None) => {
             require_matching_email(&invitation.email, &verified_email)?;
-            consume_org_invitation(
-                &transaction,
-                invitation,
-                user.id,
-                accepted_at,
-            )
-            .await?
+            consume_org_invitation(&transaction, invitation, user.id, accepted_at).await?
         }
         (None, Some(invitation)) => {
             require_matching_email(&invitation.email, &verified_email)?;
-            consume_project_invitation(
-                &transaction,
-                invitation,
-                user.id,
-                accepted_at,
-            )
-            .await?
+            consume_project_invitation(&transaction, invitation, user.id, accepted_at).await?
         }
         (None, None) | (Some(_), Some(_)) => return Err(invalid_invitation()),
     };
