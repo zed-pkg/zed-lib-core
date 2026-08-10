@@ -14,8 +14,7 @@ RegistryNamespacePlan planRegistryNamespaces(
   RegistryNamespaceRequest input,
 ) {
   _validateRequest(input);
-  final providers = [...input.providers]
-    ..sort(
+  final providers = [...input.providers]..sort(
       (left, right) =>
           _providerOrder.indexOf(left).compareTo(_providerOrder.indexOf(right)),
     );
@@ -28,9 +27,8 @@ RegistryNamespacePlan planRegistryNamespaces(
   return RegistryNamespacePlan(
     schema: 'zed.registry-namespace-plan/v1',
     request: request,
-    entries: providers
-        .map((provider) => _planProvider(request, provider))
-        .toList(),
+    entries:
+        providers.map((provider) => _planProvider(request, provider)).toList(),
     warnings: const [
       'Provider availability can change between planning, manual proof, and claim execution.',
       'This plan is pre-mutation intent and is not external namespace ownership evidence.',
@@ -357,8 +355,7 @@ RegistryNamespaceStep _step(
       prerequisite: prerequisite,
     );
 
-String _reverseDomain(String domain) =>
-    domain.split('.').reversed.join('.');
+String _reverseDomain(String domain) => domain.split('.').reversed.join('.');
 
 void _validateRequest(RegistryNamespaceRequest request) {
   final slug = RegExp(r'^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$');
@@ -371,7 +368,8 @@ void _validateRequest(RegistryNamespaceRequest request) {
   if (request.githubOwner != null &&
       (!slug.hasMatch(request.githubOwner!) ||
           request.githubOwner!.contains('--'))) {
-    throw FormatException('invalid explicit GitHub owner: ${request.githubOwner}');
+    throw FormatException(
+        'invalid explicit GitHub owner: ${request.githubOwner}');
   }
   if (request.providers.isEmpty) {
     throw const FormatException('at least one provider is required');
@@ -387,10 +385,10 @@ bool _isDomain(String domain) =>
     domain.contains('.') &&
     !domain.endsWith('.') &&
     domain.split('.').every(
-      (label) => RegExp(
-        r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$',
-      ).hasMatch(label),
-    );
+          (label) => RegExp(
+            r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$',
+          ).hasMatch(label),
+        );
 
 List<Map<String, Object?>> summarizeRegistryNamespacePlan(
   RegistryNamespacePlan plan,
@@ -403,10 +401,11 @@ List<Map<String, Object?>> summarizeRegistryNamespacePlan(
             'package_prefix': entry.packagePrefix,
             'automation': entry.automation.toJson(),
             'disposition': entry.disposition.toJson(),
-            'proofs': entry.proofs.map((proof) => proof.toJson()).toList(),
-            'step_actions': entry.steps
-                .map((step) => step.action.toJson())
+            'proofs': (entry.proofs ?? const <RegistryNamespaceProof>[])
+                .map((proof) => proof.toJson())
                 .toList(),
+            'step_actions':
+                entry.steps.map((step) => step.action.toJson()).toList(),
           },
         )
         .toList();

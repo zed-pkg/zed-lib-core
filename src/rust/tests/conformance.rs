@@ -184,7 +184,10 @@ fn check_namespace(case: NamespaceCase, file: &str) {
     assert_eq!(observed, case.expected, "{file}:{}", case.name);
     assert_eq!(
         plan.request.providers,
-        observed.iter().map(|entry| entry.provider).collect::<Vec<_>>(),
+        observed
+            .iter()
+            .map(|entry| entry.provider)
+            .collect::<Vec<_>>(),
         "{file}:{} provider order",
         case.name
     );
@@ -201,8 +204,9 @@ fn every_corpus_file_passes() {
 
         match header.schema.as_str() {
             RESOLUTION_SCHEMA | LATEST_SCHEMA => {
-                let corpus: Corpus = serde_json::from_str(&raw)
-                    .unwrap_or_else(|error| panic!("{file} is not a valid version corpus: {error}"));
+                let corpus: Corpus = serde_json::from_str(&raw).unwrap_or_else(|error| {
+                    panic!("{file} is not a valid version corpus: {error}")
+                });
                 assert_eq!(corpus.schema, header.schema);
                 assert!(!corpus.cases.is_empty(), "{file} has no cases");
                 for case in &corpus.cases {

@@ -10,7 +10,12 @@ library;
 export 'src/namespace_plan.dart'
     show planRegistryNamespaces, summarizeRegistryNamespacePlan;
 export 'src/resolve.dart'
-    show ResolveErrorKind, ResolveException, latestStable, resolveVersion, schemeOf;
+    show
+        ResolveErrorKind,
+        ResolveException,
+        latestStable,
+        resolveVersion,
+        schemeOf;
 // `VersionBound`, not `Comparator`: dart:core exports `Comparator<T>`, and an
 // explicit import *wins* over the implicit dart:core one — so the old name did
 // not raise an ambiguity error, it silently shadowed the real type and broke

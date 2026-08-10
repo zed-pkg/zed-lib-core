@@ -11,12 +11,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
-import 'package:zed_interfaces/package_metadata.dart';
+import 'package:zed_interfaces/zed_interfaces.dart';
 import 'package:zed_lib/zed_lib.dart';
 
 const _casesDir = '../../conformance/cases';
 const _resolutionSchema = 'zed-lib/conformance/version-resolution/v1';
 const _latestSchema = 'zed-lib/conformance/latest-stable/v1';
+const _namespacePlanSchema = 'zed.registry-namespace-planner-cases/v1';
 
 /// `latest` is data for a latest-stable case — including when it is null, which
 /// is what "the registry recorded nothing" looks like. Resolution cases never
@@ -26,19 +27,22 @@ PackageMetadata metadataFor(
   List<String> versions, {
   required String? latest,
   required bool latestIsData,
-}) => PackageMetadata(
-  org: 'acme',
-  name: 'conformance',
-  vcs: Vcs.git,
-  repoUrl: 'https://github.com/acme/conformance',
-  latest: latestIsData ? latest : (latest ?? (versions.isEmpty ? null : versions.last)),
-  versions: versions,
-  versionScheme: switch (scheme) {
-    'calver' => VersionScheme.calver,
-    'opaque' => VersionScheme.opaque,
-    _ => VersionScheme.semver,
-  },
-);
+}) =>
+    PackageMetadata(
+      org: 'acme',
+      name: 'conformance',
+      vcs: Vcs.git,
+      repoUrl: 'https://github.com/acme/conformance',
+      latest: latestIsData
+          ? latest
+          : (latest ?? (versions.isEmpty ? null : versions.last)),
+      versions: versions,
+      versionScheme: switch (scheme) {
+        'calver' => VersionScheme.calver,
+        'opaque' => VersionScheme.opaque,
+        _ => VersionScheme.semver,
+      },
+    );
 
 void main() {
   final files = Directory(_casesDir)
@@ -56,7 +60,33 @@ void main() {
     final name = file.uri.pathSegments.last;
     final corpus = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
     final schema = corpus['schema'] as String;
-    final cases = (corpus['cases'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final cases =
+        (corpus['cases'] as List<dynamic>).cast<Map<String, dynamic>>();
+
+    if (schema == _namespacePlanSchema) {
+      group(name, () {
+        for (final testCase in cases) {
+          total++;
+          test(testCase['name'] as String, () {
+            final request = RegistryNamespaceRequest.fromJson(
+              testCase['request'] as Map<String, dynamic>,
+            );
+            final plan = planRegistryNamespaces(request);
+            final expected = (testCase['expected'] as List<dynamic>)
+                .map((entry) => Map<String, dynamic>.from(entry as Map))
+                .toList();
+            expect(summarizeRegistryNamespacePlan(plan), equals(expected));
+            expect(
+              plan.request.providers
+                  .map((provider) => provider.toJson())
+                  .toList(),
+              equals(expected.map((entry) => entry['provider']).toList()),
+            );
+          });
+        }
+      });
+      continue;
+    }
 
     group(name, () {
       for (final testCase in cases) {
@@ -102,12 +132,14 @@ void main() {
                 latest: testCase['latest'] as String?,
                 latestIsData: true,
               );
-              expect(expected['error'], isNull, reason: 'latest-stable cases return null, not errors');
+              expect(expected['error'], isNull,
+                  reason: 'latest-stable cases return null, not errors');
               expect(latestStable(metadata), wantVersion);
             });
 
           default:
-            test('$name has a known schema', () => fail('unknown corpus schema `$schema`'));
+            test('$name has a known schema',
+                () => fail('unknown corpus schema `$schema`'));
         }
       }
     });

@@ -9,8 +9,8 @@ void main() {
   final corpusFile = File(
     '${Directory.current.path}/../../conformance/cases/registry-namespace-plans.json',
   );
-  final corpus = jsonDecode(corpusFile.readAsStringSync())
-      as Map<String, dynamic>;
+  final corpus =
+      jsonDecode(corpusFile.readAsStringSync()) as Map<String, dynamic>;
   final cases = corpus['cases'] as List<dynamic>;
 
   for (final value in cases) {

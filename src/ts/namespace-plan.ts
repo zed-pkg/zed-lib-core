@@ -384,7 +384,7 @@ export function summarizeRegistryNamespacePlan(plan: RegistryNamespacePlan) {
     package_prefix: entry.package_prefix ?? null,
     automation: entry.automation,
     disposition: entry.disposition,
-    proofs: [...entry.proofs],
+    proofs: [...(entry.proofs ?? [])],
     step_actions: entry.steps.map((step) => step.action),
   }));
 }

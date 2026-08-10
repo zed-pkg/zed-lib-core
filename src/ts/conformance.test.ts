@@ -16,12 +16,24 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
-import type { PackageMetadata, VersionScheme } from "@zed-pkg/zed-interfaces";
+import type {
+  PackageMetadata,
+  RegistryNamespaceProvider,
+  RegistryNamespaceRequest,
+  VersionScheme,
+} from "@zed-pkg/zed-interfaces";
 
-import { ResolveError, latestStable, resolveVersion } from "./index.ts";
+import {
+  ResolveError,
+  latestStable,
+  planRegistryNamespaces,
+  resolveVersion,
+  summarizeRegistryNamespacePlan,
+} from "./index.ts";
 
 const RESOLUTION_SCHEMA = "zed-lib/conformance/version-resolution/v1";
 const LATEST_SCHEMA = "zed-lib/conformance/latest-stable/v1";
+const NAMESPACE_PLAN_SCHEMA = "zed.registry-namespace-planner-cases/v1";
 
 interface Case {
   readonly name: string;
@@ -35,6 +47,25 @@ interface Case {
 interface Corpus {
   readonly schema: string;
   readonly cases: readonly Case[];
+}
+
+interface NamespaceCase {
+  readonly name: string;
+  readonly request: RegistryNamespaceRequest;
+  readonly expected: readonly {
+    readonly provider: RegistryNamespaceProvider;
+    readonly coordinate: string | null;
+    readonly package_prefix: string | null;
+    readonly automation: string;
+    readonly disposition: string;
+    readonly proofs: readonly string[];
+    readonly step_actions: readonly string[];
+  }[];
+}
+
+interface NamespaceCorpus {
+  readonly schema: typeof NAMESPACE_PLAN_SCHEMA;
+  readonly cases: readonly NamespaceCase[];
 }
 
 const casesDir = path.join(import.meta.dirname, "../../conformance/cases");
@@ -73,6 +104,23 @@ let total = 0;
 for (const file of files) {
   const corpus = JSON.parse(fs.readFileSync(path.join(casesDir, file), "utf8")) as Corpus;
   assert.ok(corpus.cases.length > 0, `${file} has no cases`);
+
+  if (corpus.schema === NAMESPACE_PLAN_SCHEMA) {
+    const namespaceCorpus = corpus as unknown as NamespaceCorpus;
+    for (const testCase of namespaceCorpus.cases) {
+      total += 1;
+      test(`${file}: ${testCase.name}`, () => {
+        const plan = planRegistryNamespaces(testCase.request);
+        assert.deepEqual(summarizeRegistryNamespacePlan(plan), testCase.expected);
+        assert.deepEqual(
+          plan.request.providers,
+          testCase.expected.map((entry) => entry.provider),
+          "provider order must be canonical",
+        );
+      });
+    }
+    continue;
+  }
 
   for (const testCase of corpus.cases) {
     total += 1;

@@ -240,7 +240,9 @@ fn crates_io(request: &RegistryNamespaceRequest) -> RegistryNamespaceEntry {
         steps: vec![
             step(
                 RegistryNamespaceAction::CheckAvailability,
-                format!("Check every intended crates.io crate name using advisory prefix `{prefix}`."),
+                format!(
+                    "Check every intended crates.io crate name using advisory prefix `{prefix}`."
+                ),
                 false,
                 None,
             ),
@@ -264,7 +266,9 @@ fn crates_io(request: &RegistryNamespaceRequest) -> RegistryNamespaceEntry {
             ),
         ],
         warnings: vec![
-            format!("`{prefix}` is a naming convention only; crates.io does not reserve organization prefixes."),
+            format!(
+                "`{prefix}` is a naming convention only; crates.io does not reserve organization prefixes."
+            ),
             "Do not publish empty placeholder crates solely to squat on names.".to_owned(),
         ],
     }
@@ -416,11 +420,13 @@ mod tests {
 
     #[test]
     fn complete_plan_preserves_each_provider_namespace_model() {
-        let plan = plan_registry_namespaces(request(RegistryNamespaceProvider::ALL.to_vec()))
-            .unwrap();
+        let plan =
+            plan_registry_namespaces(request(RegistryNamespaceProvider::ALL.to_vec())).unwrap();
         assert_eq!(plan.entries.len(), 7);
         assert_eq!(
-            entry(&plan, RegistryNamespaceProvider::Npm).coordinate.as_deref(),
+            entry(&plan, RegistryNamespaceProvider::Npm)
+                .coordinate
+                .as_deref(),
             Some("@acme-cloud")
         );
         assert_eq!(
@@ -447,7 +453,10 @@ mod tests {
             RegistryNamespaceProvider::GitLabCom,
             RegistryNamespaceProvider::BitbucketCloud,
         ] {
-            assert_eq!(entry(&plan, provider).coordinate.as_deref(), Some("acme-cloud"));
+            assert_eq!(
+                entry(&plan, provider).coordinate.as_deref(),
+                Some("acme-cloud")
+            );
             assert_eq!(
                 entry(&plan, provider).disposition,
                 RegistryNamespaceDisposition::ManualActionRequired
