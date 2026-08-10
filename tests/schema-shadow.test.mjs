@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { generateFiles, normalizeSchema } from '../tools/schema-shadow-codegen.mjs';
+import { assertOutputRoot, generateFiles, normalizeSchema } from '../tools/schema-shadow-codegen.mjs';
 import { extractSqlTableBlock, gitBlobSha, parseSeaOrmEntity } from '../tools/check-schema-shadow.mjs';
 
 const schema = JSON.parse(readFileSync(new URL('../schema/persistence.schema.json', import.meta.url), 'utf8'));
@@ -38,6 +38,8 @@ test('emits every requested ORM family without migration authority', () => {
   for (const path of expected) assert.ok(files.has(path), path);
   assert.equal(manifest.entityCount, 15);
   assert.equal(manifest.authorityMode, 'shadow-import');
+  assert.equal(manifest.generatorFormatVersion, 1);
+  assert.match(manifest.generatorSha256, /^[0-9a-f]{64}$/);
   assert.match(files.get('sql/postgres.sql'), /SHADOW ONLY/);
   assert.match(files.get('sql/postgres.sql'), /src\/rust-orm\/sql\/registry\.sql/);
   assert.match(files.get('go/ent/schema/entities.go'), /ent\.View/);
@@ -85,4 +87,28 @@ create table if not exists zed_example (
 `, 'zed_example');
   assert.match(block, /optional_value text/);
   assert.equal(gitBlobSha('abc'), 'f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f');
+});
+
+test('rejects unsafe or duplicate imported database identifiers', () => {
+  const unsafeTable = structuredClone(schema);
+  unsafeTable.$defs.Org['x-db'].table = 'zed_orgs; drop table zed_users';
+  assert.throws(() => normalizeSchema(unsafeTable), /safe snake_case identifier/);
+
+  const unsafeColumn = structuredClone(schema);
+  unsafeColumn.$defs.Org.properties.id['x-db'] = {
+    ...unsafeColumn.$defs.Org.properties.id['x-db'],
+    column: 'id) references zed_users(id',
+  };
+  assert.throws(() => normalizeSchema(unsafeColumn), /safe snake_case identifier/);
+
+  const duplicateColumn = structuredClone(schema);
+  duplicateColumn.$defs.Org.properties.name['x-db'] = {
+    ...duplicateColumn.$defs.Org.properties.name['x-db'],
+    column: 'id',
+  };
+  assert.throws(() => normalizeSchema(duplicateColumn), /duplicate persistence columns/);
+});
+
+test('refuses destructive generation outside the canonical shadow tree', () => {
+  assert.throws(() => assertOutputRoot('/tmp/not-zed-shadow-output'), /refusing to delete or generate outside/);
 });

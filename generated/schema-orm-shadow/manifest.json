@@ -19,6 +19,8 @@
     "EntityEmbedding"
   ],
   "generator": "tools/schema-shadow-codegen.mjs",
+  "generatorFormatVersion": 1,
+  "generatorSha256": "7f41ec405a278888b6e0c7c348483229c6a6db6ad45e1ed93c30bc93e830a6a4",
   "interfaces": {
     "repository": "zed-pkg/zed-interfaces",
     "revision": "5394b2e7b070354ee79a4c6ac79c26d6264970cd",
