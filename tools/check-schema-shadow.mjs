@@ -15,6 +15,10 @@ function gitBlobSha(content) {
   return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 }
 
+function sha256(content) {
+  return createHash('sha256').update(content).digest('hex');
+}
+
 function gitRevisionBlobSha(root, revision, path) {
   const result = spawnSync('git', ['-C', root, 'rev-parse', `${revision}:${path}`], { encoding: 'utf8' });
   if (result.error?.code === 'ENOENT') fail('git is required to verify immutable import revisions');
@@ -294,6 +298,10 @@ function main() {
   const manifest = readJson('generated/schema-orm-shadow/manifest.json');
   if (manifest.authorityMode !== 'shadow-import') fail('generated manifest lost shadow authority mode');
   if (manifest.entityCount !== 15 || manifest.productionSqlBlobSha !== contract.productionSqlBlobSha) fail('generated manifest is stale');
+  const generator = readFileSync(resolve(root, 'tools/schema-shadow-codegen.mjs'), 'utf8');
+  if (manifest.generatorFormatVersion !== 1 || manifest.generatorSha256 !== sha256(generator)) {
+    fail('generated manifest does not identify the exact generator bytes');
+  }
   const generatedSql = readFileSync(resolve(generatedRoot, 'sql/postgres.sql'), 'utf8');
   if (!generatedSql.includes('SHADOW ONLY') || !generatedSql.includes(contract.productionSql)) fail('generated SQL lacks the non-executable shadow warning');
   if (existsSync(resolve(root, 'generated/sql/postgres.sql'))) fail('shadow output escaped into the canonical migration path');
