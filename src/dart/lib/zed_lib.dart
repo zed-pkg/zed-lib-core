@@ -1,13 +1,14 @@
 /// Implementations of the zed-pkg contract, in Dart.
 ///
-/// The Dart slice of `zed-lib` exists so a Flutter or web client answers
-/// "which version does `^1.2` install?" exactly the way `zed-cli` does. Both
-/// run `conformance/cases/*.json`; a disagreement is a failing test rather than
-/// a support ticket.
+/// The Dart slice of `zed-lib` exists so Flutter and web clients answer
+/// planning and resolution questions exactly the way `zed-cli` does. All
+/// slices run the shared conformance corpus.
 ///
 /// Types come from `package:zed_interfaces`; this package adds only behavior.
 library;
 
+export 'src/namespace_plan.dart'
+    show planRegistryNamespaces, summarizeRegistryNamespacePlan;
 export 'src/resolve.dart'
     show ResolveErrorKind, ResolveException, latestStable, resolveVersion, schemeOf;
 // `VersionBound`, not `Comparator`: dart:core exports `Comparator<T>`, and an

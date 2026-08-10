@@ -17,10 +17,11 @@
 //! moved, do not copy it — depend on it.
 //!
 //! Rust is the first slice. Dart and TypeScript implementations of the same
-//! behavior will live beside it under `src/`, verified against the shared
-//! corpus in `conformance/`, so a front end and the CLI cannot disagree about
-//! what a requirement resolves to.
+//! behavior live beside it under `src/`, verified against the shared corpus in
+//! `conformance/`, so a front end and the CLI cannot disagree about a plan.
 
+pub mod namespace_plan;
 pub mod resolve;
 
+pub use namespace_plan::plan_registry_namespaces;
 pub use resolve::{ResolveError, latest_stable, resolve_version};

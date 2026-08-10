@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_INTERFACES_POLYGLOT_REF: 6ad1ad3c0584a60778bf0d451d9d091ad90e6c0c
+  ZED_INTERFACES_POLYGLOT_REF: 2687d46b2049669b5d1183d9d2cbc69c63a78f61
 
 jobs:
   rust:
@@ -27,11 +27,10 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      # zed-lib is still a three-language contract suite. Its path dependencies
-      # require the reviewed polyglot zed-interfaces layout, while
-      # zed-interfaces/main is now the Rust-only production crate. Pin the exact
-      # compatibility baseline rather than following either mutable branch.
-      - name: Check out polyglot zed-interfaces contract
+      # zed-lib is a three-language behavior suite. Pin the exact merged
+      # zed-interfaces commit whose Rust, TypeScript, Dart, and generated-schema
+      # surfaces define the shared namespace contract under test.
+      - name: Check out merged polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ github.repository_owner }}/zed-interfaces
@@ -61,21 +60,19 @@ jobs:
         working-directory: zed-lib
         run: cargo test --locked --all-targets
 
-      - name: Conformance corpus
+      - name: Schema-aware conformance corpus
         working-directory: zed-lib
         run: cargo test --locked --test conformance
 
-      # Rust is the oracle for the generated cases, so a change here can rewrite
-      # what Dart and TypeScript are held to. Regenerating must be a no-op.
-      - name: Generated corpus is up to date
+      # Rust is the oracle for generated version cases. Regeneration must leave
+      # the version files unchanged and must not consume the namespace corpus.
+      - name: Generated version corpus is up to date
         working-directory: zed-lib
         run: |
           cargo run --locked --example generate_fuzz_corpus
           git diff --exit-code conformance/ \
-            || (echo "conformance/ is stale; run 'cargo run --locked --example generate_fuzz_corpus' and commit" && exit 1)
+            || (echo "generated version corpus is stale; regenerate and commit" && exit 1)
 
-  # Each implementation slice runs the same corpus. These jobs are what turn
-  # "three implementations of one contract" from a claim into a check.
   dart:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -87,7 +84,7 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Check out polyglot zed-interfaces contract
+      - name: Check out merged polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ github.repository_owner }}/zed-interfaces
@@ -111,7 +108,7 @@ jobs:
         working-directory: zed-lib/src/dart
         run: dart analyze --fatal-infos
 
-      - name: Conformance corpus
+      - name: Run all behavior and conformance tests
         working-directory: zed-lib/src/dart
         run: dart test
 
@@ -126,7 +123,7 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Check out polyglot zed-interfaces contract
+      - name: Check out merged polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ github.repository_owner }}/zed-interfaces
@@ -149,8 +146,6 @@ jobs:
         working-directory: zed-lib/src/ts
         run: npx tsc --noEmit
 
-      # Node strips the types, so the corpus runs against the shipped source
-      # rather than a build artifact.
-      - name: Conformance corpus
+      - name: Run all behavior and conformance tests
         working-directory: zed-lib/src/ts
-        run: node --test conformance.test.ts
+        run: npm test

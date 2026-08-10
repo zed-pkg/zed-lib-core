@@ -1,0 +1,201 @@
+{
+  "schema": "zed.registry-namespace-planner-cases/v1",
+  "cases": [
+    {
+      "name": "domain-complete",
+      "request": {
+        "brand": "acme-cloud",
+        "domain": "packages.acme.example",
+        "github_owner": "acme-cloud",
+        "providers": [
+          "npm",
+          "maven-central",
+          "crates-io",
+          "pub-dev",
+          "github",
+          "gitlab-com",
+          "bitbucket-cloud"
+        ]
+      },
+      "expected": [
+        {
+          "provider": "npm",
+          "coordinate": "@acme-cloud",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["registry-account-control"],
+          "step_actions": [
+            "check-availability",
+            "create-organization",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "maven-central",
+          "coordinate": "example.acme.packages",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["registry-account-control", "domain-control"],
+          "step_actions": [
+            "check-availability",
+            "register-namespace",
+            "verify-domain",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "crates-io",
+          "coordinate": null,
+          "package_prefix": "acme-cloud-",
+          "automation": "not-reservable",
+          "disposition": "not-reservable",
+          "proofs": ["existing-package-ownership"],
+          "step_actions": [
+            "check-availability",
+            "publish-first-package",
+            "add-owner-team",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "pub-dev",
+          "coordinate": "packages.acme.example",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["registry-account-control", "domain-control"],
+          "step_actions": [
+            "verify-domain",
+            "create-publisher",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "github",
+          "coordinate": "acme-cloud",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["forge-administrator"],
+          "step_actions": [
+            "check-availability",
+            "create-organization",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "gitlab-com",
+          "coordinate": "acme-cloud",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["forge-administrator"],
+          "step_actions": [
+            "check-availability",
+            "create-group",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "bitbucket-cloud",
+          "coordinate": "acme-cloud",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["forge-administrator"],
+          "step_actions": [
+            "check-availability",
+            "create-workspace",
+            "record-ownership-evidence"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "github-maven-fallback-and-missing-pub-domain",
+      "request": {
+        "brand": "acme",
+        "domain": null,
+        "github_owner": "acme-labs",
+        "providers": ["maven-central", "pub-dev"]
+      },
+      "expected": [
+        {
+          "provider": "maven-central",
+          "coordinate": "io.github.acme-labs",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["registry-account-control", "github-account-control"],
+          "step_actions": [
+            "check-availability",
+            "register-namespace",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "pub-dev",
+          "coordinate": null,
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "missing-prerequisite",
+          "proofs": ["domain-control"],
+          "step_actions": ["verify-domain"]
+        }
+      ]
+    },
+    {
+      "name": "provider-order-is-canonical",
+      "request": {
+        "brand": "zed-pkg",
+        "domain": "zpkg.example",
+        "github_owner": "zed-pkg",
+        "providers": ["bitbucket-cloud", "crates-io", "npm"]
+      },
+      "expected": [
+        {
+          "provider": "npm",
+          "coordinate": "@zed-pkg",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["registry-account-control"],
+          "step_actions": [
+            "check-availability",
+            "create-organization",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "crates-io",
+          "coordinate": null,
+          "package_prefix": "zed-pkg-",
+          "automation": "not-reservable",
+          "disposition": "not-reservable",
+          "proofs": ["existing-package-ownership"],
+          "step_actions": [
+            "check-availability",
+            "publish-first-package",
+            "add-owner-team",
+            "record-ownership-evidence"
+          ]
+        },
+        {
+          "provider": "bitbucket-cloud",
+          "coordinate": "zed-pkg",
+          "package_prefix": null,
+          "automation": "manual-web-flow",
+          "disposition": "manual-action-required",
+          "proofs": ["forge-administrator"],
+          "step_actions": [
+            "check-availability",
+            "create-workspace",
+            "record-ownership-evidence"
+          ]
+        }
+      ]
+    }
+  ]
+}

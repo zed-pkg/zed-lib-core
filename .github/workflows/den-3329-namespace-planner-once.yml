@@ -1,0 +1,160 @@
+name: certify registry namespace planner once
+
+# Exact-head rerun after pinning normal CI to the merged interface contract.
+on:
+  push:
+    branches:
+      - alexanderdmills/den-3329-registry-namespace-planner-v1
+    paths:
+      - .github/workflows/den-3329-namespace-planner-once.yml
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/den-3329-namespace-planner-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: den-3329-namespace-planner-certification
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  TARGET_BRANCH: alexanderdmills/den-3329-registry-namespace-planner-v1
+  ZED_INTERFACES_REF: 2687d46b2049669b5d1183d9d2cbc69c63a78f61
+
+jobs:
+  certify:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/alexanderdmills/den-3329-registry-namespace-planner-v1') ||
+      (github.event_name == 'pull_request' &&
+       github.head_ref == 'alexanderdmills/den-3329-registry-namespace-planner-v1' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Check out exact behavior candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          path: zed-lib
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Check out exact merged namespace interface contract
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_REF }}
+          path: zed-interfaces
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact sibling contract and correct optional generated fields
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          test "$(git -C ../zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_REF"
+          grep -F 'github(' ../zed-interfaces/src/dart/lib/common.dart
+          grep -F 'gitlabCom(' ../zed-interfaces/src/dart/lib/common.dart
+          grep -F 'githubAccountControl(' ../zed-interfaces/src/dart/lib/common.dart
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ts = Path('src/ts/namespace-plan.ts')
+          text = ts.read_text(encoding='utf-8')
+          old = '    proofs: [...entry.proofs],\n'
+          new = '    proofs: [...(entry.proofs ?? [])],\n'
+          if text.count(old) != 1:
+              raise SystemExit('TypeScript optional proofs anchor drifted')
+          ts.write_text(text.replace(old, new), encoding='utf-8')
+
+          dart = Path('src/dart/lib/src/namespace_plan.dart')
+          text = dart.read_text(encoding='utf-8')
+          old = "            'proofs': entry.proofs.map((proof) => proof.toJson()).toList(),\n"
+          new = "            'proofs': (entry.proofs ?? const <RegistryNamespaceProof>[])\n                .map((proof) => proof.toJson())\n                .toList(),\n"
+          if text.count(old) != 1:
+              raise SystemExit('Dart optional proofs anchor drifted')
+          dart.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+
+      - name: Install Dart SDK
+        uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
+
+      - name: Run Rust planner and schema-aware shared corpus
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo test --locked --all-targets
+          cargo clippy --locked --all-targets -- -D warnings
+          git diff --check
+
+      - name: Run TypeScript planner and corpus
+        working-directory: zed-lib/src/ts
+        run: |
+          set -euo pipefail
+          npm install
+          npm install --no-save typescript@5 @types/node
+          npx tsc --noEmit
+          npm test
+
+      - name: Run Dart planner and corpus
+        working-directory: zed-lib/src/dart
+        run: |
+          set -euo pipefail
+          dart pub get
+          dart format lib/zed_lib.dart lib/src/namespace_plan.dart test/namespace_plan_test.dart
+          dart analyze --fatal-infos
+          dart test
+
+      - name: Clean dependency state and enforce source boundary
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          rm -rf src/ts/node_modules src/dart/.dart_tool
+          if ! git ls-files --error-unmatch src/ts/package-lock.json >/dev/null 2>&1; then
+            rm -f src/ts/package-lock.json
+          fi
+          if ! git ls-files --error-unmatch src/dart/pubspec.lock >/dev/null 2>&1; then
+            rm -f src/dart/pubspec.lock
+          fi
+          git diff --check
+
+          mapfile -t changed < <(git status --short | sed -E 's/^.. //')
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/workflows/den-3329-namespace-planner-once.yml|src/rust/namespace_plan.rs|src/rust/lib.rs|src/rust/tests/conformance.rs|conformance/cases/registry-namespace-plans.json|src/ts/namespace-plan.ts|src/ts/namespace-plan.test.ts|src/ts/index.ts|src/ts/package.json|src/dart/lib/src/namespace_plan.dart|src/dart/lib/zed_lib.dart|src/dart/test/namespace_plan_test.dart|docs/registry-namespace-planning.md|.github/workflows/ci.yml|.github/workflows/merge-certification.yml)
+                ;;
+              *)
+                echo "namespace planner validation changed an unexpected path: $path" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Remove one-shot workflow and publish certified behavior
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          rm .github/workflows/den-3329-namespace-planner-once.yml
+          git add -A
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "chore(DEN-3329): certify cross-language namespace planner"
+          git push origin HEAD:${TARGET_BRANCH}
