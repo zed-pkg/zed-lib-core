@@ -36,8 +36,8 @@ models use `entsql.Skip()` and composite-key tables are emitted as `ent.View`
 models so Ent cannot inject a synthetic key or mutate the schema.
 
 The relationship projection is intentionally incomplete: production SQL has
-34 foreign keys and 34 explicit `ON DELETE` actions, while the current JSON
-Schema models 13 relationships and no referential actions. The other 21
+40 foreign keys and 40 explicit `ON DELETE` actions, while the current JSON
+Schema models 19 relationships and no referential actions. The other 21
 foreign keys and all deletion behavior remain owned by `registry.sql`; the
 generated shadow DDL uses dialect defaults and must not be used as a semantic
 substitute. `schema/import.lock.json` pins these counts so the gap cannot grow
@@ -55,10 +55,11 @@ exists:
 - `AuditLog` → `AuditLogResponse`
 - `EntityEmbedding` → `EmbeddingUpsertRequest`
 
-Memberships, invitations, tokens, upload attempts, and other internal records
-remain internal persistence types. The generated descriptors may name those
-records for storage and authorization routines, but they must not publish a
-second API contract.
+Memberships, invitations, tokens, upload attempts, immutable dependency-graph
+artifacts, normalized graph edges, and other internal records remain internal
+persistence types. The generated descriptors may name those records for
+storage and authorization routines, but they must not publish a second API
+contract.
 
 ## Drift gates
 
@@ -68,7 +69,7 @@ semantic reconciliation in the same commit:
 1. the immutable `zed-interfaces` revision, schema-index blob, bound schema
    paths, and bound schema titles;
 2. the production SQL Git-blob identity;
-3. any of the 15 SeaORM entity source blob identities;
+3. any of the 17 SeaORM entity source blob identities;
 4. a SeaORM table name, field, Rust type, or nullability;
 5. a JSON Schema table or column missing from production SQL;
 6. the isolated `generated/schema-orm-shadow` output path; or

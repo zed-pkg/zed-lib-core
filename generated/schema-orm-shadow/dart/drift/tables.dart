@@ -182,6 +182,65 @@ class PackageVersion extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+class DependencyGraphArtifact extends Table {
+  @override
+  String get tableName => "zed_dependency_graph_artifacts";
+
+  TextColumn get id => text().named("id")();
+  TextColumn get rootPackageVersionId => text().named("root_package_version_id")();
+  TextColumn get graphKind => text().named("graph_kind")();
+  TextColumn get schemaVersion => text().named("schema_version")();
+  TextColumn get graphDigest => text().named("graph_digest")();
+  TextColumn get resolverName => text().named("resolver_name").nullable()();
+  TextColumn get resolverVersion => text().named("resolver_version").nullable()();
+  TextColumn get resolutionInputDigest => text().named("resolution_input_digest").nullable()();
+  TextColumn get registryCheckpoint => text().named("registry_checkpoint").nullable()();
+  TextColumn get target => text().named("target")();
+  TextColumn get enabledFeatures => text().named("enabled_features")();
+  TextColumn get document => text().named("document")();
+  IntColumn get nodeCount => integer().named("node_count")();
+  IntColumn get edgeCount => integer().named("edge_count")();
+  IntColumn get maxDepth => integer().named("max_depth")();
+  IntColumn get cycleCount => integer().named("cycle_count")();
+  DateTimeColumn get createdAt => dateTime().named("created_at")();
+  DateTimeColumn get sealedAt => dateTime().named("sealed_at").nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class DependencyGraphEdge extends Table {
+  @override
+  String get tableName => "zed_dependency_graph_edges";
+
+  TextColumn get id => text().named("id")();
+  TextColumn get graphArtifactId => text().named("graph_artifact_id")();
+  IntColumn get ordinal => integer().named("ordinal")();
+  TextColumn get fromRegistryId => text().named("from_registry_id")();
+  TextColumn get fromOrgSlug => text().named("from_org_slug")();
+  TextColumn get fromPackageName => text().named("from_package_name")();
+  TextColumn get fromVersion => text().named("from_version").nullable()();
+  TextColumn get fromPackageId => text().named("from_package_id").nullable()();
+  TextColumn get fromPackageVersionId => text().named("from_package_version_id").nullable()();
+  TextColumn get toRegistryId => text().named("to_registry_id")();
+  TextColumn get toOrgSlug => text().named("to_org_slug")();
+  TextColumn get toPackageName => text().named("to_package_name")();
+  TextColumn get toVersion => text().named("to_version").nullable()();
+  TextColumn get toPackageId => text().named("to_package_id").nullable()();
+  TextColumn get toPackageVersionId => text().named("to_package_version_id").nullable()();
+  TextColumn get requirement => text().named("requirement").nullable()();
+  TextColumn get dependencyKind => text().named("dependency_kind")();
+  BoolColumn get optional => boolean().named("optional")();
+  BoolColumn get defaultFeatures => boolean().named("default_features")();
+  TextColumn get features => text().named("features")();
+  TextColumn get target => text().named("target").nullable()();
+  IntColumn get minimumDepth => integer().named("minimum_depth")();
+  DateTimeColumn get createdAt => dateTime().named("created_at")();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 class PackageLicense extends Table {
   @override
   String get tableName => "zed_package_licenses";

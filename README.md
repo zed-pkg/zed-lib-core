@@ -49,13 +49,33 @@ Three rules define the crate:
 - `write`: identity projection, org/project/package creation, visibility
   transition, compatibility download recording, and invitation creation.
 - `registry`: cross-entity text/semantic search plus read-write-gated upload,
-  full download evidence, package licenses, and embedding upserts.
+  full download evidence, package licenses, embedding upserts, and immutable
+  dependency-graph documents with normalized reverse-impact edges.
 - `invitations`: atomic one-time organization/project invitation acceptance,
   compiled only for API write builds.
 
 The API tier owns authentication and authorization. These operations own input
 validation, schema relationships, transaction boundaries, source redaction,
 and fail-closed persistence behavior.
+
+### Dependency graphs
+
+`zed_dependency_graph_artifacts.document` is the lossless JSON authority for a
+declared or resolved graph. Its `sha256:` semantic digest is immutable. The
+ordered `zed_dependency_graph_edges` rows are a relational index derived from
+that document for neighborhood and reverse-impact queries; they are never an
+independent serialization authority.
+
+`registry::persist_dependency_graph` validates and commits the document and
+all edges in one transaction, then seals both representations against partial
+mutation. The shared typed graph contract recomputes the canonical semantic
+digest and every normalized edge before the seal. An exact retry returns the
+original artifact id, while a digest or declared-root replay with different
+facts fails closed. Read-only consumers use visibility-scoped named operations:
+fetch by digest, fetch the newest graph for a root package version, or query
+incoming and outgoing edges for reverse-impact and dependency-path traversal.
+Private consumer graphs are filtered by the root package's organization rather
+than leaked through a public dependency target.
 
 ### Where the tables live
 
@@ -78,7 +98,7 @@ A principal maps to exactly one registry user through
 separate databases, so there is deliberately no foreign key;
 `write::upsert_user_from_session` is what keeps the two planes consistent.
 
-### The private → public promotion rule
+### The private → public promotion and permanence rules
 
 A private package may be made public only while it is at most **10 days old**
 and has at most **50 recorded downloads**.
@@ -94,6 +114,12 @@ The limits are read from `zed_public_conversion_max_age_days()` and
 `zed_public_conversion_max_downloads()` rather than hardcoded, so the policy
 changes in one place. Both layers use `>` rather than `>=`: a package sitting
 exactly on a boundary still promotes.
+
+Once public, a package cannot become private or organization-only again:
+published artifact bytes and exact dependency graphs may already be held by
+shared caches indefinitely. The same database trigger rejects that transition
+with `ZD003`, and the ordered forward migration upgrades databases that already
+recorded the original registry snapshot.
 
 ### Search vectors
 

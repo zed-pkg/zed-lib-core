@@ -19,6 +19,8 @@ const entityDescriptors = <EntityDescriptor>[
   EntityDescriptor(entity: "ProjectInvitation", interfaceType: "internal::ProjectInvitation", table: "zed_project_invitations", primaryKey: <String>["id"]),
   EntityDescriptor(entity: "Package", interfaceType: "PackageMetadata", table: "zed_packages", primaryKey: <String>["id"]),
   EntityDescriptor(entity: "PackageVersion", interfaceType: "VersionMetadata", table: "zed_package_versions", primaryKey: <String>["id"]),
+  EntityDescriptor(entity: "DependencyGraphArtifact", interfaceType: "internal::DependencyGraphArtifact", table: "zed_dependency_graph_artifacts", primaryKey: <String>["id"]),
+  EntityDescriptor(entity: "DependencyGraphEdge", interfaceType: "internal::DependencyGraphEdge", table: "zed_dependency_graph_edges", primaryKey: <String>["id"]),
   EntityDescriptor(entity: "PackageLicense", interfaceType: "internal::PackageLicense", table: "zed_package_licenses", primaryKey: <String>["id"]),
   EntityDescriptor(entity: "PackageUpload", interfaceType: "internal::PublishAttempt", table: "zed_package_uploads", primaryKey: <String>["id"]),
   EntityDescriptor(entity: "PackageDownload", interfaceType: "internal::DownloadEvent", table: "zed_package_downloads", primaryKey: <String>["id"]),

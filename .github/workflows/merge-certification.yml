@@ -44,7 +44,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_INTERFACES_POLYGLOT_REF: 2687d46b2049669b5d1183d9d2cbc69c63a78f61
+  ZED_INTERFACES_POLYGLOT_REF: 7d31f80dd8a310f218931165a3ad636a2f32b932
 
 jobs:
   certify:

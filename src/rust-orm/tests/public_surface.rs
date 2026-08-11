@@ -70,12 +70,15 @@ fn organization_invitations_use_one_typed_write_command() {
 fn shared_schema_source_is_exact_and_external() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
-        "d8fb884023a26de79d4f5d533f486a2d3dbec7cc",
-        "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c",
+        "a1fb823890d4a36dfab67c311f0d728d7b22c1c9",
+        "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9",
+        "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2",
+        "8612f037dce7de6d7db66ee96db7996b33b32ea9",
         "\"org_slice\": \"zed-pkg\"",
         "\"schema\": \"public\"",
         "\"table_prefix\": \"zed_\"",
         "pg-defs/schema/orgs/zed-pkg/registry.sql",
+        "2026-08-11-dependency-graph-artifacts.sql",
         "2026-08-11-public-visibility-is-permanent.sql",
         "pg-defs/generated/rust/sea-orm",
     ] {
@@ -84,6 +87,68 @@ fn shared_schema_source_is_exact_and_external() {
 
     let zpkg = read_repo(".zpkg.toml");
     assert!(zpkg.contains("\"oresoftware/k8s-libs-and-shared-defs\""));
+
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_REVISION,
+        "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION,
+        "pg-defs/schema/orgs/zed-pkg/migrations/2026-08-11-dependency-graph-artifacts.sql"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA,
+        "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION,
+        "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION,
+        "pg-defs/schema/orgs/zed-pkg/migrations/2026-08-11-public-visibility-is-permanent.sql"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA,
+        "8612f037dce7de6d7db66ee96db7996b33b32ea9"
+    );
+}
+
+#[test]
+fn migration_ledger_keeps_base_graph_and_visibility_distinct() {
+    let migrations = read("migrations.rs");
+    assert!(migrations.contains("registry@c8bdc06d74746acc6439f9527ebd02697fdf028b"));
+    assert!(migrations.contains("Self::HistoricalBase"));
+    assert!(migrations.contains("Self::DependencyGraph"));
+    assert!(migrations.contains("Self::VisibilityImmutability"));
+    assert!(migrations.contains("sql/2026-08-11-dependency-graph-artifacts.sql"));
+    assert!(migrations.contains("sql/2026-08-11-public-visibility-is-permanent.sql"));
+}
+
+#[cfg(feature = "migrate")]
+#[test]
+fn individual_migration_versions_are_public_and_distinct() {
+    let graph = zed_orm_core::migrations::dependency_graph_version();
+    let visibility = zed_orm_core::migrations::visibility_immutability_version();
+    assert!(graph.ends_with(zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_REVISION));
+    assert!(visibility.ends_with(zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION));
+    assert_ne!(graph, visibility);
+    assert_eq!(zed_orm_core::migrations::registry_version(), visibility);
+}
+
+#[test]
+fn dependency_graph_writes_are_gated_and_reads_are_visibility_scoped() {
+    let registry = read("registry/mod.rs");
+    assert!(registry.contains("#[cfg(feature = \"read-write\")]\npub use graphs"));
+
+    let graphs = read("registry/graphs.rs");
+    assert!(graphs.contains("pub async fn dependency_graph_by_digest"));
+    assert!(graphs.contains("pub async fn incoming_dependency_edges"));
+    assert!(graphs.contains("pub async fn outgoing_dependency_edges"));
+    assert!(graphs.contains("visible_org_ids"));
+    assert!(graphs.contains("package::Column::Visibility.eq(\"public\")"));
+    assert!(graphs.contains("pub async fn persist_dependency_graph"));
+    assert!(graphs.contains("#[cfg(feature = \"read-write\")]"));
 }
 
 #[test]

@@ -7,6 +7,8 @@
 
 pub mod api_token;
 pub mod audit_log;
+pub mod dependency_graph_artifact;
+pub mod dependency_graph_edge;
 pub mod entity_embedding;
 pub mod org;
 pub mod org_invitation;

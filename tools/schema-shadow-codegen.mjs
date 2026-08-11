@@ -152,7 +152,7 @@ function normalizeSchema(schema) {
       primaryKey,
     });
   }
-  if (entities.length !== 15) fail(`expected 15 imported entities, got ${entities.length}`);
+  if (entities.length !== 17) fail(`expected 17 imported entities, got ${entities.length}`);
   const tables = entities.map((entity) => entity.table);
   if (new Set(tables).size !== tables.length) fail('imported entities contain duplicate table names');
   const entityMap = new Map(entities.map((entity) => [entity.name, entity]));

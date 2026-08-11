@@ -19,6 +19,8 @@ var EntityDescriptors = []EntityDescriptor{
 	{Entity: "ProjectInvitation", InterfaceType: "internal::ProjectInvitation", Table: "zed_project_invitations", PrimaryKey: []string{"id"}},
 	{Entity: "Package", InterfaceType: "PackageMetadata", Table: "zed_packages", PrimaryKey: []string{"id"}},
 	{Entity: "PackageVersion", InterfaceType: "VersionMetadata", Table: "zed_package_versions", PrimaryKey: []string{"id"}},
+	{Entity: "DependencyGraphArtifact", InterfaceType: "internal::DependencyGraphArtifact", Table: "zed_dependency_graph_artifacts", PrimaryKey: []string{"id"}},
+	{Entity: "DependencyGraphEdge", InterfaceType: "internal::DependencyGraphEdge", Table: "zed_dependency_graph_edges", PrimaryKey: []string{"id"}},
 	{Entity: "PackageLicense", InterfaceType: "internal::PackageLicense", Table: "zed_package_licenses", PrimaryKey: []string{"id"}},
 	{Entity: "PackageUpload", InterfaceType: "internal::PublishAttempt", Table: "zed_package_uploads", PrimaryKey: []string{"id"}},
 	{Entity: "PackageDownload", InterfaceType: "internal::DownloadEvent", Table: "zed_package_downloads", PrimaryKey: []string{"id"}},

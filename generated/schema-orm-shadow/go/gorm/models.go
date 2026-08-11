@@ -163,6 +163,63 @@ type PackageVersion struct {
 
 func (PackageVersion) TableName() string { return "zed_package_versions" }
 
+type DependencyGraphArtifact struct {
+	ID                                   uuid.UUID       `json:"id" gorm:"column:id;type:uuid;primaryKey;autoIncrement:false;not null"`
+	RootPackageVersionID                 uuid.UUID       `json:"rootPackageVersionId" gorm:"column:root_package_version_id;type:uuid;not null"`
+	GraphKind                            string          `json:"graphKind" gorm:"column:graph_kind;type:text;not null"`
+	SchemaVersion                        string          `json:"schemaVersion" gorm:"column:schema_version;type:text;not null"`
+	GraphDigest                          string          `json:"graphDigest" gorm:"column:graph_digest;type:text;not null"`
+	ResolverName                         *string         `json:"resolverName" gorm:"column:resolver_name;type:text"`
+	ResolverVersion                      *string         `json:"resolverVersion" gorm:"column:resolver_version;type:text"`
+	ResolutionInputDigest                *string         `json:"resolutionInputDigest" gorm:"column:resolution_input_digest;type:text"`
+	RegistryCheckpoint                   *string         `json:"registryCheckpoint" gorm:"column:registry_checkpoint;type:text"`
+	Target                               json.RawMessage `json:"target" gorm:"column:target;type:jsonb;not null"`
+	EnabledFeatures                      json.RawMessage `json:"enabledFeatures" gorm:"column:enabled_features;type:jsonb;not null"`
+	Document                             json.RawMessage `json:"document" gorm:"column:document;type:jsonb;not null"`
+	NodeCount                            int32           `json:"nodeCount" gorm:"column:node_count;type:integer;not null"`
+	EdgeCount                            int32           `json:"edgeCount" gorm:"column:edge_count;type:integer;not null"`
+	MaxDepth                             int32           `json:"maxDepth" gorm:"column:max_depth;type:integer;not null"`
+	CycleCount                           int32           `json:"cycleCount" gorm:"column:cycle_count;type:integer;not null"`
+	CreatedAt                            time.Time       `json:"createdAt" gorm:"column:created_at;type:timestamptz;not null"`
+	SealedAt                             *time.Time      `json:"sealedAt" gorm:"column:sealed_at;type:timestamptz"`
+	PackageVersionByRootPackageVersionID PackageVersion  `json:"-" gorm:"foreignKey:RootPackageVersionID;references:ID"`
+}
+
+func (DependencyGraphArtifact) TableName() string { return "zed_dependency_graph_artifacts" }
+
+type DependencyGraphEdge struct {
+	ID                                       uuid.UUID               `json:"id" gorm:"column:id;type:uuid;primaryKey;autoIncrement:false;not null"`
+	GraphArtifactID                          uuid.UUID               `json:"graphArtifactId" gorm:"column:graph_artifact_id;type:uuid;not null"`
+	Ordinal                                  int32                   `json:"ordinal" gorm:"column:ordinal;type:integer;not null"`
+	FromRegistryID                           string                  `json:"fromRegistryId" gorm:"column:from_registry_id;type:text;not null"`
+	FromOrgSlug                              string                  `json:"fromOrgSlug" gorm:"column:from_org_slug;type:text;not null"`
+	FromPackageName                          string                  `json:"fromPackageName" gorm:"column:from_package_name;type:text;not null"`
+	FromVersion                              *string                 `json:"fromVersion" gorm:"column:from_version;type:text"`
+	FromPackageID                            *uuid.UUID              `json:"fromPackageId" gorm:"column:from_package_id;type:uuid"`
+	FromPackageVersionID                     *uuid.UUID              `json:"fromPackageVersionId" gorm:"column:from_package_version_id;type:uuid"`
+	ToRegistryID                             string                  `json:"toRegistryId" gorm:"column:to_registry_id;type:text;not null"`
+	ToOrgSlug                                string                  `json:"toOrgSlug" gorm:"column:to_org_slug;type:text;not null"`
+	ToPackageName                            string                  `json:"toPackageName" gorm:"column:to_package_name;type:text;not null"`
+	ToVersion                                *string                 `json:"toVersion" gorm:"column:to_version;type:text"`
+	ToPackageID                              *uuid.UUID              `json:"toPackageId" gorm:"column:to_package_id;type:uuid"`
+	ToPackageVersionID                       *uuid.UUID              `json:"toPackageVersionId" gorm:"column:to_package_version_id;type:uuid"`
+	Requirement                              *string                 `json:"requirement" gorm:"column:requirement;type:text"`
+	DependencyKind                           string                  `json:"dependencyKind" gorm:"column:dependency_kind;type:text;not null"`
+	Optional                                 bool                    `json:"optional" gorm:"column:optional;type:boolean;not null"`
+	DefaultFeatures                          bool                    `json:"defaultFeatures" gorm:"column:default_features;type:boolean;not null"`
+	Features                                 json.RawMessage         `json:"features" gorm:"column:features;type:jsonb;not null"`
+	Target                                   *string                 `json:"target" gorm:"column:target;type:text"`
+	MinimumDepth                             int32                   `json:"minimumDepth" gorm:"column:minimum_depth;type:integer;not null"`
+	CreatedAt                                time.Time               `json:"createdAt" gorm:"column:created_at;type:timestamptz;not null"`
+	DependencyGraphArtifactByGraphArtifactID DependencyGraphArtifact `json:"-" gorm:"foreignKey:GraphArtifactID;references:ID"`
+	PackageByFromPackageID                   *Package                `json:"-" gorm:"foreignKey:FromPackageID;references:ID"`
+	PackageVersionByFromPackageVersionID     *PackageVersion         `json:"-" gorm:"foreignKey:FromPackageVersionID;references:ID"`
+	PackageByToPackageID                     *Package                `json:"-" gorm:"foreignKey:ToPackageID;references:ID"`
+	PackageVersionByToPackageVersionID       *PackageVersion         `json:"-" gorm:"foreignKey:ToPackageVersionID;references:ID"`
+}
+
+func (DependencyGraphEdge) TableName() string { return "zed_dependency_graph_edges" }
+
 type PackageLicense struct {
 	ID                 uuid.UUID  `json:"id" gorm:"column:id;type:uuid;primaryKey;autoIncrement:false;not null"`
 	PackageID          uuid.UUID  `json:"packageId" gorm:"column:package_id;type:uuid;not null"`

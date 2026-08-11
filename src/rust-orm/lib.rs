@@ -8,8 +8,8 @@
 //! 1. **The schema is not ours.** Every table lives in
 //!    `pg-defs/schema/orgs/zed-pkg/registry.sql` in `k8s-libs-and-shared-defs`
 //!    at the revision pinned in [`schema::SHARED_DEFS_REVISION`] and
-//!    `shared-defs.lock.json`. [`migrations`] applies that reviewed SQL and
-//!    authors none of its own.
+//!    `shared-defs.lock.json`. [`migrations`] applies that reviewed base plus
+//!    exact-pinned forward migrations and authors no DDL of its own.
 //! 2. **Raw sessions do not escape.** Consumers receive an opaque
 //!    [`ReadContext`] or [`WriteContext`] and call named operations in [`read`],
 //!    [`registry`], [`write`], and the feature-gated [`account`],
@@ -69,10 +69,12 @@ pub use error::{
 };
 pub use policy::{PromotionRefusal, VisibilityLimits};
 pub use schema::{
-    qualified, ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT,
-    SHARED_DEFS_REVISION, SHARED_DEFS_SEA_ORM_ADAPTER,
-    SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION, SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION,
-    TABLE_PREFIX,
+    qualified, ORG_SCHEMA, SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION,
+    SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA, SHARED_DEFS_DEPENDENCY_GRAPH_REVISION,
+    SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT, SHARED_DEFS_REVISION,
+    SHARED_DEFS_SEA_ORM_ADAPTER, SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION,
+    SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA,
+    SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION, TABLE_PREFIX,
 };
 
 /// Default consumers cannot import write symbols. This doctest is compiled only

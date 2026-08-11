@@ -334,6 +334,125 @@ pub mod package_version {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+pub mod dependency_graph_artifact {
+    use sea_orm::entity::prelude::*;
+
+    /// Shadow model for `zed_dependency_graph_artifacts`; imported from `src/rust-orm/entities/dependency_graph_artifact.rs`.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "zed_dependency_graph_artifacts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub root_package_version_id: Uuid,
+        pub graph_kind: String,
+        pub schema_version: String,
+        pub graph_digest: String,
+        pub resolver_name: Option<String>,
+        pub resolver_version: Option<String>,
+        pub resolution_input_digest: Option<String>,
+        pub registry_checkpoint: Option<String>,
+        #[sea_orm(column_type = "JsonBinary")]
+        pub target: Json,
+        #[sea_orm(column_type = "JsonBinary")]
+        pub enabled_features: Json,
+        #[sea_orm(column_type = "JsonBinary")]
+        pub document: Json,
+        pub node_count: i32,
+        pub edge_count: i32,
+        pub max_depth: i32,
+        pub cycle_count: i32,
+        pub created_at: DateTimeWithTimeZone,
+        pub sealed_at: Option<DateTimeWithTimeZone>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(
+            belongs_to = "super::package_version::Entity",
+            from = "Column::RootPackageVersionId",
+            to = "super::package_version::Column::Id"
+        )]
+        PackageVersionRootPackageVersionId,
+    }
+
+    // Multiple foreign keys may point at one entity; use Relation variants explicitly.
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod dependency_graph_edge {
+    use sea_orm::entity::prelude::*;
+
+    /// Shadow model for `zed_dependency_graph_edges`; imported from `src/rust-orm/entities/dependency_graph_edge.rs`.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "zed_dependency_graph_edges")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub graph_artifact_id: Uuid,
+        pub ordinal: i32,
+        pub from_registry_id: String,
+        pub from_org_slug: String,
+        pub from_package_name: String,
+        pub from_version: Option<String>,
+        pub from_package_id: Option<Uuid>,
+        pub from_package_version_id: Option<Uuid>,
+        pub to_registry_id: String,
+        pub to_org_slug: String,
+        pub to_package_name: String,
+        pub to_version: Option<String>,
+        pub to_package_id: Option<Uuid>,
+        pub to_package_version_id: Option<Uuid>,
+        pub requirement: Option<String>,
+        pub dependency_kind: String,
+        pub optional: bool,
+        pub default_features: bool,
+        #[sea_orm(column_type = "JsonBinary")]
+        pub features: Json,
+        pub target: Option<String>,
+        pub minimum_depth: i32,
+        pub created_at: DateTimeWithTimeZone,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(
+            belongs_to = "super::dependency_graph_artifact::Entity",
+            from = "Column::GraphArtifactId",
+            to = "super::dependency_graph_artifact::Column::Id"
+        )]
+        DependencyGraphArtifactGraphArtifactId,
+        #[sea_orm(
+            belongs_to = "super::package::Entity",
+            from = "Column::FromPackageId",
+            to = "super::package::Column::Id"
+        )]
+        PackageFromPackageId,
+        #[sea_orm(
+            belongs_to = "super::package_version::Entity",
+            from = "Column::FromPackageVersionId",
+            to = "super::package_version::Column::Id"
+        )]
+        PackageVersionFromPackageVersionId,
+        #[sea_orm(
+            belongs_to = "super::package::Entity",
+            from = "Column::ToPackageId",
+            to = "super::package::Column::Id"
+        )]
+        PackageToPackageId,
+        #[sea_orm(
+            belongs_to = "super::package_version::Entity",
+            from = "Column::ToPackageVersionId",
+            to = "super::package_version::Column::Id"
+        )]
+        PackageVersionToPackageVersionId,
+    }
+
+    // Multiple foreign keys may point at one entity; use Relation variants explicitly.
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 pub mod package_license {
     use sea_orm::entity::prelude::*;
 

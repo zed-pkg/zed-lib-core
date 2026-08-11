@@ -10,11 +10,19 @@ const schema = JSON.parse(readFileSync(new URL('../schema/persistence.schema.jso
 
 test('normalizes the complete imported Zed persistence surface', () => {
   const model = normalizeSchema(schema);
-  assert.equal(model.entities.length, 15);
+  assert.equal(model.entities.length, 17);
   assert.equal(model.contract.authorityMode, 'shadow-import');
   assert.equal(model.contract.productionSql, 'src/rust-orm/sql/registry.sql');
   assert.deepEqual(model.entityMap.get('OrgMember').primaryKey, ['orgId', 'userId']);
   assert.deepEqual(model.entityMap.get('ProjectMember').primaryKey, ['projectId', 'userId']);
+  assert.equal(
+    model.entityMap.get('DependencyGraphArtifact').fieldMap.get('rootPackageVersionId').db.references.entity,
+    'PackageVersion',
+  );
+  assert.equal(
+    model.entityMap.get('DependencyGraphEdge').fieldMap.get('graphArtifactId').db.references.entity,
+    'DependencyGraphArtifact',
+  );
 });
 
 test('emits every requested ORM family without migration authority', () => {
@@ -36,7 +44,7 @@ test('emits every requested ORM family without migration authority', () => {
     'shared/dart/entity_descriptors.dart',
   ];
   for (const path of expected) assert.ok(files.has(path), path);
-  assert.equal(manifest.entityCount, 15);
+  assert.equal(manifest.entityCount, 17);
   assert.equal(manifest.authorityMode, 'shadow-import');
   assert.equal(manifest.generatorFormatVersion, 1);
   assert.match(manifest.generatorSha256, /^[0-9a-f]{64}$/);
@@ -64,6 +72,8 @@ test('pins public interface projections instead of redefining wire DTOs', () => 
   assert.equal(bindings.get('PackageVersion'), 'VersionMetadata');
   assert.equal(bindings.get('Org'), 'ClaimOrgResponse');
   assert.ok(interfaces.internalPersistenceEntities.includes('ApiToken'));
+  assert.ok(interfaces.internalPersistenceEntities.includes('DependencyGraphArtifact'));
+  assert.ok(interfaces.internalPersistenceEntities.includes('DependencyGraphEdge'));
 });
 
 test('parses SeaORM and SQL shapes used by the drift gate', () => {

@@ -65,6 +65,18 @@ pub const ENTITY_DESCRIPTORS: &[EntityDescriptor] = &[
         primary_key: &["id"],
     },
     EntityDescriptor {
+        entity: "DependencyGraphArtifact",
+        interface_type: "internal::DependencyGraphArtifact",
+        table: "zed_dependency_graph_artifacts",
+        primary_key: &["id"],
+    },
+    EntityDescriptor {
+        entity: "DependencyGraphEdge",
+        interface_type: "internal::DependencyGraphEdge",
+        table: "zed_dependency_graph_edges",
+        primary_key: &["id"],
+    },
+    EntityDescriptor {
         entity: "PackageLicense",
         interface_type: "internal::PackageLicense",
         table: "zed_package_licenses",

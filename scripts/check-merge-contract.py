@@ -16,11 +16,28 @@ PARENTS = (
     "430aafe24b6c3ab1263f1351ab4941545f592f19",
     "a5dabf3685db94ffdf5ae30cb3b3e4cc1cce298f",
 )
-EXPECTED_SHARED_DEFS_REVISION = "d8fb884023a26de79d4f5d533f486a2d3dbec7cc"
-EXPECTED_REGISTRY_BLOB = "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf"
-EXPECTED_VISIBILITY_REVISION = "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c"
+EXPECTED_SHARED_DEFS_REVISION = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
+EXPECTED_REGISTRY_BLOB = "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9"
+EXPECTED_DEPENDENCY_GRAPH_REVISION = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
+EXPECTED_DEPENDENCY_GRAPH_BLOB = "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2"
+EXPECTED_VISIBILITY_REVISION = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
 EXPECTED_VISIBILITY_BLOB = "8612f037dce7de6d7db66ee96db7996b33b32ea9"
 EXPECTED_PACKAGE = "zed-pkg/zed-lib-core"
+
+DEPENDENCY_GRAPH_MIGRATION = (
+    "pg-defs/schema/orgs/zed-pkg/migrations/"
+    "2026-08-11-dependency-graph-artifacts.sql"
+)
+VENDORED_DEPENDENCY_GRAPH_MIGRATION = (
+    "src/rust-orm/sql/2026-08-11-dependency-graph-artifacts.sql"
+)
+VISIBILITY_MIGRATION = (
+    "pg-defs/schema/orgs/zed-pkg/migrations/"
+    "2026-08-11-public-visibility-is-permanent.sql"
+)
+VENDORED_VISIBILITY_MIGRATION = (
+    "src/rust-orm/sql/2026-08-11-public-visibility-is-permanent.sql"
+)
 
 
 def fail(message: str) -> "NoReturn":
@@ -38,6 +55,16 @@ def git(*args: str) -> str:
     return subprocess.check_output(
         ["git", "-C", str(ROOT), *args], text=True, stderr=subprocess.DEVNULL
     ).strip()
+
+
+def rust_string_const(source: str, name: str) -> str:
+    match = re.search(
+        rf"pub const {re.escape(name)}: &str =\s*\"([^\"]+)\";",
+        source,
+    )
+    if match is None:
+        fail(f"Rust schema constant is missing or is not a string: {name}")
+    return match.group(1)
 
 
 def assert_history() -> None:
@@ -114,16 +141,51 @@ def assert_shared_defs() -> None:
         fail("shared-definitions revision differs")
     if lock.get("registry_blob_sha") != EXPECTED_REGISTRY_BLOB:
         fail("registry blob identity differs")
+    if lock.get("dependency_graph_revision") != EXPECTED_DEPENDENCY_GRAPH_REVISION:
+        fail("dependency-graph migration revision differs")
+    if lock.get("dependency_graph_migration") != DEPENDENCY_GRAPH_MIGRATION:
+        fail("dependency-graph canonical migration path differs")
+    if lock.get("dependency_graph_migration_blob_sha") != EXPECTED_DEPENDENCY_GRAPH_BLOB:
+        fail("dependency-graph migration blob identity differs")
+    if lock.get("vendored_dependency_graph_migration") != VENDORED_DEPENDENCY_GRAPH_MIGRATION:
+        fail("dependency-graph vendored migration path differs")
     if lock.get("visibility_immutability_revision") != EXPECTED_VISIBILITY_REVISION:
         fail("visibility migration revision differs")
+    if lock.get("visibility_immutability_migration") != VISIBILITY_MIGRATION:
+        fail("visibility canonical migration path differs")
     if lock.get("visibility_immutability_blob_sha") != EXPECTED_VISIBILITY_BLOB:
         fail("visibility migration blob identity differs")
+    if lock.get("vendored_visibility_immutability_migration") != VENDORED_VISIBILITY_MIGRATION:
+        fail("visibility vendored migration path differs")
     source = ROOT / lock["vendored_copy"]
     if not source.is_file():
         fail("vendored registry SQL is missing")
     actual_blob = git("hash-object", str(source.relative_to(ROOT)))
     if actual_blob != EXPECTED_REGISTRY_BLOB:
         fail(f"vendored registry SQL blob differs: {actual_blob}")
+
+    graph_patch = ROOT / lock["vendored_dependency_graph_migration"]
+    if not graph_patch.is_file():
+        fail("vendored dependency-graph migration is missing")
+    actual_graph_blob = git("hash-object", str(graph_patch.relative_to(ROOT)))
+    if actual_graph_blob != EXPECTED_DEPENDENCY_GRAPH_BLOB:
+        fail(f"vendored dependency-graph migration blob differs: {actual_graph_blob}")
+    graph_text = graph_patch.read_text(encoding="utf-8").lower()
+    for required_fragment in (
+        "create table if not exists zed_dependency_graph_artifacts",
+        "create table if not exists zed_dependency_graph_edges",
+        "zed_dependency_graph_artifacts_document_binding_chk",
+        "zed_dependency_graph_artifacts_immutable",
+        "zed_dependency_graph_edges_immutable",
+        "must be inserted unsealed",
+        "zd004",
+        "zd005",
+    ):
+        if required_fragment not in graph_text:
+            fail(f"dependency-graph migration is missing {required_fragment}")
+    if "public package % cannot become non-public" in graph_text:
+        fail("dependency-graph migration mixes visibility policy")
+
     patch = ROOT / lock["vendored_visibility_immutability_migration"]
     if not patch.is_file():
         fail("vendored visibility migration is missing")
@@ -144,6 +206,8 @@ def assert_shared_defs() -> None:
         "zed_projects",
         "zed_packages",
         "zed_package_versions",
+        "zed_dependency_graph_artifacts",
+        "zed_dependency_graph_edges",
         "zed_package_licenses",
         "zed_entity_embeddings",
         "zed_package_uploads",
@@ -154,9 +218,45 @@ def assert_shared_defs() -> None:
     missing = sorted(table for table in required if f"create table if not exists {table}" not in text)
     if missing:
         fail(f"vendored registry SQL is missing tables: {missing}")
-    for required_fragment in ("zd001", "zd002", "zed_packages_visibility_guard"):
+    for required_fragment in (
+        "zd001",
+        "zd002",
+        "zd003",
+        "public package % cannot become non-public",
+        "zed_packages_visibility_guard",
+    ):
         if required_fragment not in text:
             fail(f"registry policy is missing {required_fragment}")
+
+    schema = (ROOT / "src/rust-orm/schema.rs").read_text(encoding="utf-8")
+    for name, expected in (
+        ("SHARED_DEFS_DEPENDENCY_GRAPH_REVISION", EXPECTED_DEPENDENCY_GRAPH_REVISION),
+        ("SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION", DEPENDENCY_GRAPH_MIGRATION),
+        (
+            "SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA",
+            EXPECTED_DEPENDENCY_GRAPH_BLOB,
+        ),
+        ("SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION", EXPECTED_VISIBILITY_REVISION),
+        ("SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION", VISIBILITY_MIGRATION),
+        (
+            "SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA",
+            EXPECTED_VISIBILITY_BLOB,
+        ),
+    ):
+        if rust_string_const(schema, name) != expected:
+            fail(f"Rust schema constant {name} differs from its locked migration")
+
+    migrations = (ROOT / "src/rust-orm/migrations.rs").read_text(encoding="utf-8")
+    if "registry@c8bdc06d74746acc6439f9527ebd02697fdf028b" not in migrations:
+        fail("historical base ledger identity changed")
+    if "Self::HistoricalBase,\n        Self::DependencyGraph,\n        Self::VisibilityImmutability" not in migrations:
+        fail("ordered migration ledger differs")
+    for vendored in (
+        VENDORED_DEPENDENCY_GRAPH_MIGRATION.removeprefix("src/rust-orm/"),
+        VENDORED_VISIBILITY_MIGRATION.removeprefix("src/rust-orm/"),
+    ):
+        if f'include_str!("{vendored}")' not in migrations:
+            fail(f"migration runner does not include {vendored}")
 
 
 def assert_routes() -> None:
@@ -226,6 +326,8 @@ def main() -> None:
         "semanticFold": SEMANTIC_FOLD,
         "sharedDefsRevision": EXPECTED_SHARED_DEFS_REVISION,
         "registryBlob": EXPECTED_REGISTRY_BLOB,
+        "dependencyGraphMigrationRevision": EXPECTED_DEPENDENCY_GRAPH_REVISION,
+        "dependencyGraphMigrationBlob": EXPECTED_DEPENDENCY_GRAPH_BLOB,
         "visibilityMigrationRevision": EXPECTED_VISIBILITY_REVISION,
         "visibilityMigrationBlob": EXPECTED_VISIBILITY_BLOB,
         "routeContract": 1,

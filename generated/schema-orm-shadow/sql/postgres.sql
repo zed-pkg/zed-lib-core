@@ -228,7 +228,7 @@ create table if not exists zed_package_uploads (
   primary key (id)
 );
 
--- Imported from src/rust-orm/entities/package_version.rs @ 8d873d435d97592742254683dbef5beadf3c76d3.
+-- Imported from src/rust-orm/entities/package_version.rs @ 43040f88668c62d947340bdcfd6fdea26f2ca0c6.
 create table if not exists zed_package_versions (
   id uuid not null,
   package_id uuid not null references zed_packages (id),
@@ -247,5 +247,56 @@ create table if not exists zed_package_versions (
   yanked_reason text,
   published_by_user_id uuid,
   published_at timestamptz not null,
+  primary key (id)
+);
+
+-- Imported from src/rust-orm/entities/dependency_graph_artifact.rs @ e237ddad7ed98f53bf3cf54b68899f0b962033be.
+create table if not exists zed_dependency_graph_artifacts (
+  id uuid not null,
+  root_package_version_id uuid not null references zed_package_versions (id),
+  graph_kind text not null,
+  schema_version text not null,
+  graph_digest text not null,
+  resolver_name text,
+  resolver_version text,
+  resolution_input_digest text,
+  registry_checkpoint text,
+  target jsonb not null,
+  enabled_features jsonb not null,
+  document jsonb not null,
+  node_count integer not null,
+  edge_count integer not null,
+  max_depth integer not null,
+  cycle_count integer not null,
+  created_at timestamptz not null,
+  sealed_at timestamptz,
+  primary key (id)
+);
+
+-- Imported from src/rust-orm/entities/dependency_graph_edge.rs @ 2eaa8bee75ca6e63e66a9ab56b5ceca82059b50b.
+create table if not exists zed_dependency_graph_edges (
+  id uuid not null,
+  graph_artifact_id uuid not null references zed_dependency_graph_artifacts (id),
+  ordinal integer not null,
+  from_registry_id text not null,
+  from_org_slug text not null,
+  from_package_name text not null,
+  from_version text,
+  from_package_id uuid references zed_packages (id),
+  from_package_version_id uuid references zed_package_versions (id),
+  to_registry_id text not null,
+  to_org_slug text not null,
+  to_package_name text not null,
+  to_version text,
+  to_package_id uuid references zed_packages (id),
+  to_package_version_id uuid references zed_package_versions (id),
+  requirement text,
+  dependency_kind text not null,
+  optional boolean not null,
+  default_features boolean not null,
+  features jsonb not null,
+  target text,
+  minimum_depth integer not null,
+  created_at timestamptz not null,
   primary key (id)
 );

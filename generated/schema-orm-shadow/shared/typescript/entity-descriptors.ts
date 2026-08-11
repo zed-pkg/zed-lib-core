@@ -169,6 +169,54 @@ export const entityDescriptors = [
     "table": "zed_package_versions"
   },
   {
+    "entity": "DependencyGraphArtifact",
+    "interfaceType": "internal::DependencyGraphArtifact",
+    "primaryKey": [
+      "id"
+    ],
+    "requiredFields": [
+      "id",
+      "rootPackageVersionId",
+      "graphKind",
+      "schemaVersion",
+      "graphDigest",
+      "target",
+      "enabledFeatures",
+      "document",
+      "nodeCount",
+      "edgeCount",
+      "maxDepth",
+      "cycleCount",
+      "createdAt"
+    ],
+    "table": "zed_dependency_graph_artifacts"
+  },
+  {
+    "entity": "DependencyGraphEdge",
+    "interfaceType": "internal::DependencyGraphEdge",
+    "primaryKey": [
+      "id"
+    ],
+    "requiredFields": [
+      "id",
+      "graphArtifactId",
+      "ordinal",
+      "fromRegistryId",
+      "fromOrgSlug",
+      "fromPackageName",
+      "toRegistryId",
+      "toOrgSlug",
+      "toPackageName",
+      "dependencyKind",
+      "optional",
+      "defaultFeatures",
+      "features",
+      "minimumDepth",
+      "createdAt"
+    ],
+    "table": "zed_dependency_graph_edges"
+  },
+  {
     "entity": "PackageLicense",
     "interfaceType": "internal::PackageLicense",
     "primaryKey": [

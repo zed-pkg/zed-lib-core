@@ -257,6 +257,79 @@ func (PackageVersion) Fields() []ent.Field {
 	}
 }
 
+type DependencyGraphArtifact struct {
+	ent.Schema
+}
+
+func (DependencyGraphArtifact) Annotations() []entschema.Annotation {
+	return []entschema.Annotation{
+		entsql.Annotation{Table: "zed_dependency_graph_artifacts"},
+		entsql.Skip(),
+	}
+}
+
+func (DependencyGraphArtifact) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("id", uuid.UUID{}).StructTag("json:\"id,omitempty\""),
+		field.UUID("root_package_version_id", uuid.UUID{}).StructTag("json:\"rootPackageVersionId,omitempty\"").Comment("Foreign key to PackageVersion.id; production DDL remains SQL-owned."),
+		field.String("graph_kind").StructTag("json:\"graphKind,omitempty\""),
+		field.String("schema_version").StructTag("json:\"schemaVersion,omitempty\""),
+		field.String("graph_digest").StructTag("json:\"graphDigest,omitempty\""),
+		field.String("resolver_name").Optional().Nillable().StructTag("json:\"resolverName,omitempty\""),
+		field.String("resolver_version").Optional().Nillable().StructTag("json:\"resolverVersion,omitempty\""),
+		field.String("resolution_input_digest").Optional().Nillable().StructTag("json:\"resolutionInputDigest,omitempty\""),
+		field.String("registry_checkpoint").Optional().Nillable().StructTag("json:\"registryCheckpoint,omitempty\""),
+		field.JSON("target", json.RawMessage{}).StructTag("json:\"target,omitempty\""),
+		field.JSON("enabled_features", json.RawMessage{}).StructTag("json:\"enabledFeatures,omitempty\""),
+		field.JSON("document", json.RawMessage{}).StructTag("json:\"document,omitempty\""),
+		field.Int32("node_count").StructTag("json:\"nodeCount,omitempty\""),
+		field.Int32("edge_count").StructTag("json:\"edgeCount,omitempty\""),
+		field.Int32("max_depth").StructTag("json:\"maxDepth,omitempty\""),
+		field.Int32("cycle_count").StructTag("json:\"cycleCount,omitempty\""),
+		field.Time("created_at").StructTag("json:\"createdAt,omitempty\""),
+		field.Time("sealed_at").Optional().Nillable().StructTag("json:\"sealedAt,omitempty\""),
+	}
+}
+
+type DependencyGraphEdge struct {
+	ent.Schema
+}
+
+func (DependencyGraphEdge) Annotations() []entschema.Annotation {
+	return []entschema.Annotation{
+		entsql.Annotation{Table: "zed_dependency_graph_edges"},
+		entsql.Skip(),
+	}
+}
+
+func (DependencyGraphEdge) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("id", uuid.UUID{}).StructTag("json:\"id,omitempty\""),
+		field.UUID("graph_artifact_id", uuid.UUID{}).StructTag("json:\"graphArtifactId,omitempty\"").Comment("Foreign key to DependencyGraphArtifact.id; production DDL remains SQL-owned."),
+		field.Int32("ordinal").StructTag("json:\"ordinal,omitempty\""),
+		field.String("from_registry_id").StructTag("json:\"fromRegistryId,omitempty\""),
+		field.String("from_org_slug").StructTag("json:\"fromOrgSlug,omitempty\""),
+		field.String("from_package_name").StructTag("json:\"fromPackageName,omitempty\""),
+		field.String("from_version").Optional().Nillable().StructTag("json:\"fromVersion,omitempty\""),
+		field.UUID("from_package_id", uuid.UUID{}).Optional().Nillable().StructTag("json:\"fromPackageId,omitempty\"").Comment("Foreign key to Package.id; production DDL remains SQL-owned."),
+		field.UUID("from_package_version_id", uuid.UUID{}).Optional().Nillable().StructTag("json:\"fromPackageVersionId,omitempty\"").Comment("Foreign key to PackageVersion.id; production DDL remains SQL-owned."),
+		field.String("to_registry_id").StructTag("json:\"toRegistryId,omitempty\""),
+		field.String("to_org_slug").StructTag("json:\"toOrgSlug,omitempty\""),
+		field.String("to_package_name").StructTag("json:\"toPackageName,omitempty\""),
+		field.String("to_version").Optional().Nillable().StructTag("json:\"toVersion,omitempty\""),
+		field.UUID("to_package_id", uuid.UUID{}).Optional().Nillable().StructTag("json:\"toPackageId,omitempty\"").Comment("Foreign key to Package.id; production DDL remains SQL-owned."),
+		field.UUID("to_package_version_id", uuid.UUID{}).Optional().Nillable().StructTag("json:\"toPackageVersionId,omitempty\"").Comment("Foreign key to PackageVersion.id; production DDL remains SQL-owned."),
+		field.String("requirement").Optional().Nillable().StructTag("json:\"requirement,omitempty\""),
+		field.String("dependency_kind").StructTag("json:\"dependencyKind,omitempty\""),
+		field.Bool("optional").StructTag("json:\"optional,omitempty\""),
+		field.Bool("default_features").StructTag("json:\"defaultFeatures,omitempty\""),
+		field.JSON("features", json.RawMessage{}).StructTag("json:\"features,omitempty\""),
+		field.String("target").Optional().Nillable().StructTag("json:\"target,omitempty\""),
+		field.Int32("minimum_depth").StructTag("json:\"minimumDepth,omitempty\""),
+		field.Time("created_at").StructTag("json:\"createdAt,omitempty\""),
+	}
+}
+
 type PackageLicense struct {
 	ent.Schema
 }
