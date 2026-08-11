@@ -92,3 +92,9 @@ fn live_denial_probe_remains_available_but_opt_in() {
     assert!(connection.contains("live_read_only_context_rejects_schema_ddl"));
     assert!(connection.contains("read-only context unexpectedly executed DDL"));
 }
+
+#[test]
+fn exact_project_reads_are_on_the_default_surface() {
+    let _project = zed_orm_core::read::project_by_org_and_slug;
+    let _query = zed_orm_core::read::project_role_for_user;
+}

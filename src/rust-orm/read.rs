@@ -66,7 +66,7 @@ pub async fn ping(context: &ReadContext) -> Result<(), OrmError> {
 
 use sea_orm::{
     ColumnTrait, Condition, EntityTrait, JoinType, QueryFilter, QueryOrder, QuerySelect,
-    RelationTrait,
+    RelationTrait, Select,
 };
 
 use crate::entities::{
@@ -209,6 +209,29 @@ pub async fn projects_for_org(
         .collect())
 }
 
+/// Resolve one active project at its canonical `{org}/{project}` coordinate.
+///
+/// This uses the schema's active-project unique key directly and intentionally
+/// does not scan the paginated [`projects_for_org`] or [`projects_for_user`]
+/// listings.
+pub async fn project_by_org_and_slug(
+    context: &ReadContext,
+    org_id: uuid::Uuid,
+    slug: &str,
+) -> Result<Option<project::Model>, OrmError> {
+    project_by_org_and_slug_query(org_id, slug)
+        .one(context.connection())
+        .await
+        .map_err(OrmError::from_db_err)
+}
+
+fn project_by_org_and_slug_query(org_id: uuid::Uuid, slug: &str) -> Select<project::Entity> {
+    project::Entity::find()
+        .filter(project::Column::OrgId.eq(org_id))
+        .filter(project::Column::Slug.eq(slug))
+        .filter(project::Column::IsSoftDeleted.eq(false))
+}
+
 /// Projects the user is a direct member of, across every org.
 pub async fn projects_for_user(
     context: &ReadContext,
@@ -238,6 +261,33 @@ pub async fn projects_for_user(
             role: String::new(),
         })
         .collect())
+}
+
+/// The viewer's direct role in a project, or `None` if they are not a direct
+/// project member.
+///
+/// Organization membership remains a separate authority. Callers that accept
+/// either scope must combine this result with [`org_role_for_user`] using the
+/// same role precedence as the account-control plane. This exact composite-key
+/// lookup intentionally does not scan the paginated [`projects_for_user`]
+/// listing.
+pub async fn project_role_for_user(
+    context: &ReadContext,
+    project_id: uuid::Uuid,
+    user_id: uuid::Uuid,
+) -> Result<Option<String>, OrmError> {
+    let membership = project_role_for_user_query(project_id, user_id)
+        .one(context.connection())
+        .await
+        .map_err(OrmError::from_db_err)?;
+    Ok(membership.map(|row| row.role))
+}
+
+fn project_role_for_user_query(
+    project_id: uuid::Uuid,
+    user_id: uuid::Uuid,
+) -> Select<project_member::Entity> {
+    project_member::Entity::find_by_id((project_id, user_id))
 }
 
 fn package_summary(row: package::Model, org_slug: String) -> PackageSummary {
@@ -421,4 +471,79 @@ pub async fn search_packages(
             package_summary(row, slug)
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{DatabaseBackend, QueryTrait};
+
+    use super::*;
+
+    #[test]
+    fn direct_project_role_lookup_uses_the_exact_composite_key() {
+        let project_id = uuid::Uuid::parse_str("10000000-0000-0000-0000-000000000001")
+            .expect("fixture project id");
+        let user_id =
+            uuid::Uuid::parse_str("20000000-0000-0000-0000-000000000002").expect("fixture user id");
+        let statement =
+            project_role_for_user_query(project_id, user_id).build(DatabaseBackend::Postgres);
+
+        assert!(statement
+            .sql
+            .contains("\"zed_project_members\".\"project_id\" = $1"));
+        assert!(statement
+            .sql
+            .contains("\"zed_project_members\".\"user_id\" = $2"));
+        assert!(!statement.sql.contains("JOIN"));
+        assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
+    }
+
+    #[test]
+    fn project_coordinate_lookup_uses_the_active_unique_key() {
+        let org_id =
+            uuid::Uuid::parse_str("30000000-0000-0000-0000-000000000003").expect("fixture org id");
+        let statement =
+            project_by_org_and_slug_query(org_id, "compiler").build(DatabaseBackend::Postgres);
+
+        assert!(statement.sql.contains("\"zed_projects\".\"org_id\" = $1"));
+        assert!(statement.sql.contains("\"zed_projects\".\"slug\" = $2"));
+        assert!(statement
+            .sql
+            .contains("\"zed_projects\".\"is_soft_deleted\" = $3"));
+        assert!(!statement.sql.contains("JOIN"));
+        assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a dedicated ORM_CORE_TEST_DATABASE_URL database"]
+    async fn live_direct_project_role_lookup_accepts_a_missing_membership() {
+        let database_url = std::env::var("ORM_CORE_TEST_DATABASE_URL")
+            .expect("ORM_CORE_TEST_DATABASE_URL must target a disposable test database");
+        let context = crate::connect_read_only(&database_url)
+            .await
+            .expect("read-only connection must verify");
+
+        let role = project_role_for_user(&context, uuid::Uuid::new_v4(), uuid::Uuid::new_v4())
+            .await
+            .expect("exact membership lookup must execute");
+
+        assert_eq!(role, None);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a dedicated ORM_CORE_TEST_DATABASE_URL database"]
+    async fn live_project_coordinate_lookup_accepts_a_missing_project() {
+        let database_url = std::env::var("ORM_CORE_TEST_DATABASE_URL")
+            .expect("ORM_CORE_TEST_DATABASE_URL must target a disposable test database");
+        let context = crate::connect_read_only(&database_url)
+            .await
+            .expect("read-only connection must verify");
+
+        let project =
+            project_by_org_and_slug(&context, uuid::Uuid::new_v4(), "missing-project-probe")
+                .await
+                .expect("exact project lookup must execute");
+
+        assert_eq!(project, None);
+    }
 }
