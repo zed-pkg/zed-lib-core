@@ -225,6 +225,24 @@ pub async fn project_by_org_and_slug(
         .map_err(OrmError::from_db_err)
 }
 
+/// Resolve one active project by its immutable primary key.
+///
+/// This is used when a package stores only `project_id` and a caller needs the
+/// canonical project slug without scanning a page-limited organization list.
+pub async fn project_by_id(
+    context: &ReadContext,
+    project_id: uuid::Uuid,
+) -> Result<Option<project::Model>, OrmError> {
+    project_by_id_query(project_id)
+        .one(context.connection())
+        .await
+        .map_err(OrmError::from_db_err)
+}
+
+fn project_by_id_query(project_id: uuid::Uuid) -> Select<project::Entity> {
+    project::Entity::find_by_id(project_id).filter(project::Column::IsSoftDeleted.eq(false))
+}
+
 fn project_by_org_and_slug_query(org_id: uuid::Uuid, slug: &str) -> Select<project::Entity> {
     project::Entity::find()
         .filter(project::Column::OrgId.eq(org_id))
@@ -535,6 +553,20 @@ mod tests {
         assert!(statement
             .sql
             .contains("\"zed_projects\".\"is_soft_deleted\" = $3"));
+        assert!(!statement.sql.contains("JOIN"));
+        assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
+    }
+
+    #[test]
+    fn project_primary_key_lookup_is_exact_and_active_only() {
+        let project_id =
+            uuid::Uuid::parse_str("35000000-0000-0000-0000-000000000003").expect("project id");
+        let statement = project_by_id_query(project_id).build(DatabaseBackend::Postgres);
+
+        assert!(statement.sql.contains("\"zed_projects\".\"id\" = $1"));
+        assert!(statement
+            .sql
+            .contains("\"zed_projects\".\"is_soft_deleted\" = $2"));
         assert!(!statement.sql.contains("JOIN"));
         assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
     }
