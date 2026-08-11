@@ -55,6 +55,10 @@ fn every_write_symbol_is_feature_gated() {
     let cargo = read("Cargo.toml");
     assert!(cargo.contains("default = [\"read-only\"]"));
     assert!(cargo.contains("read-write = [\"read-only\"]"));
+    assert!(cargo.contains(
+        "zed-interfaces = { git = \"https://github.com/zed-pkg/zed-interfaces.git\", rev = \"7d31f80dd8a310f218931165a3ad636a2f32b932\" }"
+    ));
+    assert!(!cargo.contains("../../../zed-interfaces"));
 }
 
 #[test]
