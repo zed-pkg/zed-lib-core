@@ -71,10 +71,12 @@ fn shared_schema_source_is_exact_and_external() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
         "d8fb884023a26de79d4f5d533f486a2d3dbec7cc",
+        "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c",
         "\"org_slice\": \"zed-pkg\"",
         "\"schema\": \"public\"",
         "\"table_prefix\": \"zed_\"",
         "pg-defs/schema/orgs/zed-pkg/registry.sql",
+        "2026-08-11-public-visibility-is-permanent.sql",
         "pg-defs/generated/rust/sea-orm",
     ] {
         assert!(lock.contains(contract), "shared-defs lock lost {contract}");

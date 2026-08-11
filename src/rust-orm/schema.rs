@@ -3,8 +3,9 @@
 //!
 //! This crate never authors DDL of its own. Every table it addresses is defined
 //! in `pg-defs/schema/orgs/zed-pkg/registry.sql` in the shared-definitions
-//! repository at [`SHARED_DEFS_REVISION`]; [`crate::migrations`] applies that
-//! reviewed SQL and nothing else.
+//! repository at [`SHARED_DEFS_REVISION`]. Forward-only compatibility changes
+//! are also reviewed there and pinned independently before
+//! [`crate::migrations`] applies them.
 
 /// Postgres schema holding the registry tables.
 ///
@@ -27,10 +28,18 @@ pub const SHARED_DEFS_ORG_SLICE: &str = "zed-pkg";
 /// Exact reviewed shared-definitions revision the entities correspond to.
 ///
 /// Bump this and `shared-defs.lock.json` in the same commit, never separately.
-pub const SHARED_DEFS_REVISION: &str = "c8bdc06d74746acc6439f9527ebd02697fdf028b";
+pub const SHARED_DEFS_REVISION: &str = "d8fb884023a26de79d4f5d533f486a2d3dbec7cc";
 
 /// The SQL segment that owns the registry tables.
 pub const SHARED_DEFS_REGISTRY_SEGMENT: &str = "pg-defs/schema/orgs/zed-pkg/registry.sql";
+
+/// Reviewed revision containing the additive public-visibility migration.
+pub const SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION: &str =
+    "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c";
+
+/// Forward-only migration that upgrades an already-ledgered registry safely.
+pub const SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION: &str =
+    "pg-defs/schema/orgs/zed-pkg/migrations/2026-08-11-public-visibility-is-permanent.sql";
 
 /// Generated adapter location within the shared-definitions repository.
 pub const SHARED_DEFS_SEA_ORM_ADAPTER: &str = "pg-defs/generated/rust/sea-orm";

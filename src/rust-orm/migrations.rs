@@ -1,30 +1,47 @@
 //! Registry migrations — the `migrate` feature, and the discrete DPM job only.
 //!
-//! This runner applies exactly one thing: the reviewed `registry.sql` segment
-//! vendored from `k8s-libs-and-shared-defs` at
-//! [`crate::schema::SHARED_DEFS_REVISION`]. It never authors DDL, so the
-//! canonical contract and what is actually deployed cannot drift.
+//! This runner applies the reviewed `registry.sql` base segment and separately
+//! versioned, forward-only compatibility migrations vendored from
+//! `k8s-libs-and-shared-defs`. It never authors DDL, so the canonical contract
+//! and what is actually deployed cannot drift.
 //!
 //! `registry.sql` is written to be idempotent — `create table if not exists`,
 //! `create index if not exists`, `create or replace function` — with one
 //! exception: `create trigger` and `alter table ... add constraint` are not
 //! idempotent in PostgreSQL 16, so re-application is guarded by the version
-//! ledger rather than by the SQL itself.
+//! ledger rather than by the SQL itself. The base ledger identity is therefore
+//! immutable: a new shared-definitions revision must not replay that segment.
 
 use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
 
-use crate::{connection::WriteContext, error::OrmError, schema::SHARED_DEFS_REVISION};
+use crate::{
+    connection::WriteContext, error::OrmError, schema::SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION,
+};
 
 /// The vendored contract segment. Verified byte-for-byte against the
 /// shared-definitions repository in CI.
 const REGISTRY_SQL: &str = include_str!("sql/registry.sql");
 
+/// Additive migration reviewed in shared definitions. It only replaces the
+/// function already targeted by the existing visibility trigger, so applying
+/// it cannot replay non-idempotent triggers or constraints.
+const VISIBILITY_IMMUTABILITY_SQL: &str =
+    include_str!("sql/2026-08-11-public-visibility-is-permanent.sql");
+
+/// Historical ledger key emitted by the first registry migration release.
+///
+/// The original source-provenance constant accidentally named an unpublished
+/// revision. Existing databases nevertheless recorded this exact key, so it is
+/// a durable migration identity and must never be changed or replayed.
+const BASE_REGISTRY_VERSION: &str = "registry@c8bdc06d74746acc6439f9527ebd02697fdf028b";
+
 /// Version recorded in `zed_schema_migrations` once the segment is applied.
 ///
-/// It carries the contract revision, so re-pinning the shared definitions
-/// produces a new version and the segment is re-applied.
+/// It carries the exact shared-definitions revision that introduced the latest
+/// additive migration. The non-idempotent base segment retains its historical
+/// ledger key independently.
 pub fn registry_version() -> String {
-    format!("registry@{SHARED_DEFS_REVISION}")
+    format!("registry-visibility-immutability@{SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION}")
 }
 
 /// Arbitrary but stable key for the advisory lock guarding migration.
@@ -66,7 +83,32 @@ pub async fn migrate(context: &WriteContext) -> Result<MigrationReport, OrmError
         .await
         .map_err(OrmError::from_db_err)?;
 
-    let already_applied = transaction
+    let base_already_applied = transaction
+        .query_one(Statement::from_sql_and_values(
+            transaction.get_database_backend(),
+            "SELECT version FROM zed_schema_migrations WHERE version = $1",
+            [BASE_REGISTRY_VERSION.into()],
+        ))
+        .await
+        .map_err(OrmError::from_db_err)?
+        .is_some();
+
+    if !base_already_applied {
+        transaction
+            .execute_unprepared(REGISTRY_SQL)
+            .await
+            .map_err(OrmError::from_db_err)?;
+        transaction
+            .execute(Statement::from_sql_and_values(
+                transaction.get_database_backend(),
+                "INSERT INTO zed_schema_migrations(version) VALUES ($1)",
+                [BASE_REGISTRY_VERSION.into()],
+            ))
+            .await
+            .map_err(OrmError::from_db_err)?;
+    }
+
+    let patch_already_applied = transaction
         .query_one(Statement::from_sql_and_values(
             transaction.get_database_backend(),
             "SELECT version FROM zed_schema_migrations WHERE version = $1",
@@ -76,9 +118,9 @@ pub async fn migrate(context: &WriteContext) -> Result<MigrationReport, OrmError
         .map_err(OrmError::from_db_err)?
         .is_some();
 
-    if !already_applied {
+    if !patch_already_applied {
         transaction
-            .execute_unprepared(REGISTRY_SQL)
+            .execute_unprepared(VISIBILITY_IMMUTABILITY_SQL)
             .await
             .map_err(OrmError::from_db_err)?;
         transaction
@@ -95,7 +137,7 @@ pub async fn migrate(context: &WriteContext) -> Result<MigrationReport, OrmError
 
     Ok(MigrationReport {
         version,
-        applied: !already_applied,
+        applied: !base_already_applied || !patch_already_applied,
     })
 }
 
@@ -104,8 +146,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_version_is_pinned_to_the_contract_revision() {
-        assert!(registry_version().ends_with(SHARED_DEFS_REVISION));
+    fn the_latest_version_is_pinned_to_the_additive_contract_revision() {
+        assert!(registry_version().ends_with(SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION));
+        assert_ne!(registry_version(), BASE_REGISTRY_VERSION);
     }
 
     #[test]
@@ -135,14 +178,31 @@ mod tests {
     }
 
     #[test]
-    fn the_vendored_segment_carries_the_visibility_guard() {
+    fn the_base_segment_retains_the_original_visibility_guard() {
         // Without the trigger the promotion rule would exist only in Rust, and
         // any other writer could bypass it.
         assert!(REGISTRY_SQL.contains("zed_packages_visibility_guard"));
         assert!(REGISTRY_SQL.contains("ZD001"));
         assert!(REGISTRY_SQL.contains("ZD002"));
-        assert!(REGISTRY_SQL.contains("ZD003"));
-        assert!(REGISTRY_SQL.contains("public package % cannot become non-public"));
+        assert!(!REGISTRY_SQL.contains("ZD003"));
+    }
+
+    #[test]
+    fn the_additive_visibility_migration_is_safe_to_apply_after_the_base() {
+        assert!(VISIBILITY_IMMUTABILITY_SQL.contains("create or replace function"));
+        assert!(VISIBILITY_IMMUTABILITY_SQL.contains("ZD003"));
+        assert!(VISIBILITY_IMMUTABILITY_SQL.contains("public package % cannot become non-public"));
+        for forbidden in [
+            "\ncreate trigger",
+            "\nalter table",
+            "\ncreate table",
+            "\ndrop trigger",
+        ] {
+            assert!(
+                !VISIBILITY_IMMUTABILITY_SQL.contains(forbidden),
+                "additive migration contains base DDL: {forbidden}"
+            );
+        }
     }
 
     #[test]

@@ -63,11 +63,16 @@ pub use connection::{
 };
 #[cfg(feature = "read-write")]
 pub use connection::{connect_read_write, connect_read_write_with_policy, WriteContext};
-pub use error::{OrmError, SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS, SQLSTATE_VISIBILITY_TOO_OLD};
+pub use error::{
+    OrmError, SQLSTATE_PUBLIC_VISIBILITY_IS_PERMANENT, SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS,
+    SQLSTATE_VISIBILITY_TOO_OLD,
+};
 pub use policy::{PromotionRefusal, VisibilityLimits};
 pub use schema::{
     qualified, ORG_SCHEMA, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT,
-    SHARED_DEFS_REVISION, SHARED_DEFS_SEA_ORM_ADAPTER, TABLE_PREFIX,
+    SHARED_DEFS_REVISION, SHARED_DEFS_SEA_ORM_ADAPTER,
+    SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION, SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION,
+    TABLE_PREFIX,
 };
 
 /// Default consumers cannot import write symbols. This doctest is compiled only

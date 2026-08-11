@@ -800,15 +800,6 @@ declare
   max_age integer := zed_public_conversion_max_age_days();
   max_downloads bigint := zed_public_conversion_max_downloads();
 begin
-  -- Public package artifacts and dependency graphs are served with immutable
-  -- shared caching. Confidentiality therefore cannot be restored by changing
-  -- metadata after those bytes may have reached third-party caches.
-  if old.visibility = 'public' and new.visibility <> 'public' then
-    raise exception
-      'public package % cannot become non-public', old.id
-      using errcode = 'ZD003';
-  end if;
-
   if old.visibility = 'public' or new.visibility <> 'public' then
     return new;
   end if;
