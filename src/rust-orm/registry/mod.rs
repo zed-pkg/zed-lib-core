@@ -9,6 +9,18 @@
 mod search;
 mod validation;
 
+mod graphs;
+
+pub use graphs::{
+    dependency_graph_by_digest, incoming_dependency_edges, latest_dependency_graph_for_root,
+    DependencyGraphCoordinate, DependencyGraphSnapshot, GRAPH_EDGE_PAGE_LIMIT,
+};
+#[cfg(feature = "read-write")]
+pub use graphs::{
+    persist_dependency_graph, DependencyGraphArtifactInput, DependencyGraphEdgeInput,
+    DependencyGraphPersistReceipt,
+};
+
 #[cfg(feature = "read-write")]
 pub use search::upsert_embedding;
 pub use search::{search_registry, semantic_search, EmbeddingInput, RegistrySearchHit};

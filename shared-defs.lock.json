@@ -1,11 +1,11 @@
 {
   "repository": "https://github.com/ORESoftware/k8s-libs-and-shared-defs",
-  "revision": "d8fb884023a26de79d4f5d533f486a2d3dbec7cc",
+  "revision": "d58ec90c0129151d1c09d2cf59b2804087059ef5",
   "org_slice": "zed-pkg",
   "schema": "public",
   "table_prefix": "zed_",
   "registry_segment": "pg-defs/schema/orgs/zed-pkg/registry.sql",
-  "registry_blob_sha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf",
+  "registry_blob_sha": "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
   "vendored_copy": "src/rust-orm/sql/registry.sql",
   "generated_adapter": "pg-defs/generated/rust/sea-orm",
   "generated_crate": "dd-pg-defs-sea-orm",

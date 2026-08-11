@@ -120,6 +120,8 @@ mod tests {
             "zed_project_invitations",
             "zed_packages",
             "zed_package_versions",
+            "zed_dependency_graph_artifacts",
+            "zed_dependency_graph_edges",
             "zed_package_licenses",
             "zed_entity_embeddings",
             "zed_package_uploads",

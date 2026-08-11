@@ -27,7 +27,7 @@ pub const SHARED_DEFS_ORG_SLICE: &str = "zed-pkg";
 /// Exact reviewed shared-definitions revision the entities correspond to.
 ///
 /// Bump this and `shared-defs.lock.json` in the same commit, never separately.
-pub const SHARED_DEFS_REVISION: &str = "c8bdc06d74746acc6439f9527ebd02697fdf028b";
+pub const SHARED_DEFS_REVISION: &str = "d58ec90c0129151d1c09d2cf59b2804087059ef5";
 
 /// The SQL segment that owns the registry tables.
 pub const SHARED_DEFS_REGISTRY_SEGMENT: &str = "pg-defs/schema/orgs/zed-pkg/registry.sql";

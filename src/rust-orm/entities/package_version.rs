@@ -33,11 +33,19 @@ pub enum Relation {
         to = "super::package::Column::Id"
     )]
     Package,
+    #[sea_orm(has_many = "super::dependency_graph_artifact::Entity")]
+    DependencyGraphArtifact,
 }
 
 impl Related<super::package::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Package.def()
+    }
+}
+
+impl Related<super::dependency_graph_artifact::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::DependencyGraphArtifact.def()
     }
 }
 

@@ -49,13 +49,30 @@ Three rules define the crate:
 - `write`: identity projection, org/project/package creation, visibility
   transition, compatibility download recording, and invitation creation.
 - `registry`: cross-entity text/semantic search plus read-write-gated upload,
-  full download evidence, package licenses, and embedding upserts.
+  full download evidence, package licenses, embedding upserts, and immutable
+  dependency-graph documents with normalized reverse-impact edges.
 - `invitations`: atomic one-time organization/project invitation acceptance,
   compiled only for API write builds.
 
 The API tier owns authentication and authorization. These operations own input
 validation, schema relationships, transaction boundaries, source redaction,
 and fail-closed persistence behavior.
+
+### Dependency graphs
+
+`zed_dependency_graph_artifacts.document` is the lossless JSON authority for a
+declared or resolved graph. Its `sha256:` semantic digest is immutable. The
+ordered `zed_dependency_graph_edges` rows are a relational index derived from
+that document for neighborhood and reverse-impact queries; they are never an
+independent serialization authority.
+
+`registry::persist_dependency_graph` validates and commits the document and
+all edges in one transaction. An exact retry returns the original artifact id,
+while a digest or declared-root replay with different facts fails closed.
+Read-only consumers use visibility-scoped named operations: fetch by digest,
+fetch the newest graph for a root package version, or query incoming edges for
+a registry coordinate. Private consumer graphs are filtered by the root
+package's organization rather than leaked through a public dependency target.
 
 ### Where the tables live
 

@@ -70,7 +70,8 @@ fn organization_invitations_use_one_typed_write_command() {
 fn shared_schema_source_is_exact_and_external() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
-        "d8fb884023a26de79d4f5d533f486a2d3dbec7cc",
+        "d58ec90c0129151d1c09d2cf59b2804087059ef5",
+        "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
         "\"org_slice\": \"zed-pkg\"",
         "\"schema\": \"public\"",
         "\"table_prefix\": \"zed_\"",
@@ -82,6 +83,20 @@ fn shared_schema_source_is_exact_and_external() {
 
     let zpkg = read_repo(".zpkg.toml");
     assert!(zpkg.contains("\"oresoftware/k8s-libs-and-shared-defs\""));
+}
+
+#[test]
+fn dependency_graph_writes_are_gated_and_reads_are_visibility_scoped() {
+    let registry = read("registry/mod.rs");
+    assert!(registry.contains("#[cfg(feature = \"read-write\")]\npub use graphs"));
+
+    let graphs = read("registry/graphs.rs");
+    assert!(graphs.contains("pub async fn dependency_graph_by_digest"));
+    assert!(graphs.contains("pub async fn incoming_dependency_edges"));
+    assert!(graphs.contains("visible_org_ids"));
+    assert!(graphs.contains("package::Column::Visibility.eq(\"public\")"));
+    assert!(graphs.contains("pub async fn persist_dependency_graph"));
+    assert!(graphs.contains("#[cfg(feature = \"read-write\")]"));
 }
 
 #[test]
