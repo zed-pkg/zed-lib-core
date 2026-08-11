@@ -375,6 +375,158 @@ export class PackageVersion {
 
 }
 
+@Entity("zed_dependency_graph_artifacts")
+export class DependencyGraphArtifact {
+  @PrimaryColumn({ name: "id", type: "uuid" })
+  id!: string;
+
+  @Column({ name: "root_package_version_id", type: "uuid" })
+  rootPackageVersionId!: string;
+
+  @ManyToOne(() => PackageVersion, { nullable: false })
+  @JoinColumn({ name: "root_package_version_id", referencedColumnName: "id" })
+  packageVersionByRootPackageVersionId!: PackageVersion;
+
+  @Column({ name: "graph_kind", type: "text" })
+  graphKind!: string;
+
+  @Column({ name: "schema_version", type: "text" })
+  schemaVersion!: string;
+
+  @Column({ name: "graph_digest", type: "text" })
+  graphDigest!: string;
+
+  @Column({ name: "resolver_name", type: "text", nullable: true })
+  resolverName?: string;
+
+  @Column({ name: "resolver_version", type: "text", nullable: true })
+  resolverVersion?: string;
+
+  @Column({ name: "resolution_input_digest", type: "text", nullable: true })
+  resolutionInputDigest?: string;
+
+  @Column({ name: "registry_checkpoint", type: "text", nullable: true })
+  registryCheckpoint?: string;
+
+  @Column({ name: "target", type: "jsonb" })
+  target!: Record<string, unknown>;
+
+  @Column({ name: "enabled_features", type: "jsonb" })
+  enabledFeatures!: unknown[];
+
+  @Column({ name: "document", type: "jsonb" })
+  document!: Record<string, unknown>;
+
+  @Column({ name: "node_count", type: "integer" })
+  nodeCount!: number;
+
+  @Column({ name: "edge_count", type: "integer" })
+  edgeCount!: number;
+
+  @Column({ name: "max_depth", type: "integer" })
+  maxDepth!: number;
+
+  @Column({ name: "cycle_count", type: "integer" })
+  cycleCount!: number;
+
+  @Column({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+
+}
+
+@Entity("zed_dependency_graph_edges")
+export class DependencyGraphEdge {
+  @PrimaryColumn({ name: "id", type: "uuid" })
+  id!: string;
+
+  @Column({ name: "graph_artifact_id", type: "uuid" })
+  graphArtifactId!: string;
+
+  @ManyToOne(() => DependencyGraphArtifact, { nullable: false })
+  @JoinColumn({ name: "graph_artifact_id", referencedColumnName: "id" })
+  dependencyGraphArtifactByGraphArtifactId!: DependencyGraphArtifact;
+
+  @Column({ name: "ordinal", type: "integer" })
+  ordinal!: number;
+
+  @Column({ name: "from_registry_id", type: "text" })
+  fromRegistryId!: string;
+
+  @Column({ name: "from_org_slug", type: "text" })
+  fromOrgSlug!: string;
+
+  @Column({ name: "from_package_name", type: "text" })
+  fromPackageName!: string;
+
+  @Column({ name: "from_version", type: "text", nullable: true })
+  fromVersion?: string;
+
+  @Column({ name: "from_package_id", type: "uuid", nullable: true })
+  fromPackageId?: string;
+
+  @ManyToOne(() => Package, { nullable: true })
+  @JoinColumn({ name: "from_package_id", referencedColumnName: "id" })
+  packageByFromPackageId?: Package;
+
+  @Column({ name: "from_package_version_id", type: "uuid", nullable: true })
+  fromPackageVersionId?: string;
+
+  @ManyToOne(() => PackageVersion, { nullable: true })
+  @JoinColumn({ name: "from_package_version_id", referencedColumnName: "id" })
+  packageVersionByFromPackageVersionId?: PackageVersion;
+
+  @Column({ name: "to_registry_id", type: "text" })
+  toRegistryId!: string;
+
+  @Column({ name: "to_org_slug", type: "text" })
+  toOrgSlug!: string;
+
+  @Column({ name: "to_package_name", type: "text" })
+  toPackageName!: string;
+
+  @Column({ name: "to_version", type: "text", nullable: true })
+  toVersion?: string;
+
+  @Column({ name: "to_package_id", type: "uuid", nullable: true })
+  toPackageId?: string;
+
+  @ManyToOne(() => Package, { nullable: true })
+  @JoinColumn({ name: "to_package_id", referencedColumnName: "id" })
+  packageByToPackageId?: Package;
+
+  @Column({ name: "to_package_version_id", type: "uuid", nullable: true })
+  toPackageVersionId?: string;
+
+  @ManyToOne(() => PackageVersion, { nullable: true })
+  @JoinColumn({ name: "to_package_version_id", referencedColumnName: "id" })
+  packageVersionByToPackageVersionId?: PackageVersion;
+
+  @Column({ name: "requirement", type: "text", nullable: true })
+  requirement?: string;
+
+  @Column({ name: "dependency_kind", type: "text" })
+  dependencyKind!: string;
+
+  @Column({ name: "optional", type: "boolean" })
+  optional!: boolean;
+
+  @Column({ name: "default_features", type: "boolean" })
+  defaultFeatures!: boolean;
+
+  @Column({ name: "features", type: "jsonb" })
+  features!: unknown[];
+
+  @Column({ name: "target", type: "text", nullable: true })
+  target?: string;
+
+  @Column({ name: "minimum_depth", type: "integer" })
+  minimumDepth!: number;
+
+  @Column({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+
+}
+
 @Entity("zed_package_licenses")
 export class PackageLicense {
   @PrimaryColumn({ name: "id", type: "uuid" })

@@ -141,6 +141,8 @@ model Package {
   orgByOrgId Org @relation("Package_OrgId_Org", fields: [orgId], references: [id])
   projectByProjectId Project? @relation("Package_ProjectId_Project", fields: [projectId], references: [id])
   packageVersionByPackageId PackageVersion[] @relation("PackageVersion_PackageId_Package")
+  dependencyGraphEdgeByFromPackageId DependencyGraphEdge[] @relation("DependencyGraphEdge_FromPackageId_Package")
+  dependencyGraphEdgeByToPackageId DependencyGraphEdge[] @relation("DependencyGraphEdge_ToPackageId_Package")
   packageLicenseByPackageId PackageLicense[] @relation("PackageLicense_PackageId_Package")
   packageUploadByPackageId PackageUpload[] @relation("PackageUpload_PackageId_Package")
   packageDownloadByPackageId PackageDownload[] @relation("PackageDownload_PackageId_Package")
@@ -166,7 +168,65 @@ model PackageVersion {
   publishedByUserId String? @db.Uuid @map("published_by_user_id")
   publishedAt DateTime @db.Timestamptz(6) @map("published_at")
   packageByPackageId Package @relation("PackageVersion_PackageId_Package", fields: [packageId], references: [id])
+  dependencyGraphArtifactByRootPackageVersionId DependencyGraphArtifact[] @relation("DependencyGraphArtifact_RootPackageVersionId_PackageVersion")
+  dependencyGraphEdgeByFromPackageVersionId DependencyGraphEdge[] @relation("DependencyGraphEdge_FromPackageVersionId_PackageVersion")
+  dependencyGraphEdgeByToPackageVersionId DependencyGraphEdge[] @relation("DependencyGraphEdge_ToPackageVersionId_PackageVersion")
   @@map("zed_package_versions")
+}
+
+model DependencyGraphArtifact {
+  id String @id @db.Uuid
+  rootPackageVersionId String @db.Uuid @map("root_package_version_id")
+  graphKind String @db.Text @map("graph_kind")
+  schemaVersion String @db.Text @map("schema_version")
+  graphDigest String @db.Text @map("graph_digest")
+  resolverName String? @db.Text @map("resolver_name")
+  resolverVersion String? @db.Text @map("resolver_version")
+  resolutionInputDigest String? @db.Text @map("resolution_input_digest")
+  registryCheckpoint String? @db.Text @map("registry_checkpoint")
+  target Json
+  enabledFeatures Json @map("enabled_features")
+  document Json
+  nodeCount Int @map("node_count")
+  edgeCount Int @map("edge_count")
+  maxDepth Int @map("max_depth")
+  cycleCount Int @map("cycle_count")
+  createdAt DateTime @db.Timestamptz(6) @map("created_at")
+  packageVersionByRootPackageVersionId PackageVersion @relation("DependencyGraphArtifact_RootPackageVersionId_PackageVersion", fields: [rootPackageVersionId], references: [id])
+  dependencyGraphEdgeByGraphArtifactId DependencyGraphEdge[] @relation("DependencyGraphEdge_GraphArtifactId_DependencyGraphArtifact")
+  @@map("zed_dependency_graph_artifacts")
+}
+
+model DependencyGraphEdge {
+  id String @id @db.Uuid
+  graphArtifactId String @db.Uuid @map("graph_artifact_id")
+  ordinal Int
+  fromRegistryId String @db.Text @map("from_registry_id")
+  fromOrgSlug String @db.Text @map("from_org_slug")
+  fromPackageName String @db.Text @map("from_package_name")
+  fromVersion String? @db.Text @map("from_version")
+  fromPackageId String? @db.Uuid @map("from_package_id")
+  fromPackageVersionId String? @db.Uuid @map("from_package_version_id")
+  toRegistryId String @db.Text @map("to_registry_id")
+  toOrgSlug String @db.Text @map("to_org_slug")
+  toPackageName String @db.Text @map("to_package_name")
+  toVersion String? @db.Text @map("to_version")
+  toPackageId String? @db.Uuid @map("to_package_id")
+  toPackageVersionId String? @db.Uuid @map("to_package_version_id")
+  requirement String? @db.Text
+  dependencyKind String @db.Text @map("dependency_kind")
+  optional Boolean
+  defaultFeatures Boolean @map("default_features")
+  features Json
+  target String? @db.Text
+  minimumDepth Int @map("minimum_depth")
+  createdAt DateTime @db.Timestamptz(6) @map("created_at")
+  dependencyGraphArtifactByGraphArtifactId DependencyGraphArtifact @relation("DependencyGraphEdge_GraphArtifactId_DependencyGraphArtifact", fields: [graphArtifactId], references: [id])
+  packageByFromPackageId Package? @relation("DependencyGraphEdge_FromPackageId_Package", fields: [fromPackageId], references: [id])
+  packageVersionByFromPackageVersionId PackageVersion? @relation("DependencyGraphEdge_FromPackageVersionId_PackageVersion", fields: [fromPackageVersionId], references: [id])
+  packageByToPackageId Package? @relation("DependencyGraphEdge_ToPackageId_Package", fields: [toPackageId], references: [id])
+  packageVersionByToPackageVersionId PackageVersion? @relation("DependencyGraphEdge_ToPackageVersionId_PackageVersion", fields: [toPackageVersionId], references: [id])
+  @@map("zed_dependency_graph_edges")
 }
 
 model PackageLicense {

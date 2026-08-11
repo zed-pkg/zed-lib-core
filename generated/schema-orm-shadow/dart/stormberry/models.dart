@@ -249,6 +249,96 @@ abstract class PackageVersion {
 
 }
 
+@Model(tableName: "zed_dependency_graph_artifacts")
+abstract class DependencyGraphArtifact {
+  @PrimaryKey()
+  String get id;
+
+  String get rootPackageVersionId;
+
+  String get graphKind;
+
+  String get schemaVersion;
+
+  String get graphDigest;
+
+  String? get resolverName;
+
+  String? get resolverVersion;
+
+  String? get resolutionInputDigest;
+
+  String? get registryCheckpoint;
+
+  Map<String, dynamic> get target;
+
+  List<dynamic> get enabledFeatures;
+
+  Map<String, dynamic> get document;
+
+  int get nodeCount;
+
+  int get edgeCount;
+
+  int get maxDepth;
+
+  int get cycleCount;
+
+  DateTime get createdAt;
+
+}
+
+@Model(tableName: "zed_dependency_graph_edges")
+abstract class DependencyGraphEdge {
+  @PrimaryKey()
+  String get id;
+
+  String get graphArtifactId;
+
+  int get ordinal;
+
+  String get fromRegistryId;
+
+  String get fromOrgSlug;
+
+  String get fromPackageName;
+
+  String? get fromVersion;
+
+  String? get fromPackageId;
+
+  String? get fromPackageVersionId;
+
+  String get toRegistryId;
+
+  String get toOrgSlug;
+
+  String get toPackageName;
+
+  String? get toVersion;
+
+  String? get toPackageId;
+
+  String? get toPackageVersionId;
+
+  String? get requirement;
+
+  String get dependencyKind;
+
+  bool get optional;
+
+  bool get defaultFeatures;
+
+  List<dynamic> get features;
+
+  String? get target;
+
+  int get minimumDepth;
+
+  DateTime get createdAt;
+
+}
+
 @Model(tableName: "zed_package_licenses")
 abstract class PackageLicense {
   @PrimaryKey()

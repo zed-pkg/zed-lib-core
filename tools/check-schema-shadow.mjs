@@ -217,7 +217,7 @@ function main() {
 
   const lockedEntities = new Map(importLock.entities.map((entity) => [entity.entity, entity]));
   const schemaEntities = Object.entries(schema.$defs).filter(([, definition]) => definition['x-db']?.table);
-  if (schemaEntities.length !== 15 || lockedEntities.size !== 15) fail('expected 15 imported persistence entities');
+  if (schemaEntities.length !== 17 || lockedEntities.size !== 17) fail('expected 17 imported persistence entities');
 
   const productionForeignKeys = [...productionSql.matchAll(/\breferences\s+zed_[a-z0-9_]+/gi)].length;
   const productionDeleteActions = [...productionSql.matchAll(/\bon\s+delete\s+(?:cascade|set\s+null|restrict|no\s+action|set\s+default)\b/gi)].length;
@@ -297,7 +297,7 @@ function main() {
   const generatedRoot = resolve(root, 'generated/schema-orm-shadow');
   const manifest = readJson('generated/schema-orm-shadow/manifest.json');
   if (manifest.authorityMode !== 'shadow-import') fail('generated manifest lost shadow authority mode');
-  if (manifest.entityCount !== 15 || manifest.productionSqlBlobSha !== contract.productionSqlBlobSha) fail('generated manifest is stale');
+  if (manifest.entityCount !== 17 || manifest.productionSqlBlobSha !== contract.productionSqlBlobSha) fail('generated manifest is stale');
   const generator = readFileSync(resolve(root, 'tools/schema-shadow-codegen.mjs'), 'utf8');
   if (manifest.generatorFormatVersion !== 1 || manifest.generatorSha256 !== sha256(generator)) {
     fail('generated manifest does not identify the exact generator bytes');

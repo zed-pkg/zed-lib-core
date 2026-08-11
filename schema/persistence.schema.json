@@ -14,7 +14,7 @@
     },
     "authorityMode": "shadow-import",
     "productionSql": "src/rust-orm/sql/registry.sql",
-    "productionSqlBlobSha": "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf",
+    "productionSqlBlobSha": "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
     "generatedSql": "generated/schema-orm-shadow/sql/postgres.sql",
     "promotionGate": "docs/json-schema-orm-shadow.md#promotion-gate",
     "migrationPolicy": "generated shadow SQL MUST NOT be applied to any database"
@@ -1154,7 +1154,7 @@
           "id"
         ],
         "source": "src/rust-orm/entities/package_version.rs",
-        "sourceBlobSha": "8d873d435d97592742254683dbef5beadf3c76d3",
+        "sourceBlobSha": "43040f88668c62d947340bdcfd6fdea26f2ca0c6",
         "authority": "legacy-seaorm-shadow"
       },
       "properties": {
@@ -1352,6 +1352,520 @@
         "downloadCount",
         "yanked",
         "publishedAt"
+      ]
+    },
+    "DependencyGraphArtifact": {
+      "type": "object",
+      "description": "Immutable, content-addressed dependency-graph document; normalized edges are a derived relational index.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::DependencyGraphArtifact"
+      },
+      "x-db": {
+        "table": "zed_dependency_graph_artifacts",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/dependency_graph_artifact.rs",
+        "sourceBlobSha": "2e27a29881342647c94f9c31bba29b469fcd5c7b",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "rootPackageVersionId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "root_package_version_id",
+            "references": {
+              "entity": "PackageVersion",
+              "field": "id"
+            }
+          }
+        },
+        "graphKind": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "graph_kind"
+          }
+        },
+        "schemaVersion": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "schema_version"
+          }
+        },
+        "graphDigest": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "graph_digest"
+          }
+        },
+        "resolverName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "resolver_name"
+          }
+        },
+        "resolverVersion": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "resolver_version"
+          }
+        },
+        "resolutionInputDigest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "resolution_input_digest"
+          }
+        },
+        "registryCheckpoint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "registry_checkpoint"
+          }
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "target"
+          }
+        },
+        "enabledFeatures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "enabled_features"
+          }
+        },
+        "document": {
+          "type": "object",
+          "additionalProperties": true,
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "document"
+          }
+        },
+        "nodeCount": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "node_count"
+          }
+        },
+        "edgeCount": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "edge_count"
+          }
+        },
+        "maxDepth": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "max_depth"
+          }
+        },
+        "cycleCount": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "cycle_count"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "rootPackageVersionId",
+        "graphKind",
+        "schemaVersion",
+        "graphDigest",
+        "target",
+        "enabledFeatures",
+        "document",
+        "nodeCount",
+        "edgeCount",
+        "maxDepth",
+        "cycleCount",
+        "createdAt"
+      ]
+    },
+    "DependencyGraphEdge": {
+      "type": "object",
+      "description": "Ordered normalized edge derived from one immutable dependency-graph document.",
+      "additionalProperties": false,
+      "x-interface": {
+        "type": "internal::DependencyGraphEdge"
+      },
+      "x-db": {
+        "table": "zed_dependency_graph_edges",
+        "primaryKey": [
+          "id"
+        ],
+        "source": "src/rust-orm/entities/dependency_graph_edge.rs",
+        "sourceBlobSha": "2eaa8bee75ca6e63e66a9ab56b5ceca82059b50b",
+        "authority": "legacy-seaorm-shadow"
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "id"
+          }
+        },
+        "graphArtifactId": {
+          "type": "string",
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Uuid"
+          },
+          "x-db": {
+            "column": "graph_artifact_id",
+            "references": {
+              "entity": "DependencyGraphArtifact",
+              "field": "id"
+            }
+          }
+        },
+        "ordinal": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "ordinal"
+          }
+        },
+        "fromRegistryId": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "from_registry_id"
+          }
+        },
+        "fromOrgSlug": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "from_org_slug"
+          }
+        },
+        "fromPackageName": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "from_package_name"
+          }
+        },
+        "fromVersion": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "from_version"
+          }
+        },
+        "fromPackageId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "from_package_id",
+            "references": {
+              "entity": "Package",
+              "field": "id"
+            }
+          }
+        },
+        "fromPackageVersionId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "from_package_version_id",
+            "references": {
+              "entity": "PackageVersion",
+              "field": "id"
+            }
+          }
+        },
+        "toRegistryId": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "to_registry_id"
+          }
+        },
+        "toOrgSlug": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "to_org_slug"
+          }
+        },
+        "toPackageName": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "to_package_name"
+          }
+        },
+        "toVersion": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "to_version"
+          }
+        },
+        "toPackageId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "to_package_id",
+            "references": {
+              "entity": "Package",
+              "field": "id"
+            }
+          }
+        },
+        "toPackageVersionId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "x-import": {
+            "seaOrmType": "Option<Uuid>"
+          },
+          "x-db": {
+            "column": "to_package_version_id",
+            "references": {
+              "entity": "PackageVersion",
+              "field": "id"
+            }
+          }
+        },
+        "requirement": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "requirement"
+          }
+        },
+        "dependencyKind": {
+          "type": "string",
+          "x-import": {
+            "seaOrmType": "String"
+          },
+          "x-db": {
+            "column": "dependency_kind"
+          }
+        },
+        "optional": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "optional"
+          }
+        },
+        "defaultFeatures": {
+          "type": "boolean",
+          "x-import": {
+            "seaOrmType": "bool"
+          },
+          "x-db": {
+            "column": "default_features"
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-import": {
+            "seaOrmType": "Json"
+          },
+          "x-db": {
+            "column": "features"
+          }
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-import": {
+            "seaOrmType": "Option<String>"
+          },
+          "x-db": {
+            "column": "target"
+          }
+        },
+        "minimumDepth": {
+          "type": "integer",
+          "format": "int32",
+          "x-import": {
+            "seaOrmType": "i32"
+          },
+          "x-db": {
+            "column": "minimum_depth"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "DateTimeWithTimeZone"
+          },
+          "x-db": {
+            "column": "created_at"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "graphArtifactId",
+        "ordinal",
+        "fromRegistryId",
+        "fromOrgSlug",
+        "fromPackageName",
+        "toRegistryId",
+        "toOrgSlug",
+        "toPackageName",
+        "dependencyKind",
+        "optional",
+        "defaultFeatures",
+        "features",
+        "minimumDepth",
+        "createdAt"
       ]
     },
     "PackageLicense": {

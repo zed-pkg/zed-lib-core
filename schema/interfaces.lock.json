@@ -48,6 +48,8 @@
     "PackageLicense",
     "PackageUpload",
     "PackageDownload",
+    "DependencyGraphArtifact",
+    "DependencyGraphEdge",
     "ApiToken"
   ],
   "rule": "Wire DTOs stay owned by zed-interfaces. Persistence-only records remain internal; generated shared descriptors may reference them but must not publish competing wire contracts."
