@@ -28,6 +28,7 @@ pub struct Model {
     pub max_depth: i32,
     pub cycle_count: i32,
     pub created_at: DateTimeWithTimeZone,
+    pub sealed_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

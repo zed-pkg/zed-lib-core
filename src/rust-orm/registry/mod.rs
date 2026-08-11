@@ -13,7 +13,8 @@ mod graphs;
 
 pub use graphs::{
     dependency_graph_by_digest, incoming_dependency_edges, latest_dependency_graph_for_root,
-    DependencyGraphCoordinate, DependencyGraphSnapshot, GRAPH_EDGE_PAGE_LIMIT,
+    outgoing_dependency_edges, DependencyGraphCoordinate, DependencyGraphSnapshot,
+    GRAPH_EDGE_PAGE_LIMIT,
 };
 #[cfg(feature = "read-write")]
 pub use graphs::{

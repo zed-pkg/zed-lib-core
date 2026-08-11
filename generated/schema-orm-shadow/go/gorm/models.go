@@ -181,6 +181,7 @@ type DependencyGraphArtifact struct {
 	MaxDepth                             int32           `json:"maxDepth" gorm:"column:max_depth;type:integer;not null"`
 	CycleCount                           int32           `json:"cycleCount" gorm:"column:cycle_count;type:integer;not null"`
 	CreatedAt                            time.Time       `json:"createdAt" gorm:"column:created_at;type:timestamptz;not null"`
+	SealedAt                             *time.Time      `json:"sealedAt" gorm:"column:sealed_at;type:timestamptz"`
 	PackageVersionByRootPackageVersionID PackageVersion  `json:"-" gorm:"foreignKey:RootPackageVersionID;references:ID"`
 }
 

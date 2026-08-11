@@ -203,6 +203,7 @@ class DependencyGraphArtifact extends Table {
   IntColumn get maxDepth => integer().named("max_depth")();
   IntColumn get cycleCount => integer().named("cycle_count")();
   DateTimeColumn get createdAt => dateTime().named("created_at")();
+  DateTimeColumn get sealedAt => dateTime().named("sealed_at").nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

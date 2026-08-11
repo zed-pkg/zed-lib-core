@@ -16,11 +16,11 @@ PARENTS = (
     "430aafe24b6c3ab1263f1351ab4941545f592f19",
     "a5dabf3685db94ffdf5ae30cb3b3e4cc1cce298f",
 )
-EXPECTED_SHARED_DEFS_REVISION = "d58ec90c0129151d1c09d2cf59b2804087059ef5"
-EXPECTED_REGISTRY_BLOB = "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9"
-EXPECTED_DEPENDENCY_GRAPH_REVISION = "d9d33e14bead8c385aa4500fe33b56922ac63550"
-EXPECTED_DEPENDENCY_GRAPH_BLOB = "f17fd7d28a808f5fd8d26e92f4af3f0429d2cda1"
-EXPECTED_VISIBILITY_REVISION = "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c"
+EXPECTED_SHARED_DEFS_REVISION = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
+EXPECTED_REGISTRY_BLOB = "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9"
+EXPECTED_DEPENDENCY_GRAPH_REVISION = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
+EXPECTED_DEPENDENCY_GRAPH_BLOB = "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2"
+EXPECTED_VISIBILITY_REVISION = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
 EXPECTED_VISIBILITY_BLOB = "8612f037dce7de6d7db66ee96db7996b33b32ea9"
 EXPECTED_PACKAGE = "zed-pkg/zed-lib-core"
 
@@ -174,15 +174,17 @@ def assert_shared_defs() -> None:
     for required_fragment in (
         "create table if not exists zed_dependency_graph_artifacts",
         "create table if not exists zed_dependency_graph_edges",
-        "do $zed_graph_constraints$",
-        "zed_dependency_graph_edges_incoming_idx",
-        "zed_dependency_graph_edges_unresolved_target_idx",
+        "zed_dependency_graph_artifacts_document_binding_chk",
+        "zed_dependency_graph_artifacts_immutable",
+        "zed_dependency_graph_edges_immutable",
+        "must be inserted unsealed",
+        "zd004",
+        "zd005",
     ):
         if required_fragment not in graph_text:
             fail(f"dependency-graph migration is missing {required_fragment}")
-    for forbidden_fragment in ("\ncreate trigger", "\ndrop table", "zd003"):
-        if forbidden_fragment in graph_text:
-            fail(f"dependency-graph migration mixes unrelated DDL: {forbidden_fragment}")
+    if "public package % cannot become non-public" in graph_text:
+        fail("dependency-graph migration mixes visibility policy")
 
     patch = ROOT / lock["vendored_visibility_immutability_migration"]
     if not patch.is_file():
@@ -216,7 +218,13 @@ def assert_shared_defs() -> None:
     missing = sorted(table for table in required if f"create table if not exists {table}" not in text)
     if missing:
         fail(f"vendored registry SQL is missing tables: {missing}")
-    for required_fragment in ("zd001", "zd002", "zed_packages_visibility_guard"):
+    for required_fragment in (
+        "zd001",
+        "zd002",
+        "zd003",
+        "public package % cannot become non-public",
+        "zed_packages_visibility_guard",
+    ):
         if required_fragment not in text:
             fail(f"registry policy is missing {required_fragment}")
 

@@ -287,6 +287,7 @@ func (DependencyGraphArtifact) Fields() []ent.Field {
 		field.Int32("max_depth").StructTag("json:\"maxDepth,omitempty\""),
 		field.Int32("cycle_count").StructTag("json:\"cycleCount,omitempty\""),
 		field.Time("created_at").StructTag("json:\"createdAt,omitempty\""),
+		field.Time("sealed_at").Optional().Nillable().StructTag("json:\"sealedAt,omitempty\""),
 	}
 }
 

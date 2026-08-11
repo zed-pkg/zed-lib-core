@@ -432,6 +432,9 @@ export class DependencyGraphArtifact {
   @Column({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 
+  @Column({ name: "sealed_at", type: "timestamptz", nullable: true })
+  sealedAt?: Date;
+
 }
 
 @Entity("zed_dependency_graph_edges")

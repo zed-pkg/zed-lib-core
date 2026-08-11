@@ -237,6 +237,7 @@ export const zedDependencyGraphArtifact = pgTable("zed_dependency_graph_artifact
   maxDepth: integer("max_depth").notNull(),
   cycleCount: integer("cycle_count").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: 'date' }).notNull(),
+  sealedAt: timestamp("sealed_at", { withTimezone: true, mode: 'date' }),
 });
 
 export const zedDependencyGraphEdge = pgTable("zed_dependency_graph_edges", {

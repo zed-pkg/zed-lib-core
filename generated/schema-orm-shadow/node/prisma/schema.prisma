@@ -192,6 +192,7 @@ model DependencyGraphArtifact {
   maxDepth Int @map("max_depth")
   cycleCount Int @map("cycle_count")
   createdAt DateTime @db.Timestamptz(6) @map("created_at")
+  sealedAt DateTime? @db.Timestamptz(6) @map("sealed_at")
   packageVersionByRootPackageVersionId PackageVersion @relation("DependencyGraphArtifact_RootPackageVersionId_PackageVersion", fields: [rootPackageVersionId], references: [id])
   dependencyGraphEdgeByGraphArtifactId DependencyGraphEdge[] @relation("DependencyGraphEdge_GraphArtifactId_DependencyGraphArtifact")
   @@map("zed_dependency_graph_artifacts")

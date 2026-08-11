@@ -70,11 +70,9 @@ fn organization_invitations_use_one_typed_write_command() {
 fn shared_schema_source_is_exact_and_external() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
-        "d58ec90c0129151d1c09d2cf59b2804087059ef5",
-        "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
-        "d9d33e14bead8c385aa4500fe33b56922ac63550",
-        "f17fd7d28a808f5fd8d26e92f4af3f0429d2cda1",
-        "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c",
+        "a1fb823890d4a36dfab67c311f0d728d7b22c1c9",
+        "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9",
+        "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2",
         "8612f037dce7de6d7db66ee96db7996b33b32ea9",
         "\"org_slice\": \"zed-pkg\"",
         "\"schema\": \"public\"",
@@ -92,7 +90,7 @@ fn shared_schema_source_is_exact_and_external() {
 
     assert_eq!(
         zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_REVISION,
-        "d9d33e14bead8c385aa4500fe33b56922ac63550"
+        "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
     );
     assert_eq!(
         zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION,
@@ -100,11 +98,11 @@ fn shared_schema_source_is_exact_and_external() {
     );
     assert_eq!(
         zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA,
-        "f17fd7d28a808f5fd8d26e92f4af3f0429d2cda1"
+        "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2"
     );
     assert_eq!(
         zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION,
-        "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c"
+        "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
     );
     assert_eq!(
         zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION,
@@ -146,6 +144,7 @@ fn dependency_graph_writes_are_gated_and_reads_are_visibility_scoped() {
     let graphs = read("registry/graphs.rs");
     assert!(graphs.contains("pub async fn dependency_graph_by_digest"));
     assert!(graphs.contains("pub async fn incoming_dependency_edges"));
+    assert!(graphs.contains("pub async fn outgoing_dependency_edges"));
     assert!(graphs.contains("visible_org_ids"));
     assert!(graphs.contains("package::Column::Visibility.eq(\"public\")"));
     assert!(graphs.contains("pub async fn persist_dependency_graph"));

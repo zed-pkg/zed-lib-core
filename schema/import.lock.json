@@ -4,7 +4,7 @@
   "baseRevision": "2b84fd5088ddc4f0346e9e45fae10c17dbc935ed",
   "productionSql": {
     "path": "src/rust-orm/sql/registry.sql",
-    "blobSha": "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9"
+    "blobSha": "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9"
   },
   "entities": [
     {
@@ -65,7 +65,7 @@
       "entity": "DependencyGraphArtifact",
       "table": "zed_dependency_graph_artifacts",
       "source": "src/rust-orm/entities/dependency_graph_artifact.rs",
-      "blobSha": "2e27a29881342647c94f9c31bba29b469fcd5c7b"
+      "blobSha": "e237ddad7ed98f53bf3cf54b68899f0b962033be"
     },
     {
       "entity": "DependencyGraphEdge",

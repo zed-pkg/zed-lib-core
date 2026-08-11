@@ -28,7 +28,7 @@ pub const SHARED_DEFS_ORG_SLICE: &str = "zed-pkg";
 /// Exact reviewed shared-definitions revision the entities correspond to.
 ///
 /// Bump this and `shared-defs.lock.json` in the same commit, never separately.
-pub const SHARED_DEFS_REVISION: &str = "d58ec90c0129151d1c09d2cf59b2804087059ef5";
+pub const SHARED_DEFS_REVISION: &str = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9";
 
 /// The SQL segment that owns the registry tables.
 pub const SHARED_DEFS_REGISTRY_SEGMENT: &str = "pg-defs/schema/orgs/zed-pkg/registry.sql";
@@ -39,7 +39,7 @@ pub const SHARED_DEFS_REGISTRY_SEGMENT: &str = "pg-defs/schema/orgs/zed-pkg/regi
 /// identifies the desired-state registry segment, while this revision identifies
 /// the exact compatibility migration used to upgrade a database that already
 /// recorded the historical base ledger entry.
-pub const SHARED_DEFS_DEPENDENCY_GRAPH_REVISION: &str = "d9d33e14bead8c385aa4500fe33b56922ac63550";
+pub const SHARED_DEFS_DEPENDENCY_GRAPH_REVISION: &str = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9";
 
 /// Forward-only migration that adds immutable graph artifacts and normalized
 /// edge indexes to an already-ledgered registry.
@@ -48,11 +48,11 @@ pub const SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION: &str =
 
 /// Git blob identity of the exact vendored dependency-graph migration.
 pub const SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA: &str =
-    "f17fd7d28a808f5fd8d26e92f4af3f0429d2cda1";
+    "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2";
 
 /// Reviewed revision containing the additive public-visibility migration.
 pub const SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION: &str =
-    "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c";
+    "a1fb823890d4a36dfab67c311f0d728d7b22c1c9";
 
 /// Forward-only migration that upgrades an already-ledgered registry safely.
 pub const SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION: &str =

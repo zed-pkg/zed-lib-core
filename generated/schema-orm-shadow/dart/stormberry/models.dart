@@ -286,6 +286,8 @@ abstract class DependencyGraphArtifact {
 
   DateTime get createdAt;
 
+  DateTime? get sealedAt;
+
 }
 
 @Model(tableName: "zed_dependency_graph_edges")

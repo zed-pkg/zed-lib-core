@@ -250,7 +250,7 @@ create table if not exists zed_package_versions (
   primary key (id)
 );
 
--- Imported from src/rust-orm/entities/dependency_graph_artifact.rs @ 2e27a29881342647c94f9c31bba29b469fcd5c7b.
+-- Imported from src/rust-orm/entities/dependency_graph_artifact.rs @ e237ddad7ed98f53bf3cf54b68899f0b962033be.
 create table if not exists zed_dependency_graph_artifacts (
   id uuid not null,
   root_package_version_id uuid not null references zed_package_versions (id),
@@ -269,6 +269,7 @@ create table if not exists zed_dependency_graph_artifacts (
   max_depth integer not null,
   cycle_count integer not null,
   created_at timestamptz not null,
+  sealed_at timestamptz,
   primary key (id)
 );
 

@@ -8,13 +8,13 @@
     "product": "zed",
     "interfaces": {
       "repository": "zed-pkg/zed-interfaces",
-      "revision": "5394b2e7b070354ee79a4c6ac79c26d6264970cd",
+      "revision": "7d31f80dd8a310f218931165a3ad636a2f32b932",
       "schemasIndex": "schemas/index.json",
-      "schemasIndexBlobSha": "6de1fc10c811b065d34472e26b8bf72be85fdd02"
+      "schemasIndexBlobSha": "7b43a25c18d7f1c83ad13b1843def884a154e89f"
     },
     "authorityMode": "shadow-import",
     "productionSql": "src/rust-orm/sql/registry.sql",
-    "productionSqlBlobSha": "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
+    "productionSqlBlobSha": "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9",
     "generatedSql": "generated/schema-orm-shadow/sql/postgres.sql",
     "promotionGate": "docs/json-schema-orm-shadow.md#promotion-gate",
     "migrationPolicy": "generated shadow SQL MUST NOT be applied to any database"
@@ -1367,7 +1367,7 @@
           "id"
         ],
         "source": "src/rust-orm/entities/dependency_graph_artifact.rs",
-        "sourceBlobSha": "2e27a29881342647c94f9c31bba29b469fcd5c7b",
+        "sourceBlobSha": "e237ddad7ed98f53bf3cf54b68899f0b962033be",
         "authority": "legacy-seaorm-shadow"
       },
       "properties": {
@@ -1550,6 +1550,19 @@
           },
           "x-db": {
             "column": "created_at"
+          }
+        },
+        "sealedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "x-import": {
+            "seaOrmType": "Option<DateTimeWithTimeZone>"
+          },
+          "x-db": {
+            "column": "sealed_at"
           }
         }
       },

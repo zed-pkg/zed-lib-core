@@ -25,29 +25,29 @@
   "generatorSha256": "12e5f76dd3594312992c571c2e9f5c721d9d6b0d7fd80349755222bdfa4a360a",
   "interfaces": {
     "repository": "zed-pkg/zed-interfaces",
-    "revision": "5394b2e7b070354ee79a4c6ac79c26d6264970cd",
+    "revision": "7d31f80dd8a310f218931165a3ad636a2f32b932",
     "schemasIndex": "schemas/index.json",
-    "schemasIndexBlobSha": "6de1fc10c811b065d34472e26b8bf72be85fdd02"
+    "schemasIndexBlobSha": "7b43a25c18d7f1c83ad13b1843def884a154e89f"
   },
   "outputs": {
-    "dart/drift/tables.dart": "ae50d63a502b61c33d2b42ea09d9c0d47c80d07ff2fb35b1a67b567d30f3723f",
-    "dart/stormberry/models.dart": "2ca0070edbf11b93db6fa6cf72afdde0d23ce99ad65f1fe4e8a57190d03d112b",
-    "go/ent/schema/entities.go": "3db914ff1410b3c9ab9a3a46112830218df0db3164af2d361b63121a6298c962",
-    "go/gorm/models.go": "181dd63b2f22efff113a3c4260b3e9b21283b62b6b1db00fd003875ac75d6b42",
-    "node/drizzle/schema.ts": "10907e5526e98737cf5c5fe952a6f25248c5a60497595f87c9cce6786c3e52df",
-    "node/prisma/schema.prisma": "5e0a75c09500457bb156b7795180e77c8855260d345863e330ec7be624d60117",
-    "node/typeorm/entities.ts": "c250a9176e193ee45bd591ec84d46961c835be76d4d7a92220f929ca25365732",
-    "rust/sea-orm/entities.rs": "d7db336d6e37c7154a4b5fa7495f9fb4243bc852ec307a8d52f873083aec0f1e",
+    "dart/drift/tables.dart": "fb02ca20276a59ec6b01fe4cf305856111a10bda2bc83793940388d67a04efa6",
+    "dart/stormberry/models.dart": "74ed3f96fad983962aa5027477c8d11ebbfe27c2c42631feb3c3ba1dc2c10b40",
+    "go/ent/schema/entities.go": "c9114024bf1f2bfc8dca3980d0f3c358929c5eb56cabb84302e3ef1e6323b679",
+    "go/gorm/models.go": "6c6ecfa3c44179ca86a3f0da72a2c592db89bcbc47fd3d4470e38987ab0ee0f0",
+    "node/drizzle/schema.ts": "5f53f44c8a5b8e32cc5ecd88f88b13222e3335e041950ad92e7657217f7ff0fc",
+    "node/prisma/schema.prisma": "8a9e66356289d887cff3333585d19b454e811771b01d7bb8e08b63d68ea5cf72",
+    "node/typeorm/entities.ts": "6648cf118a6cf22f2f0f2b92a5dcf2419b18637e206f7602a2bb6825958ee667",
+    "rust/sea-orm/entities.rs": "4aeddb0bd22eb4402178423fdcd11e82e1180a249c2e6f69bf87120ca90db68c",
     "shared/dart/entity_descriptors.dart": "0baca7bc93b77110e2c8297c8dbe147d7e50172f4c7aca6a771b85301ac6eac5",
     "shared/go/entity_descriptors.go": "f09ea3a234126a29fd189767ed965e5642992a83e6fcee2ff24c759965c04d24",
     "shared/rust/entity_descriptors.rs": "f71b3704be95bbed44208e094c8fbe9b924be7af99a6fd693ce68ddc34287d28",
     "shared/typescript/entity-descriptors.ts": "c8f9966fa5363a496445c8eecde3b38db2c3b5807023cae2d2dc17177600b823",
-    "sql/postgres.sql": "0c73539e1145d0fad6e5f9aa3bdd6f5f78ad57388c912ecc2cebbc92d980adc7",
-    "sql/sqlite.sql": "ea577bd6e7e5bee0ae1adcfa92878af2fddc622093b3af460c24d65229aa9a65"
+    "sql/postgres.sql": "e2c290bfd8368a8a2b6a53b3d2fe5de41f7cddc6205ed94bf5e8d0b69206bb85",
+    "sql/sqlite.sql": "6ae0898fc1058319c8ca3ac7b8c598e9f8619f9debf2c4c0377207e47c4232a3"
   },
   "productionSql": "src/rust-orm/sql/registry.sql",
-  "productionSqlBlobSha": "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
+  "productionSqlBlobSha": "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9",
   "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
-  "schemaSha256": "ac3a01363040fc0819c52b2d5f89285e90b87c2517032427964635380c8a9ff3",
+  "schemaSha256": "6ef4a26ebc5c7a74320736a5c2aa9c96eae9f27309e1146d5351fa34bc408ac4",
   "warning": "SHADOW ONLY. Production migration authority remains src/rust-orm/sql/registry.sql."
 }

@@ -354,7 +354,11 @@ mod tests {
         assert!(REGISTRY_SQL.contains("zed_packages_visibility_guard"));
         assert!(REGISTRY_SQL.contains("ZD001"));
         assert!(REGISTRY_SQL.contains("ZD002"));
-        assert!(!REGISTRY_SQL.contains("ZD003"));
+        assert!(REGISTRY_SQL.contains("zed_dependency_graph_artifacts_document_binding_chk"));
+        assert!(REGISTRY_SQL.contains("zed_dependency_graph_artifacts_immutable"));
+        assert!(REGISTRY_SQL.contains("ZD003"));
+        assert!(REGISTRY_SQL.contains("ZD004"));
+        assert!(REGISTRY_SQL.contains("ZD005"));
     }
 
     #[test]
@@ -397,8 +401,16 @@ mod tests {
             assert!(DEPENDENCY_GRAPH_SQL.contains(&format!("conname = '{constraint}'")));
             assert!(DEPENDENCY_GRAPH_SQL.contains(&format!("add constraint {constraint}")));
         }
-        assert!(DEPENDENCY_GRAPH_SQL.contains("do $zed_graph_constraints$"));
-        assert!(!DEPENDENCY_GRAPH_SQL.contains("\ncreate trigger"));
+        assert_eq!(DEPENDENCY_GRAPH_SQL.matches("do $zed_fk$").count(), 6);
+        assert!(DEPENDENCY_GRAPH_SQL.contains("sealed_at timestamptz"));
+        assert!(
+            DEPENDENCY_GRAPH_SQL.contains("zed_dependency_graph_artifacts_document_binding_chk")
+        );
+        assert!(DEPENDENCY_GRAPH_SQL.contains("zed_dependency_graph_artifacts_immutable"));
+        assert!(DEPENDENCY_GRAPH_SQL.contains("zed_dependency_graph_edges_immutable"));
+        assert!(DEPENDENCY_GRAPH_SQL.contains("must be inserted unsealed"));
+        assert!(DEPENDENCY_GRAPH_SQL.contains("ZD004"));
+        assert!(DEPENDENCY_GRAPH_SQL.contains("ZD005"));
         assert!(!DEPENDENCY_GRAPH_SQL.contains("ZD003"));
         assert!(!VISIBILITY_IMMUTABILITY_SQL.contains("zed_dependency_graph_artifacts"));
         assert!(!VISIBILITY_IMMUTABILITY_SQL.contains("zed_dependency_graph_edges"));
