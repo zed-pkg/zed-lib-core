@@ -16,8 +16,8 @@ PARENTS = (
     "430aafe24b6c3ab1263f1351ab4941545f592f19",
     "a5dabf3685db94ffdf5ae30cb3b3e4cc1cce298f",
 )
-EXPECTED_SHARED_DEFS_REVISION = "d8fb884023a26de79d4f5d533f486a2d3dbec7cc"
-EXPECTED_REGISTRY_BLOB = "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf"
+EXPECTED_SHARED_DEFS_REVISION = "d58ec90c0129151d1c09d2cf59b2804087059ef5"
+EXPECTED_REGISTRY_BLOB = "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9"
 EXPECTED_PACKAGE = "zed-pkg/zed-lib-core"
 
 
@@ -125,6 +125,8 @@ def assert_shared_defs() -> None:
         "zed_projects",
         "zed_packages",
         "zed_package_versions",
+        "zed_dependency_graph_artifacts",
+        "zed_dependency_graph_edges",
         "zed_package_licenses",
         "zed_entity_embeddings",
         "zed_package_uploads",
