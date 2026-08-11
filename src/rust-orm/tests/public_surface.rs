@@ -71,10 +71,12 @@ fn shared_schema_source_is_exact_and_external() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
         "d8fb884023a26de79d4f5d533f486a2d3dbec7cc",
+        "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c",
         "\"org_slice\": \"zed-pkg\"",
         "\"schema\": \"public\"",
         "\"table_prefix\": \"zed_\"",
         "pg-defs/schema/orgs/zed-pkg/registry.sql",
+        "2026-08-11-public-visibility-is-permanent.sql",
         "pg-defs/generated/rust/sea-orm",
     ] {
         assert!(lock.contains(contract), "shared-defs lock lost {contract}");
@@ -91,4 +93,12 @@ fn live_denial_probe_remains_available_but_opt_in() {
         .contains("#[ignore = \"requires a dedicated ORM_CORE_TEST_DATABASE_URL database\"]"));
     assert!(connection.contains("live_read_only_context_rejects_schema_ddl"));
     assert!(connection.contains("read-only context unexpectedly executed DDL"));
+}
+
+#[test]
+fn exact_project_reads_are_on_the_default_surface() {
+    let _project = zed_orm_core::read::project_by_org_and_slug;
+    let _project_id = zed_orm_core::read::project_by_id;
+    let _query = zed_orm_core::read::project_role_for_user;
+    let _version = zed_orm_core::read::package_version_by_package_and_version;
 }

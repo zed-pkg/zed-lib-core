@@ -18,6 +18,8 @@ PARENTS = (
 )
 EXPECTED_SHARED_DEFS_REVISION = "d8fb884023a26de79d4f5d533f486a2d3dbec7cc"
 EXPECTED_REGISTRY_BLOB = "3a8ee3f9cba22d7ec2c66e93448ab96e9c79afcf"
+EXPECTED_VISIBILITY_REVISION = "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c"
+EXPECTED_VISIBILITY_BLOB = "8612f037dce7de6d7db66ee96db7996b33b32ea9"
 EXPECTED_PACKAGE = "zed-pkg/zed-lib-core"
 
 
@@ -112,12 +114,29 @@ def assert_shared_defs() -> None:
         fail("shared-definitions revision differs")
     if lock.get("registry_blob_sha") != EXPECTED_REGISTRY_BLOB:
         fail("registry blob identity differs")
+    if lock.get("visibility_immutability_revision") != EXPECTED_VISIBILITY_REVISION:
+        fail("visibility migration revision differs")
+    if lock.get("visibility_immutability_blob_sha") != EXPECTED_VISIBILITY_BLOB:
+        fail("visibility migration blob identity differs")
     source = ROOT / lock["vendored_copy"]
     if not source.is_file():
         fail("vendored registry SQL is missing")
     actual_blob = git("hash-object", str(source.relative_to(ROOT)))
     if actual_blob != EXPECTED_REGISTRY_BLOB:
         fail(f"vendored registry SQL blob differs: {actual_blob}")
+    patch = ROOT / lock["vendored_visibility_immutability_migration"]
+    if not patch.is_file():
+        fail("vendored visibility migration is missing")
+    actual_patch_blob = git("hash-object", str(patch.relative_to(ROOT)))
+    if actual_patch_blob != EXPECTED_VISIBILITY_BLOB:
+        fail(f"vendored visibility migration blob differs: {actual_patch_blob}")
+    patch_text = patch.read_text(encoding="utf-8").lower()
+    for required_fragment in ("create or replace function", "zd003"):
+        if required_fragment not in patch_text:
+            fail(f"visibility migration is missing {required_fragment}")
+    for forbidden_fragment in ("\ncreate trigger", "\nalter table", "\ncreate table"):
+        if forbidden_fragment in patch_text:
+            fail(f"visibility migration replays base DDL: {forbidden_fragment}")
     text = source.read_text(encoding="utf-8").lower()
     required = {
         "zed_users",
@@ -207,6 +226,8 @@ def main() -> None:
         "semanticFold": SEMANTIC_FOLD,
         "sharedDefsRevision": EXPECTED_SHARED_DEFS_REVISION,
         "registryBlob": EXPECTED_REGISTRY_BLOB,
+        "visibilityMigrationRevision": EXPECTED_VISIBILITY_REVISION,
+        "visibilityMigrationBlob": EXPECTED_VISIBILITY_BLOB,
         "routeContract": 1,
     }
     print(json.dumps(summary, sort_keys=True))

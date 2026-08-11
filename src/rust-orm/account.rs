@@ -20,8 +20,12 @@ use crate::{
         project, project_invitation, project_member,
     },
     models::InvitationReceipt,
-    OrmError, ReadContext, WriteContext,
+    OrmError, WriteContext,
 };
+
+// Preserve the read-write account surface while keeping this read-only lookup
+// available to default consumers through `zed_orm_core::read`.
+pub use crate::read::{project_by_org_and_slug, project_role_for_user};
 
 const ADMIN_ROLES: &[&str] = &["owner", "admin"];
 const WRITE_ROLES: &[&str] = &["owner", "admin", "member"];
@@ -110,35 +114,6 @@ pub struct PackageUploadInput {
     pub user_agent: Option<String>,
     pub error: Option<String>,
     pub completed_at: Option<DateTimeWithTimeZone>,
-}
-
-/// Resolve a project without exposing a query builder to consumers.
-pub async fn project_by_org_and_slug(
-    context: &ReadContext,
-    org_id: Uuid,
-    slug: &str,
-) -> Result<Option<project::Model>, OrmError> {
-    project::Entity::find()
-        .filter(project::Column::OrgId.eq(org_id))
-        .filter(project::Column::Slug.eq(slug))
-        .filter(project::Column::IsSoftDeleted.eq(false))
-        .one(context.connection())
-        .await
-        .map_err(OrmError::from_db_err)
-}
-
-/// Direct project role, if one exists. Organization roles remain a separate
-/// authority and are combined transactionally by the write operations below.
-pub async fn project_role_for_user(
-    context: &ReadContext,
-    project_id: Uuid,
-    user_id: Uuid,
-) -> Result<Option<String>, OrmError> {
-    Ok(project_member::Entity::find_by_id((project_id, user_id))
-        .one(context.connection())
-        .await
-        .map_err(OrmError::from_db_err)?
-        .map(|membership| membership.role))
 }
 
 /// Create a project after rechecking the actor's organization-admin role in the
