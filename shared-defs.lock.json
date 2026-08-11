@@ -7,7 +7,15 @@
   "registry_segment": "pg-defs/schema/orgs/zed-pkg/registry.sql",
   "registry_blob_sha": "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
   "vendored_copy": "src/rust-orm/sql/registry.sql",
+  "dependency_graph_revision": "d9d33e14bead8c385aa4500fe33b56922ac63550",
+  "dependency_graph_migration": "pg-defs/schema/orgs/zed-pkg/migrations/2026-08-11-dependency-graph-artifacts.sql",
+  "dependency_graph_migration_blob_sha": "f17fd7d28a808f5fd8d26e92f4af3f0429d2cda1",
+  "vendored_dependency_graph_migration": "src/rust-orm/sql/2026-08-11-dependency-graph-artifacts.sql",
+  "visibility_immutability_revision": "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c",
+  "visibility_immutability_migration": "pg-defs/schema/orgs/zed-pkg/migrations/2026-08-11-public-visibility-is-permanent.sql",
+  "visibility_immutability_blob_sha": "8612f037dce7de6d7db66ee96db7996b33b32ea9",
+  "vendored_visibility_immutability_migration": "src/rust-orm/sql/2026-08-11-public-visibility-is-permanent.sql",
   "generated_adapter": "pg-defs/generated/rust/sea-orm",
   "generated_crate": "dd-pg-defs-sea-orm",
-  "policy": "The registry tables are defined by the exact reviewed shared-definitions segment and applied verbatim by src/rust-orm/migrations.rs. Do not author an independent schema in this crate. The registry lives in public behind the zed_ prefix because pg-defs generated identifiers are keyed by bare table name. Schema changes are reviewed in ORESoftware/k8s-libs-and-shared-defs first, then vendored and repinned here."
+  "policy": "The registry tables and forward-only compatibility migrations are defined in the exact reviewed shared-definitions revisions and applied verbatim by src/rust-orm/migrations.rs. Never replay the non-idempotent base segment when adding a migration. Do not author an independent schema in this crate. Schema changes are reviewed in ORESoftware/k8s-libs-and-shared-defs first, then vendored and repinned here."
 }

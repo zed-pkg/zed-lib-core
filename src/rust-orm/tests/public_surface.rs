@@ -72,10 +72,16 @@ fn shared_schema_source_is_exact_and_external() {
     for contract in [
         "d58ec90c0129151d1c09d2cf59b2804087059ef5",
         "eb80355d09f0c2d4c468dc46aa6ddbd5b06993e9",
+        "d9d33e14bead8c385aa4500fe33b56922ac63550",
+        "f17fd7d28a808f5fd8d26e92f4af3f0429d2cda1",
+        "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c",
+        "8612f037dce7de6d7db66ee96db7996b33b32ea9",
         "\"org_slice\": \"zed-pkg\"",
         "\"schema\": \"public\"",
         "\"table_prefix\": \"zed_\"",
         "pg-defs/schema/orgs/zed-pkg/registry.sql",
+        "2026-08-11-dependency-graph-artifacts.sql",
+        "2026-08-11-public-visibility-is-permanent.sql",
         "pg-defs/generated/rust/sea-orm",
     ] {
         assert!(lock.contains(contract), "shared-defs lock lost {contract}");
@@ -83,6 +89,53 @@ fn shared_schema_source_is_exact_and_external() {
 
     let zpkg = read_repo(".zpkg.toml");
     assert!(zpkg.contains("\"oresoftware/k8s-libs-and-shared-defs\""));
+
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_REVISION,
+        "d9d33e14bead8c385aa4500fe33b56922ac63550"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION,
+        "pg-defs/schema/orgs/zed-pkg/migrations/2026-08-11-dependency-graph-artifacts.sql"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA,
+        "f17fd7d28a808f5fd8d26e92f4af3f0429d2cda1"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION,
+        "d54c3485ee7f0b7e0f816c42b274d1bc563a0d7c"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION,
+        "pg-defs/schema/orgs/zed-pkg/migrations/2026-08-11-public-visibility-is-permanent.sql"
+    );
+    assert_eq!(
+        zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA,
+        "8612f037dce7de6d7db66ee96db7996b33b32ea9"
+    );
+}
+
+#[test]
+fn migration_ledger_keeps_base_graph_and_visibility_distinct() {
+    let migrations = read("migrations.rs");
+    assert!(migrations.contains("registry@c8bdc06d74746acc6439f9527ebd02697fdf028b"));
+    assert!(migrations.contains("Self::HistoricalBase"));
+    assert!(migrations.contains("Self::DependencyGraph"));
+    assert!(migrations.contains("Self::VisibilityImmutability"));
+    assert!(migrations.contains("sql/2026-08-11-dependency-graph-artifacts.sql"));
+    assert!(migrations.contains("sql/2026-08-11-public-visibility-is-permanent.sql"));
+}
+
+#[cfg(feature = "migrate")]
+#[test]
+fn individual_migration_versions_are_public_and_distinct() {
+    let graph = zed_orm_core::migrations::dependency_graph_version();
+    let visibility = zed_orm_core::migrations::visibility_immutability_version();
+    assert!(graph.ends_with(zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_REVISION));
+    assert!(visibility.ends_with(zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION));
+    assert_ne!(graph, visibility);
+    assert_eq!(zed_orm_core::migrations::registry_version(), visibility);
 }
 
 #[test]
@@ -106,4 +159,12 @@ fn live_denial_probe_remains_available_but_opt_in() {
         .contains("#[ignore = \"requires a dedicated ORM_CORE_TEST_DATABASE_URL database\"]"));
     assert!(connection.contains("live_read_only_context_rejects_schema_ddl"));
     assert!(connection.contains("read-only context unexpectedly executed DDL"));
+}
+
+#[test]
+fn exact_project_reads_are_on_the_default_surface() {
+    let _project = zed_orm_core::read::project_by_org_and_slug;
+    let _project_id = zed_orm_core::read::project_by_id;
+    let _query = zed_orm_core::read::project_role_for_user;
+    let _version = zed_orm_core::read::package_version_by_package_and_version;
 }
