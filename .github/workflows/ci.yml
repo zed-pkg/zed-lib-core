@@ -48,6 +48,24 @@ jobs:
         with:
           components: rustfmt,clippy
 
+      - name: Verify zed-orm-core as a Git dependency
+        working-directory: zed-lib
+        run: |
+          consumer="$RUNNER_TEMP/zed-orm-core-consumer"
+          mkdir -p "$consumer/src"
+          printf '%s\n' \
+            '[package]' \
+            'name = "zed-orm-core-consumer"' \
+            'version = "0.0.0"' \
+            'edition = "2021"' \
+            '' \
+            '[dependencies]' \
+            "zed-orm-core = { git = \"file://$GITHUB_WORKSPACE/zed-lib\", rev = \"$(git rev-parse HEAD)\" }" \
+            > "$consumer/Cargo.toml"
+          printf '%s\n' 'fn main() {}' > "$consumer/src/main.rs"
+          cargo generate-lockfile --manifest-path "$consumer/Cargo.toml"
+          cargo check --locked --manifest-path "$consumer/Cargo.toml"
+
       - name: Format
         working-directory: zed-lib
         run: cargo fmt --all -- --check
