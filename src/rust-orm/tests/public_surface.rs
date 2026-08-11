@@ -97,4 +97,5 @@ fn live_denial_probe_remains_available_but_opt_in() {
 fn exact_project_reads_are_on_the_default_surface() {
     let _project = zed_orm_core::read::project_by_org_and_slug;
     let _query = zed_orm_core::read::project_role_for_user;
+    let _version = zed_orm_core::read::package_version_by_package_and_version;
 }

@@ -390,6 +390,31 @@ pub async fn versions_for_package(
         .map_err(OrmError::from_db_err)
 }
 
+/// One immutable published version addressed by its package and exact version.
+///
+/// This is the read path for exact-version downloads and dependency graphs. It
+/// deliberately avoids the page-limited [`versions_for_package`] listing so an
+/// old but still-addressable version cannot disappear after 100 releases.
+pub async fn package_version_by_package_and_version(
+    context: &ReadContext,
+    package_id: uuid::Uuid,
+    version: &str,
+) -> Result<Option<package_version::Model>, OrmError> {
+    package_version_by_package_and_version_query(package_id, version)
+        .one(context.connection())
+        .await
+        .map_err(OrmError::from_db_err)
+}
+
+fn package_version_by_package_and_version_query(
+    package_id: uuid::Uuid,
+    version: &str,
+) -> Select<package_version::Entity> {
+    package_version::Entity::find()
+        .filter(package_version::Column::PackageId.eq(package_id))
+        .filter(package_version::Column::Version.eq(version))
+}
+
 /// Licenses for a package: the package-level default plus any version overrides.
 pub async fn licenses_for_package(
     context: &ReadContext,
@@ -510,6 +535,23 @@ mod tests {
         assert!(statement
             .sql
             .contains("\"zed_projects\".\"is_soft_deleted\" = $3"));
+        assert!(!statement.sql.contains("JOIN"));
+        assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
+    }
+
+    #[test]
+    fn exact_package_version_lookup_does_not_scan_the_listing() {
+        let package_id =
+            uuid::Uuid::parse_str("40000000-0000-0000-0000-000000000004").expect("package id");
+        let statement = package_version_by_package_and_version_query(package_id, "1.2.3")
+            .build(DatabaseBackend::Postgres);
+
+        assert!(statement
+            .sql
+            .contains("\"zed_package_versions\".\"package_id\" = $1"));
+        assert!(statement
+            .sql
+            .contains("\"zed_package_versions\".\"version\" = $2"));
         assert!(!statement.sql.contains("JOIN"));
         assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
     }
