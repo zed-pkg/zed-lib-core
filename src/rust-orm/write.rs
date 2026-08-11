@@ -235,7 +235,8 @@ pub async fn create_package(
     .map_err(OrmError::from_db_err)
 }
 
-/// Change a package's visibility, honouring the promotion window.
+/// Change a package's visibility, honouring the promotion window and the
+/// permanent-public cache contract.
 ///
 /// The window is checked here first so the caller gets a typed refusal with a
 /// usable message. That check is a courtesy, not the control: the
@@ -252,6 +253,12 @@ pub async fn set_package_visibility(
         .await
         .map_err(OrmError::from_db_err)?
         .ok_or_else(|| OrmError::not_found("package"))?;
+
+    if found.visibility == "public" && visibility != "public" {
+        return Err(OrmError::PublicVisibilityIsPermanent(
+            "a public package cannot become private or internal".to_owned(),
+        ));
+    }
 
     if visibility == "public" && found.visibility != "public" {
         let limits = crate::policy::VisibilityLimits::load(context.connection()).await?;

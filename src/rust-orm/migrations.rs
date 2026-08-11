@@ -141,6 +141,8 @@ mod tests {
         assert!(REGISTRY_SQL.contains("zed_packages_visibility_guard"));
         assert!(REGISTRY_SQL.contains("ZD001"));
         assert!(REGISTRY_SQL.contains("ZD002"));
+        assert!(REGISTRY_SQL.contains("ZD003"));
+        assert!(REGISTRY_SQL.contains("public package % cannot become non-public"));
     }
 
     #[test]

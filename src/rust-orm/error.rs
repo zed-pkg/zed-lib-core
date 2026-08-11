@@ -8,6 +8,10 @@ pub const SQLSTATE_VISIBILITY_TOO_OLD: &str = "ZD001";
 /// downloads than the promotion window allows.
 pub const SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS: &str = "ZD002";
 
+/// SQLSTATE raised when a writer attempts to make a publicly cached package
+/// non-public again.
+pub const SQLSTATE_PUBLIC_VISIBILITY_IS_PERMANENT: &str = "ZD003";
+
 /// Error type exposed by the ORM boundary.
 ///
 /// Raw SeaORM/SQLx error types are deliberately converted to strings so the
@@ -23,6 +27,9 @@ pub enum OrmError {
     VisibilityWindowExpired(String),
     /// The package passed the download ceiling for promotion to public.
     VisibilityDownloadLimitExceeded(String),
+    /// Public package artifacts and graphs are immutable-cacheable, so their
+    /// visibility cannot later be revoked.
+    PublicVisibilityIsPermanent(String),
     NotFound(String),
 }
 
@@ -52,6 +59,7 @@ impl OrmError {
             self,
             Self::VisibilityWindowExpired(_)
                 | Self::VisibilityDownloadLimitExceeded(_)
+                | Self::PublicVisibilityIsPermanent(_)
                 | Self::NotFound(_)
         )
     }
@@ -66,6 +74,9 @@ impl OrmError {
             Some(SQLSTATE_VISIBILITY_TOO_OLD) => Self::VisibilityWindowExpired(error.to_string()),
             Some(SQLSTATE_VISIBILITY_TOO_MANY_DOWNLOADS) => {
                 Self::VisibilityDownloadLimitExceeded(error.to_string())
+            }
+            Some(SQLSTATE_PUBLIC_VISIBILITY_IS_PERMANENT) => {
+                Self::PublicVisibilityIsPermanent(error.to_string())
             }
             _ => Self::database(error),
         }
@@ -104,6 +115,12 @@ impl fmt::Display for OrmError {
                 formatter,
                 "package has too many downloads to be made public: {message}"
             ),
+            Self::PublicVisibilityIsPermanent(message) => {
+                write!(
+                    formatter,
+                    "public package visibility is permanent: {message}"
+                )
+            }
             Self::NotFound(message) => write!(formatter, "not found: {message}"),
         }
     }
@@ -119,6 +136,7 @@ mod tests {
     fn visibility_variants_are_client_errors() {
         assert!(OrmError::VisibilityWindowExpired("x".into()).is_client_error());
         assert!(OrmError::VisibilityDownloadLimitExceeded("x".into()).is_client_error());
+        assert!(OrmError::PublicVisibilityIsPermanent("x".into()).is_client_error());
         assert!(OrmError::NotFound("x".into()).is_client_error());
     }
 
