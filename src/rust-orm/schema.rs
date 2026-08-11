@@ -39,8 +39,7 @@ pub const SHARED_DEFS_REGISTRY_SEGMENT: &str = "pg-defs/schema/orgs/zed-pkg/regi
 /// identifies the desired-state registry segment, while this revision identifies
 /// the exact compatibility migration used to upgrade a database that already
 /// recorded the historical base ledger entry.
-pub const SHARED_DEFS_DEPENDENCY_GRAPH_REVISION: &str =
-    "d9d33e14bead8c385aa4500fe33b56922ac63550";
+pub const SHARED_DEFS_DEPENDENCY_GRAPH_REVISION: &str = "d9d33e14bead8c385aa4500fe33b56922ac63550";
 
 /// Forward-only migration that adds immutable graph artifacts and normalized
 /// edge indexes to an already-ledgered registry.

@@ -17,9 +17,7 @@ use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
 use crate::{
     connection::WriteContext,
     error::OrmError,
-    schema::{
-        SHARED_DEFS_DEPENDENCY_GRAPH_REVISION, SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION,
-    },
+    schema::{SHARED_DEFS_DEPENDENCY_GRAPH_REVISION, SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION},
 };
 
 /// The vendored contract segment. Verified byte-for-byte against the
@@ -31,8 +29,7 @@ const REGISTRY_SQL: &str = include_str!("sql/registry.sql");
 /// Fresh databases receive the same desired state from `registry.sql`, then
 /// execute this idempotent migration so every database records the same ordered
 /// ledger. Existing databases skip the base and receive these tables directly.
-const DEPENDENCY_GRAPH_SQL: &str =
-    include_str!("sql/2026-08-11-dependency-graph-artifacts.sql");
+const DEPENDENCY_GRAPH_SQL: &str = include_str!("sql/2026-08-11-dependency-graph-artifacts.sql");
 
 /// Additive migration reviewed in shared definitions. It only replaces the
 /// function already targeted by the existing visibility trigger, so applying
@@ -245,7 +242,10 @@ mod tests {
         assert!(dependency_graph_version().ends_with(SHARED_DEFS_DEPENDENCY_GRAPH_REVISION));
         assert!(registry_version().ends_with(SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION));
         assert_eq!(registry_version(), visibility_immutability_version());
-        assert_ne!(dependency_graph_version(), visibility_immutability_version());
+        assert_ne!(
+            dependency_graph_version(),
+            visibility_immutability_version()
+        );
         assert_ne!(dependency_graph_version(), BASE_REGISTRY_VERSION);
         assert_ne!(registry_version(), BASE_REGISTRY_VERSION);
     }
