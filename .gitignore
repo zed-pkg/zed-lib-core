@@ -11,6 +11,8 @@ temp
 # Language-slice tooling state
 node_modules/
 .dart_tool/
+__pycache__/
+*.py[cod]
 .DS_Store
 
 # Slice tooling state
