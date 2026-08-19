@@ -58,13 +58,16 @@ fn exact_unyanked_package_versions_query(
         return Ok(None);
     }
 
-    let exact_coordinates = unique.into_iter().fold(Condition::any(), |condition, (package_id, version)| {
-        condition.add(
-            Condition::all()
-                .add(package_version::Column::PackageId.eq(package_id))
-                .add(package_version::Column::Version.eq(version)),
-        )
-    });
+    let exact_coordinates =
+        unique
+            .into_iter()
+            .fold(Condition::any(), |condition, (package_id, version)| {
+                condition.add(
+                    Condition::all()
+                        .add(package_version::Column::PackageId.eq(package_id))
+                        .add(package_version::Column::Version.eq(version)),
+                )
+            });
 
     Ok(Some(
         package_version::Entity::find()
@@ -83,11 +86,9 @@ mod tests {
 
     #[test]
     fn empty_coordinates_skip_the_database_query() {
-        assert!(
-            exact_unyanked_package_versions_query(&[])
-                .expect("empty input is valid")
-                .is_none()
-        );
+        assert!(exact_unyanked_package_versions_query(&[])
+            .expect("empty input is valid")
+            .is_none());
     }
 
     #[test]
