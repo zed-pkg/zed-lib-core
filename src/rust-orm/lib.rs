@@ -12,9 +12,9 @@
 //!    exact-pinned forward migrations and authors no DDL of its own.
 //! 2. **Raw sessions do not escape.** Consumers receive an opaque
 //!    [`ReadContext`] or [`WriteContext`] and call named operations in [`read`],
-//!    [`registry`], [`write`], and the feature-gated [`account`],
-//!    [`invitations`], and [`publication`] modules. SeaORM entities and query
-//!    builders stay private.
+//!    [`registry`], [`version_reads`], [`write`], and the feature-gated
+//!    [`account`], [`invitations`], and [`publication`] modules. SeaORM entities
+//!    and query builders stay private.
 //! 3. **Writes are opt-in.** Default builds cannot compile a write symbol; API
 //!    servers must enable `read-write`, and only the discrete migration job
 //!    enables `migrate`. The feature split expresses intent — the authoritative
@@ -40,6 +40,7 @@ mod policy;
 pub mod read;
 pub mod registry;
 pub mod schema;
+pub mod version_reads;
 
 // Entities are public for the API server's own composite queries, but a
 // consumer still needs a context from this crate to execute anything.
