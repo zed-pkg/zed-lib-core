@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add a bounded Quint/TLC model, schema-v1 `fmctl` manifest, JSON Schema
+  refinement corpus, production Rust replay, and pinned formal-methods CI for
+  waiter cancellation, timeout, detached native grants, ownership transfer,
+  waiter caps, same-process rejection, and ordered lock-set unwind.
+- Emit one terminal reason for `acquire_timeout`: `TimedOut` is no longer
+  followed by the generic `Cancelled` callback when the waiter is dropped.
+- Explicitly unwind a partially acquired lock set in reverse order before
+  returning the later acquisition error.
 - Classify Windows `LockFileEx` error 33 (`ERROR_LOCK_VIOLATION`) as
   ordinary nonblocking contention, returning `Ok(None)` from
   `LockManager::try_acquire` instead of a hard I/O error. This matches the

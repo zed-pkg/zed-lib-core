@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "completion_cases": [
+    {
+      "name": "live receiver publishes the native result",
+      "waiter_id": "waiter-live",
+      "receiver_alive": true,
+      "native_granted": true,
+      "expected_disposition": "publish_result"
+    },
+    {
+      "name": "cancelled receiver releases a later native grant",
+      "waiter_id": "waiter-cancelled",
+      "receiver_alive": false,
+      "native_granted": true,
+      "expected_disposition": "release_detached"
+    },
+    {
+      "name": "timed-out receiver releases a later native grant",
+      "waiter_id": "waiter-timed-out",
+      "receiver_alive": false,
+      "native_granted": true,
+      "expected_disposition": "release_detached"
+    }
+  ],
+  "terminal_event_cases": [
+    {
+      "name": "timeout has one terminal reason",
+      "reason": "timeout",
+      "expected_events": ["TimedOut"],
+      "forbidden_events": ["Cancelled"]
+    },
+    {
+      "name": "caller cancellation has one terminal reason",
+      "reason": "cancel",
+      "expected_events": ["Cancelled"],
+      "forbidden_events": ["TimedOut"]
+    }
+  ],
+  "lockset_unwind_cases": [
+    {
+      "name": "three partially acquired guards unwind in reverse",
+      "acquired_guard_ids": ["project", "artifact", "build"],
+      "expected_release_order": ["build", "artifact", "project"]
+    },
+    {
+      "name": "one partially acquired guard still unwinds",
+      "acquired_guard_ids": ["project"],
+      "expected_release_order": ["project"]
+    },
+    {
+      "name": "empty partial acquisition is a no-op",
+      "acquired_guard_ids": [],
+      "expected_release_order": []
+    }
+  ]
+}

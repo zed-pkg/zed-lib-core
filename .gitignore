@@ -1,4 +1,6 @@
 /target/
+/.formal-artifacts/
+/_apalache-out/
 Cargo.lock
 __pycache__/
 *.py[cod]
