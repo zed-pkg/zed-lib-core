@@ -323,6 +323,7 @@ fn package_summary(row: package::Model, org_slug: String) -> PackageSummary {
         latest_version: row.latest_version,
         download_count: row.download_count,
         version_count: row.version_count,
+        updated_at: row.updated_at,
     }
 }
 
@@ -444,6 +445,54 @@ pub async fn licenses_for_package(
         .all(context.connection())
         .await
         .map_err(OrmError::from_db_err)
+}
+
+/// Effective primary-license candidates for a bounded set of exact versions.
+///
+/// Each coordinate returns at most its package-level default and its exact
+/// version override. Callers select the override when present. Package ids are
+/// already authorized by the caller's package listing; this function never
+/// widens that tenant scope or performs a page-oriented scan.
+pub async fn primary_licenses_for_exact_versions(
+    context: &ReadContext,
+    coordinates: &[(uuid::Uuid, uuid::Uuid)],
+) -> Result<Vec<package_license::Model>, OrmError> {
+    if coordinates.len() > PAGE_LIMIT as usize {
+        return Err(OrmError::policy(format!(
+            "exact-version license metadata is limited to {PAGE_LIMIT} packages"
+        )));
+    }
+    if coordinates.is_empty() {
+        return Ok(Vec::new());
+    }
+    primary_licenses_for_exact_versions_query(coordinates)
+        .all(context.connection())
+        .await
+        .map_err(OrmError::from_db_err)
+}
+
+fn primary_licenses_for_exact_versions_query(
+    coordinates: &[(uuid::Uuid, uuid::Uuid)],
+) -> Select<package_license::Entity> {
+    let package_ids = coordinates
+        .iter()
+        .map(|(package_id, _)| *package_id)
+        .collect::<Vec<_>>();
+    let version_ids = coordinates
+        .iter()
+        .map(|(_, version_id)| *version_id)
+        .collect::<Vec<_>>();
+    package_license::Entity::find()
+        .filter(package_license::Column::PackageId.is_in(package_ids))
+        .filter(package_license::Column::IsPrimary.eq(true))
+        .filter(
+            Condition::any()
+                .add(package_license::Column::PackageVersionId.is_null())
+                .add(package_license::Column::PackageVersionId.is_in(version_ids)),
+        )
+        .order_by_asc(package_license::Column::PackageId)
+        .order_by_asc(package_license::Column::PackageVersionId)
+        .limit(PAGE_LIMIT * 2)
 }
 
 /// Newest public packages — the signed-out home page.
@@ -586,6 +635,36 @@ mod tests {
             .contains("\"zed_package_versions\".\"version\" = $2"));
         assert!(!statement.sql.contains("JOIN"));
         assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
+    }
+
+    #[test]
+    fn exact_version_license_metadata_is_one_bounded_batch() {
+        let first_package =
+            uuid::Uuid::parse_str("41000000-0000-0000-0000-000000000001").expect("package id");
+        let first_version =
+            uuid::Uuid::parse_str("42000000-0000-0000-0000-000000000001").expect("version id");
+        let second_package =
+            uuid::Uuid::parse_str("41000000-0000-0000-0000-000000000002").expect("package id");
+        let second_version =
+            uuid::Uuid::parse_str("42000000-0000-0000-0000-000000000002").expect("version id");
+        let statement = primary_licenses_for_exact_versions_query(&[
+            (first_package, first_version),
+            (second_package, second_version),
+        ])
+        .build(DatabaseBackend::Postgres);
+
+        assert!(statement
+            .sql
+            .contains("\"zed_package_licenses\".\"package_id\" IN"));
+        assert!(statement
+            .sql
+            .contains("\"zed_package_licenses\".\"is_primary\" ="));
+        assert!(statement
+            .sql
+            .contains("\"zed_package_licenses\".\"package_version_id\" IS NULL"));
+        assert!(statement.sql.contains(" OR "));
+        assert!(statement.sql.contains("LIMIT $"));
+        assert!(!statement.sql.contains("JOIN"));
     }
 
     #[tokio::test]
