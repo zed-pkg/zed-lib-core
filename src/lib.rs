@@ -221,6 +221,25 @@ pub enum LockEventKind {
     Failed,
 }
 
+/// What the waiter worker must do with a native acquisition result.
+///
+/// This is the implementation-refinement boundary for the finite waiter
+/// lifecycle model. Cancellation and timeout make the receiver unavailable;
+/// a later native grant must then be released instead of published.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WaiterCompletionDisposition {
+    PublishResult,
+    ReleaseDetached,
+}
+
+pub const fn settle_waiter_completion(receiver_alive: bool) -> WaiterCompletionDisposition {
+    if receiver_alive {
+        WaiterCompletionDisposition::PublishResult
+    } else {
+        WaiterCompletionDisposition::ReleaseDetached
+    }
+}
+
 /// Structured lifecycle event. Callbacks must be fast and must not attempt to
 /// acquire the same lock synchronously.
 #[derive(Debug, Clone)]
@@ -516,6 +535,7 @@ impl LockManager {
                     None,
                     Some(format!("deadline of {timeout:?} elapsed")),
                 );
+                waiter.suppress_cancel_event();
                 drop(waiter);
                 bail!(
                     "timed out after {timeout:?} waiting for `{}` at {}",
@@ -555,7 +575,13 @@ impl LockManager {
 
         let mut guards = Vec::with_capacity(requests.len());
         for request in requests {
-            guards.push(self.acquire_blocking(request)?);
+            match self.acquire_blocking(request) {
+                Ok(guard) => guards.push(guard),
+                Err(error) => {
+                    unwind_in_reverse(&mut guards);
+                    return Err(error);
+                }
+            }
         }
         Ok(LockSetGuard { guards })
     }
@@ -717,9 +743,13 @@ impl LockSetGuard {
 
 impl Drop for LockSetGuard {
     fn drop(&mut self) {
-        while let Some(guard) = self.guards.pop() {
-            drop(guard);
-        }
+        unwind_in_reverse(&mut self.guards);
+    }
+}
+
+fn unwind_in_reverse<T>(values: &mut Vec<T>) {
+    while let Some(value) = values.pop() {
+        drop(value);
     }
 }
 
@@ -845,13 +875,17 @@ impl<G: Send + 'static> LockWaiter<G> {
                     });
                 let waker = {
                     let mut state = lock_unpoison(&worker_shared.state);
-                    if !state.receiver_alive {
-                        drop(state);
-                        drop(result);
-                        return;
+                    match settle_waiter_completion(state.receiver_alive) {
+                        WaiterCompletionDisposition::PublishResult => {
+                            state.result = Some(result);
+                            state.waker.take()
+                        }
+                        WaiterCompletionDisposition::ReleaseDetached => {
+                            drop(state);
+                            drop(result);
+                            return;
+                        }
                     }
-                    state.result = Some(result);
-                    state.waker.take()
                 };
                 worker_shared.ready.notify_all();
                 if let Some(waker) = waker {
@@ -867,6 +901,10 @@ impl<G: Send + 'static> LockWaiter<G> {
             completed: false,
             on_cancel,
         })
+    }
+
+    fn suppress_cancel_event(&mut self) {
+        self.on_cancel = None;
     }
 
     pub fn wait(mut self) -> Result<G> {
@@ -1136,6 +1174,82 @@ mod tests {
         assert_eq!(waiter.wait_timeout(Duration::from_secs(1))?, Some(42));
         assert_eq!(attempts.load(Ordering::SeqCst), 1);
         Ok(())
+    }
+
+    #[test]
+    fn acquire_timeout_emits_one_terminal_reason() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let path = temp.path().join("timeout.lock");
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let event_log = Arc::clone(&events);
+        let manager = LockManager::builder()
+            .event_sink(move |event| {
+                if event.operation == "timed waiter" {
+                    lock_unpoison(&event_log).push(event.kind);
+                }
+            })
+            .build();
+
+        let owner = manager.acquire_blocking(
+            LockRequest::exclusive(&path)
+                .operation("owner")
+                .queue_same_process(),
+        )?;
+        let error = match manager.acquire_timeout(
+            LockRequest::exclusive(&path)
+                .operation("timed waiter")
+                .queue_same_process(),
+            Duration::from_millis(20),
+        ) {
+            Ok(_) => panic!("the contended waiter must time out"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("timed out"));
+
+        let observed = lock_unpoison(&events);
+        assert_eq!(
+            observed
+                .iter()
+                .filter(|kind| **kind == LockEventKind::TimedOut)
+                .count(),
+            1
+        );
+        assert!(!observed.contains(&LockEventKind::Cancelled));
+        drop(observed);
+
+        drop(owner);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while manager.active_waiters() != 0 && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(manager.active_waiters(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn partial_lockset_unwind_is_explicitly_reverse_ordered() {
+        struct DropProbe {
+            id: usize,
+            log: Arc<Mutex<Vec<usize>>>,
+        }
+
+        impl Drop for DropProbe {
+            fn drop(&mut self) {
+                lock_unpoison(&self.log).push(self.id);
+            }
+        }
+
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let mut acquired = (1..=3)
+            .map(|id| DropProbe {
+                id,
+                log: Arc::clone(&log),
+            })
+            .collect::<Vec<_>>();
+        super::unwind_in_reverse(&mut acquired);
+
+        assert!(acquired.is_empty());
+        assert_eq!(*lock_unpoison(&log), vec![3, 2, 1]);
     }
 
     #[test]

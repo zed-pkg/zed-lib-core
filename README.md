@@ -57,6 +57,20 @@ cancels delivery, not the syscall. If the detached waiter later acquires the
 lock, failed delivery immediately drops the guard. The manager limits the
 number of such waiter threads to provide backpressure.
 
+## Formal verification
+
+The bounded Quint model in [`formal/waiter_lifecycle.qnt`](formal/waiter_lifecycle.qnt)
+checks exclusive ownership, detached grant-and-release, unique timeout versus
+cancellation outcomes, waiter-cap enforcement, same-process rejection,
+ownership transfer, and reverse partial lock-set unwind. Its schema-v1
+[`formal/fm.toml`](formal/fm.toml) manifest runs 10,000 simulated traces and
+exhaustive TLC verification in CI.
+
+Concrete JSON Schema 2020-12 cases under [`protocol/`](protocol/) replay the
+model's publish-versus-release decision through production Rust code. See
+[`formal/README.md`](formal/README.md) for the exact finite proof boundary and
+the properties intentionally left to real cross-platform process tests.
+
 ## Source provenance
 
 This standalone repository was initially extracted from
