@@ -1,6 +1,6 @@
 //! Service-neutral request and response models for registry account features.
 
-use sea_orm::prelude::{Json, Uuid};
+use sea_orm::prelude::{DateTimeWithTimeZone, Json, Uuid};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionIdentity {
@@ -59,6 +59,7 @@ pub struct PackageSummary {
     pub latest_version: Option<String>,
     pub download_count: i64,
     pub version_count: i32,
+    pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Clone, Debug, PartialEq)]
