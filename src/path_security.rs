@@ -86,17 +86,18 @@ pub fn user_private_sddl(sid: &str) -> String {
 ///
 /// Existing parent directories may safely inherit their ACL, so protection is
 /// checked separately from access. This classifier requires an allow ACE that
-/// grants full control to the current user, rejects malformed or unsupported
-/// ACEs, and rejects write-capable allow ACEs for broad user groups. Read and
-/// execute inheritance is allowed on parents, matching the Unix no-group/other-
-/// write directory policy.
+/// grants full control to the current user or a Windows privileged controller,
+/// rejects malformed or unsupported ACEs, and rejects write-capable allow ACEs
+/// for broad user groups. Windows local system/administrators are an operating-
+/// system trust boundary analogous to Unix root; read and execute inheritance is
+/// allowed on parents, matching the Unix no-group/other-write directory policy.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn sddl_is_user_private(sddl: &str, sid: &str) -> bool {
     if sid.is_empty() || sddl.matches('(').count() != sddl.matches(')').count() {
         return false;
     }
 
-    let mut grants_current_user_full_control = false;
+    let mut grants_trusted_controller_full_control = false;
     for ace in sddl_aces(sddl) {
         let Some((ace_type, rights, trustee)) = parse_sddl_ace(ace) else {
             return false;
@@ -110,18 +111,22 @@ pub fn sddl_is_user_private(sddl: &str, sid: &str) -> bool {
         if sddl_trustee_is_broad(trustee) && sddl_rights_can_modify(rights) {
             return false;
         }
-        if trustee.eq_ignore_ascii_case(sid) && sddl_rights_are_full_control(rights) {
-            grants_current_user_full_control = true;
+        if (sddl_trustee_matches_sid(trustee, sid)
+            || sddl_trustee_is_privileged_controller(trustee))
+            && sddl_rights_are_full_control(rights)
+        {
+            grants_trusted_controller_full_control = true;
         }
     }
 
-    grants_current_user_full_control
+    grants_trusted_controller_full_control
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
     sddl_has_protected_dacl(sddl)
         && sddl_is_user_private(sddl, sid)
+        && sddl_grants_full_control_to_sid(sddl, sid)
         && !sddl_has_broad_allow_ace(sddl)
 }
 
@@ -153,6 +158,28 @@ fn sddl_rights_are_full_control(rights: &str) -> bool {
         rights.to_ascii_uppercase().as_str(),
         "FA" | "GA" | "0X1F01FF" | "0X10000000"
     )
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_trustee_matches_sid(trustee: &str, sid: &str) -> bool {
+    trustee.eq_ignore_ascii_case(sid)
+        || (trustee.eq_ignore_ascii_case("SY") && sid.eq_ignore_ascii_case("S-1-5-18"))
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_trustee_is_privileged_controller(trustee: &str) -> bool {
+    matches!(trustee.to_ascii_uppercase().as_str(), "SY" | "BA" | "LA")
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_grants_full_control_to_sid(sddl: &str, sid: &str) -> bool {
+    sddl_aces(sddl).any(|ace| {
+        parse_sddl_ace(ace).is_some_and(|(ace_type, rights, trustee)| {
+            ace_type.eq_ignore_ascii_case("A")
+                && sddl_trustee_matches_sid(trustee, sid)
+                && sddl_rights_are_full_control(rights)
+        })
+    })
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -862,6 +889,13 @@ mod tests {
         ));
         assert!(!sddl_is_user_private(
             &format!("D:AI(A;OICI;FA;;;{sid})(A;ID;0x120116;;;BU)"),
+            sid
+        ));
+        let hosted_windows_parent = "D:(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;LA)";
+        assert!(sddl_is_user_private(hosted_windows_parent, sid));
+        assert!(!sddl_is_protected_user_private(hosted_windows_parent, sid));
+        assert!(!sddl_is_protected_user_private(
+            "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;LA)",
             sid
         ));
         assert!(!sddl_is_user_private("D:(A;;FA;;;WD)", sid));
