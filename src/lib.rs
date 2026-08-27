@@ -5,11 +5,13 @@
 //! dedicated, bounded waiter thread, while completion is relayed to the caller
 //! through a runtime-neutral [`Future`] and condition variable. There is no
 //! lock-file polling, filesystem-watcher protocol, PID-file ownership, or
-//! network dependency in the local path.
+//! network dependency in the local path. Rendezvous files are opened under a
+//! private, fail-closed path policy unless a caller opts into
+//! [`PathSecurityPolicy::Shared`].
 
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::fs::{self, File, OpenOptions};
+use std::fs::File;
 use std::future::Future;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -22,6 +24,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context as AnyhowContext, Result, anyhow, bail};
 use fs2::FileExt;
+
+mod path_security;
+pub use path_security::PathSecurityPolicy;
+use path_security::{canonical_lock_path, open_lock_file};
 
 const DEFAULT_MAX_WAITERS: usize = 128;
 
@@ -126,6 +132,7 @@ pub struct LockRequest {
     operation: String,
     class: LockClass,
     same_process_policy: SameProcessPolicy,
+    path_security_policy: PathSecurityPolicy,
 }
 
 impl LockRequest {
@@ -135,6 +142,7 @@ impl LockRequest {
             operation: "exclusive lock".to_owned(),
             class: LockClass::Custom(100),
             same_process_policy: SameProcessPolicy::Reject,
+            path_security_policy: PathSecurityPolicy::Private,
         }
     }
 
@@ -157,6 +165,15 @@ impl LockRequest {
         self.same_process_policy(SameProcessPolicy::Queue)
     }
 
+    pub fn path_security_policy(mut self, policy: PathSecurityPolicy) -> Self {
+        self.path_security_policy = policy;
+        self
+    }
+
+    pub fn shared_path(self) -> Self {
+        self.path_security_policy(PathSecurityPolicy::Shared)
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -167,6 +184,10 @@ impl LockRequest {
 
     pub fn lock_class(&self) -> LockClass {
         self.class
+    }
+
+    pub fn path_security(&self) -> PathSecurityPolicy {
+        self.path_security_policy
     }
 }
 
@@ -352,7 +373,8 @@ impl LockManager {
             None,
         );
 
-        let (mut file, identity) = match open_lock_file(&request.path) {
+        let (mut file, identity) = match open_lock_file(&request.path, request.path_security_policy)
+        {
             Ok(opened) => opened,
             Err(error) => {
                 self.emit(
@@ -436,7 +458,7 @@ impl LockManager {
     /// currently authoritative.
     pub fn try_acquire(&self, request: LockRequest) -> Result<Option<LockGuard>> {
         let started = Instant::now();
-        let (mut file, identity) = open_lock_file(&request.path)?;
+        let (mut file, identity) = open_lock_file(&request.path, request.path_security_policy)?;
         check_lock_order(request.class, &identity, &request.operation)?;
         let reserved = self.reserve_if_required(&request, &identity)?;
 
@@ -554,7 +576,7 @@ impl LockManager {
     {
         let mut requests = requests.into_iter().collect::<Vec<_>>();
         for request in &mut requests {
-            request.path = canonical_lock_path(&request.path)?;
+            request.path = canonical_lock_path(&request.path, request.path_security_policy)?;
         }
         requests.sort_by(|left, right| {
             left.class
@@ -1032,29 +1054,6 @@ impl<G> Drop for LockWaiter<G> {
     }
 }
 
-fn open_lock_file(path: &Path) -> Result<(File, PathBuf)> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("creating lock directory {}", parent.display()))?;
-    }
-    let file = OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(path)
-        .with_context(|| format!("opening lock file {}", path.display()))?;
-    let identity = fs::canonicalize(path)
-        .with_context(|| format!("canonicalizing lock identity {}", path.display()))?;
-    Ok((file, identity))
-}
-
-fn canonical_lock_path(path: &Path) -> Result<PathBuf> {
-    let (file, canonical) = open_lock_file(path)?;
-    drop(file);
-    Ok(canonical)
-}
-
 fn path_sort_key(path: &Path) -> String {
     let key = path.to_string_lossy().into_owned();
     if cfg!(windows) {
@@ -1129,6 +1128,27 @@ mod tests {
     use anyhow::{Result, anyhow};
 
     use super::{LockClass, LockEventKind, LockManager, LockRequest, LockWaiter, lock_unpoison};
+
+    #[cfg(unix)]
+    #[test]
+    fn acquire_creates_private_unix_lock_paths() -> Result<()> {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let temp = tempfile::tempdir()?;
+        let path = temp.path().join("nested").join("project.lock");
+        let manager = LockManager::default();
+        let guard = manager
+            .acquire_blocking(LockRequest::exclusive(&path).operation("private rendezvous"))?;
+        drop(guard);
+        let dir_mode = std::fs::metadata(path.parent().unwrap())?
+            .permissions()
+            .mode()
+            & 0o777;
+        let file_mode = std::fs::metadata(&path)?.permissions().mode() & 0o777;
+        assert_eq!(dir_mode, 0o700);
+        assert_eq!(file_mode, 0o600);
+        Ok(())
+    }
 
     #[test]
     fn would_block_is_classified_as_lock_contention() {

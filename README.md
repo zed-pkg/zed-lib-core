@@ -19,6 +19,14 @@ runtime-neutral future APIs.
   Intentional independent tasks may opt into kernel queuing.
 - Multi-lock transactions are canonicalized, deduplicated, sorted by lock
   class and path, and released in reverse order.
+- Lock rendezvous paths default to a private, fail-closed policy: Unix
+  directories are `0700`, lock files are `0600`, the final path component is
+  opened with `O_NOFOLLOW`, and foreign ownership or group/other-writable
+  parents are rejected. Windows opens the final component without following
+  reparse points/junctions, uses non-inheritable handles, and applies a
+  user-private DACL. Shared-directory mode is opt-in via
+  `PathSecurityPolicy::Shared` / `LockRequest::shared_path()` and still
+  refuses symlink and reparse substitution.
 - Fiducia is not part of the local path. It remains an optional outer lease and
   fencing layer for genuinely multi-host shared state.
 

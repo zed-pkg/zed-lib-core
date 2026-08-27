@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Harden `open_lock_file()` behind an explicit `PathSecurityPolicy`.
+  Private/fail-closed is the default: Unix creates `0700` directories and
+  `0600` files, opens the final component with `O_NOFOLLOW`, and rejects
+  foreign ownership, symlink parents, and group/other-writable rendezvous
+  paths. Existing overly-permissive lock files are rejected rather than
+  chmod'd. Windows refuses reparse points and junctions, keeps handles
+  non-inheritable via `SetHandleInformation` (MSRV 1.88 has no
+  `OpenOptionsExt::inherit_handle`), and applies a user-private DACL. Windows
+  FFI uses edition-2024 `unsafe extern` blocks. Shared-directory mode is
+  opt-in and still refuses substitution. Policy helpers are unit-tested on
+  every OS; native reparse/DACL APIs are `cfg(windows)` and exercised on
+  Windows CI.
 - Add a bounded Quint/TLC model, schema-v1 `fmctl` manifest, JSON Schema
   refinement corpus, production Rust replay, and pinned formal-methods CI for
   waiter cancellation, timeout, detached native grants, ownership transfer,
