@@ -37,72 +37,61 @@ jobs:
 
           path = Path('src/path_security.rs')
           text = path.read_text()
-          replacements = [
-              (
-                  '''/// grants full control to the current user, rejects malformed or unsupported
+
+          def replace_once(old: str, new: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one replacement anchor, found {count}: {old[:100]!r}')
+              text = text.replace(old, new)
+
+          replace_once(
+              '''/// grants full control to the current user, rejects malformed or unsupported
           /// ACEs, and rejects write-capable allow ACEs for broad user groups. Read and
           /// execute inheritance is allowed on parents, matching the Unix no-group/other-
           /// write directory policy.''',
-                  '''/// grants full control to the current user or a Windows privileged controller,
+              '''/// grants full control to the current user or a Windows privileged controller,
           /// rejects malformed or unsupported ACEs, and rejects write-capable allow ACEs
           /// for broad user groups. Windows local system/administrators are an operating-
           /// system trust boundary analogous to Unix root; read and execute inheritance is
           /// allowed on parents, matching the Unix no-group/other-write directory policy.''',
-              ),
-              (
-                  '''    let mut grants_current_user_full_control = false;''',
-                  '''    let mut grants_trusted_controller_full_control = false;''',
-              ),
-              (
-                  '''        if trustee.eq_ignore_ascii_case(sid) && sddl_rights_are_full_control(rights) {
+          )
+          replace_once(
+              '    let mut grants_current_user_full_control = false;',
+              '    let mut grants_trusted_controller_full_control = false;',
+          )
+          replace_once(
+              '''        if trustee.eq_ignore_ascii_case(sid) && sddl_rights_are_full_control(rights) {
                       grants_current_user_full_control = true;
                   }''',
-                  '''        if (sddl_trustee_matches_sid(trustee, sid)
+              '''        if (sddl_trustee_matches_sid(trustee, sid)
                       || sddl_trustee_is_privileged_controller(trustee))
                       && sddl_rights_are_full_control(rights)
                   {
                       grants_trusted_controller_full_control = true;
                   }''',
-              ),
-              (
-                  '''    grants_current_user_full_control
-          }
-
-          #[cfg_attr(not(windows), allow(dead_code))]
-          pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
+          )
+          replace_once(
+              '    grants_current_user_full_control\n}',
+              '    grants_trusted_controller_full_control\n}',
+          )
+          replace_once(
+              '''pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
               sddl_has_protected_dacl(sddl)
                   && sddl_is_user_private(sddl, sid)
                   && !sddl_has_broad_allow_ace(sddl)
           }''',
-                  '''    grants_trusted_controller_full_control
-          }
-
-          #[cfg_attr(not(windows), allow(dead_code))]
-          pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
+              '''pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
               sddl_has_protected_dacl(sddl)
                   && sddl_is_user_private(sddl, sid)
                   && sddl_grants_full_control_to_sid(sddl, sid)
                   && !sddl_has_broad_allow_ace(sddl)
           }''',
-              ),
-              (
-                  '''fn sddl_rights_are_full_control(rights: &str) -> bool {
-              matches!(
-                  rights.to_ascii_uppercase().as_str(),
-                  "FA" | "GA" | "0X1F01FF" | "0X10000000"
-              )
-          }
+          )
 
-          #[cfg_attr(not(windows), allow(dead_code))]
-          fn sddl_trustee_is_broad''',
-                  '''fn sddl_rights_are_full_control(rights: &str) -> bool {
-              matches!(
-                  rights.to_ascii_uppercase().as_str(),
-                  "FA" | "GA" | "0X1F01FF" | "0X10000000"
-              )
-          }
-
-          #[cfg_attr(not(windows), allow(dead_code))]
+          broad_anchor = '''#[cfg_attr(not(windows), allow(dead_code))]
+          fn sddl_trustee_is_broad'''
+          helpers = '''#[cfg_attr(not(windows), allow(dead_code))]
           fn sddl_trustee_matches_sid(trustee: &str, sid: &str) -> bool {
               trustee.eq_ignore_ascii_case(sid)
                   || (trustee.eq_ignore_ascii_case("SY") && sid.eq_ignore_ascii_case("S-1-5-18"))
@@ -124,20 +113,11 @@ jobs:
               })
           }
 
-          #[cfg_attr(not(windows), allow(dead_code))]
-          fn sddl_trustee_is_broad''',
-              ),
-          ]
+          '''
+          replace_once(broad_anchor, helpers + broad_anchor)
 
-          for old, new in replacements:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'expected one replacement anchor, found {count}: {old[:100]!r}')
-              text = text.replace(old, new)
-
-          anchor = '''        let inherited_with_broad_read =
-              format!("D:AI(A;OICI;FA;;;{sid})(A;ID;0x1200a9;;;BU)");'''
-          insert = '''        let hosted_windows_parent =
+          test_anchor = '        assert!(!sddl_is_user_private("D:(A;;FA;;;WD)", sid));'
+          test_insert = '''        let hosted_windows_parent =
               "D:(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;LA)";
           assert!(sddl_is_user_private(hosted_windows_parent, sid));
           assert!(!sddl_is_protected_user_private(hosted_windows_parent, sid));
@@ -145,11 +125,9 @@ jobs:
               "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;LA)",
               sid
           ));
+          ''' + test_anchor
+          replace_once(test_anchor, test_insert)
 
-          ''' + anchor
-          if text.count(anchor) != 1:
-              raise SystemExit('expected one inherited-parent test anchor')
-          text = text.replace(anchor, insert)
           path.write_text(text)
           PY
           cargo fmt --all
