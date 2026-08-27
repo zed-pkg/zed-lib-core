@@ -125,6 +125,60 @@ fn migration_plan(
         .collect()
 }
 
+async fn recorded_versions<C: ConnectionTrait>(connection: &C) -> Result<Vec<String>, OrmError> {
+    let mut recorded = Vec::with_capacity(MigrationStep::ORDERED.len());
+    for step in MigrationStep::ORDERED {
+        recorded.extend(recorded_version(connection, step).await?);
+    }
+    Ok(recorded)
+}
+
+async fn recorded_version<C: ConnectionTrait>(
+    connection: &C,
+    step: MigrationStep,
+) -> Result<Option<String>, OrmError> {
+    let version = step.version();
+    Ok(match ledger_contains(connection, &version).await? {
+        true => Some(version),
+        false => None,
+    })
+}
+
+async fn ledger_contains<C: ConnectionTrait>(
+    connection: &C,
+    version: &str,
+) -> Result<bool, OrmError> {
+    Ok(connection
+        .query_one(Statement::from_sql_and_values(
+            connection.get_database_backend(),
+            "SELECT version FROM zed_schema_migrations WHERE version = $1",
+            [version.to_owned().into()],
+        ))
+        .await
+        .map_err(OrmError::from_db_err)?
+        .is_some())
+}
+
+async fn apply_step<C: ConnectionTrait>(
+    connection: &C,
+    step: MigrationStep,
+) -> Result<(), OrmError> {
+    let version = step.version();
+    connection
+        .execute_unprepared(step.sql())
+        .await
+        .map_err(OrmError::from_db_err)?;
+    connection
+        .execute(Statement::from_sql_and_values(
+            connection.get_database_backend(),
+            "INSERT INTO zed_schema_migrations(version) VALUES ($1)",
+            [version.into()],
+        ))
+        .await
+        .map_err(OrmError::from_db_err)?;
+    Ok(())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MigrationReport {
     /// Final target identity in the ordered migration series.
@@ -187,42 +241,14 @@ pub async fn migrate(context: &WriteContext) -> Result<MigrationReport, OrmError
         .map_err(OrmError::from_db_err)?
         .is_some();
 
-    let mut recorded_versions = Vec::new();
-    for step in MigrationStep::ORDERED {
-        let version = step.version();
-        let is_recorded = transaction
-            .query_one(Statement::from_sql_and_values(
-                transaction.get_database_backend(),
-                "SELECT version FROM zed_schema_migrations WHERE version = $1",
-                [version.clone().into()],
-            ))
-            .await
-            .map_err(OrmError::from_db_err)?
-            .is_some();
-        if is_recorded {
-            recorded_versions.push(version);
-        }
-    }
-
+    let recorded_versions = recorded_versions(&transaction).await?;
     let pending = migration_plan(
         ledger_has_entries,
         registry_has_base_table,
         &recorded_versions,
     );
     for step in &pending {
-        let version = step.version();
-        transaction
-            .execute_unprepared(step.sql())
-            .await
-            .map_err(OrmError::from_db_err)?;
-        transaction
-            .execute(Statement::from_sql_and_values(
-                transaction.get_database_backend(),
-                "INSERT INTO zed_schema_migrations(version) VALUES ($1)",
-                [version.into()],
-            ))
-            .await
-            .map_err(OrmError::from_db_err)?;
+        apply_step(&transaction, *step).await?;
     }
 
     transaction.commit().await.map_err(OrmError::from_db_err)?;
