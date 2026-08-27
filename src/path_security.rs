@@ -300,7 +300,7 @@ fn try_open_existing(path: &Path) -> std::io::Result<File> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(false).truncate(false);
     apply_final_component_open_flags(&mut options);
-    options.open(path)
+    finish_opened_lock_file(options.open(path)?)
 }
 
 fn try_create_exclusive(path: &Path) -> std::io::Result<File> {
@@ -316,7 +316,7 @@ fn try_create_exclusive(path: &Path) -> std::io::Result<File> {
         use std::os::unix::fs::OpenOptionsExt as _;
         options.mode(0o600);
     }
-    options.open(path)
+    finish_opened_lock_file(options.open(path)?)
 }
 
 fn apply_final_component_open_flags(options: &mut OpenOptions) {
@@ -330,8 +330,17 @@ fn apply_final_component_open_flags(options: &mut OpenOptions) {
         use std::os::windows::fs::OpenOptionsExt as _;
         const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
         options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
-        options.inherit_handle(false);
+        // `OpenOptionsExt::inherit_handle` landed after MSRV 1.88. Clear
+        // HANDLE_FLAG_INHERIT on the opened handle instead.
     }
+}
+
+fn finish_opened_lock_file(file: File) -> std::io::Result<File> {
+    #[cfg(windows)]
+    {
+        windows_acl::disable_handle_inheritance(&file)?;
+    }
+    Ok(file)
 }
 
 fn tighten_created_lock_file(file: &File, path: &Path) -> Result<()> {
@@ -348,6 +357,7 @@ fn tighten_created_lock_file(file: &File, path: &Path) -> Result<()> {
     }
     #[cfg(windows)]
     {
+        let _ = file;
         windows_acl::apply_user_private_dacl(path)
             .with_context(|| format!("applying private DACL to {}", path.display()))?;
     }
@@ -446,7 +456,7 @@ mod windows_acl {
     }
 
     #[link(name = "advapi32")]
-    extern "system" {
+    unsafe extern "system" {
         fn OpenProcessToken(process: Handle, access: u32, token: *mut Handle) -> i32;
         fn GetTokenInformation(
             token: Handle,
@@ -498,10 +508,19 @@ mod windows_acl {
     }
 
     #[link(name = "kernel32")]
-    extern "system" {
+    unsafe extern "system" {
         fn GetCurrentProcess() -> Handle;
         fn CloseHandle(handle: Handle) -> i32;
+        fn SetHandleInformation(handle: Handle, mask: u32, flags: u32) -> i32;
     }
+
+    #[cfg(test)]
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetHandleInformation(handle: Handle, flags: *mut u32) -> i32;
+    }
+
+    const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
 
     fn wide(path: &Path) -> Vec<u16> {
         OsStr::new(path)
@@ -521,12 +540,43 @@ mod windows_acl {
         if ptr.is_null() {
             bail!("Windows security API returned a null string");
         }
-        let mut len = 0usize;
-        while *ptr.add(len) != 0 {
-            len += 1;
+        // SAFETY: the caller owns a NUL-terminated UTF-16 buffer from a
+        // Windows allocator. Edition 2024 does not treat the `unsafe fn`
+        // body as an unsafe block.
+        unsafe {
+            let mut len = 0usize;
+            while *ptr.add(len) != 0 {
+                len += 1;
+            }
+            let slice = core::slice::from_raw_parts(ptr, len);
+            Ok(String::from_utf16_lossy(slice))
         }
-        let slice = core::slice::from_raw_parts(ptr, len);
-        Ok(String::from_utf16_lossy(slice))
+    }
+
+    pub fn disable_handle_inheritance(file: &std::fs::File) -> std::io::Result<()> {
+        use std::os::windows::io::AsRawHandle as _;
+        // SAFETY: `file` is an open handle we own; clearing HANDLE_FLAG_INHERIT
+        // is a documented kernel32 query/set on that handle.
+        let ok = unsafe { SetHandleInformation(file.as_raw_handle(), HANDLE_FLAG_INHERIT, 0) };
+        if ok == 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    pub fn handle_is_inheritable(file: &std::fs::File) -> std::io::Result<bool> {
+        use std::os::windows::io::AsRawHandle as _;
+        let mut flags = 0u32;
+        // SAFETY: `file` is an open handle we own; GetHandleInformation writes
+        // into a local DWORD.
+        let ok = unsafe { GetHandleInformation(file.as_raw_handle(), &mut flags) };
+        if ok == 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(flags & HANDLE_FLAG_INHERIT != 0)
+        }
     }
 
     pub fn current_user_sid_string() -> Result<String> {
@@ -807,5 +857,19 @@ mod tests {
         let path = parent.join("install.lock");
         let error = open_lock_file(&path, PathSecurityPolicy::Private).unwrap_err();
         assert!(format!("{error:#}").contains("writable"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_private_open_uses_non_inheritable_handle() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("install.lock");
+        let (file, identity) = open_lock_file(&path, PathSecurityPolicy::Private).unwrap();
+        assert!(
+            !windows_acl::handle_is_inheritable(&file).unwrap(),
+            "lock file handle must not be inheritable"
+        );
+        drop(file);
+        assert_eq!(identity, fs::canonicalize(&path).unwrap());
     }
 }

@@ -8,7 +8,9 @@
   foreign ownership, symlink parents, and group/other-writable rendezvous
   paths. Existing overly-permissive lock files are rejected rather than
   chmod'd. Windows refuses reparse points and junctions, keeps handles
-  non-inheritable, and applies a user-private DACL. Shared-directory mode is
+  non-inheritable via `SetHandleInformation` (MSRV 1.88 has no
+  `OpenOptionsExt::inherit_handle`), and applies a user-private DACL. Windows
+  FFI uses edition-2024 `unsafe extern` blocks. Shared-directory mode is
   opt-in and still refuses substitution. Policy helpers are unit-tested on
   every OS; native reparse/DACL APIs are `cfg(windows)` and exercised on
   Windows CI.
