@@ -82,37 +82,88 @@ pub fn user_private_sddl(sid: &str) -> String {
     format!("D:P(A;;FA;;;{sid})")
 }
 
-/// Classify a Windows SDDL string without calling Windows APIs.
+/// Classify a Windows DACL without calling Windows APIs.
+///
+/// Existing parent directories may safely inherit their ACL, so protection is
+/// checked separately from access. This classifier requires an allow ACE that
+/// grants full control to the current user, rejects malformed or unsupported
+/// ACEs, and rejects every allow ACE for a broad user group.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn sddl_is_user_private(sddl: &str, sid: &str) -> bool {
-    if sid.is_empty() || !sddl_has_protected_dacl(sddl) {
+    if sid.is_empty() || sddl.matches('(').count() != sddl.matches(')').count() {
         return false;
     }
-    let upper = sddl.to_ascii_uppercase();
-    let sid_upper = sid.to_ascii_uppercase();
-    if !upper.contains(&sid_upper) || !upper.contains("(A;;FA;;;") {
-        return false;
+
+    let mut grants_current_user_full_control = false;
+    for ace in sddl_aces(sddl) {
+        let Some((ace_type, rights, trustee)) = parse_sddl_ace(ace) else {
+            return false;
+        };
+        if ace_type.eq_ignore_ascii_case("D") {
+            continue;
+        }
+        if !ace_type.eq_ignore_ascii_case("A") {
+            return false;
+        }
+        if sddl_trustee_is_broad(trustee) {
+            return false;
+        }
+        if trustee.eq_ignore_ascii_case(sid) && sddl_rights_are_full_control(rights) {
+            grants_current_user_full_control = true;
+        }
     }
-    !sddl_grants_well_known_world(&upper)
+
+    grants_current_user_full_control
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
+    sddl_has_protected_dacl(sddl) && sddl_is_user_private(sddl, sid)
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_aces(sddl: &str) -> impl Iterator<Item = &str> {
+    sddl
+        .split('(')
+        .skip(1)
+        .filter_map(|tail| tail.split_once(')').map(|(ace, _)| ace))
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn parse_sddl_ace(ace: &str) -> Option<(&str, &str, &str)> {
+    let mut fields = ace.split(';');
+    let ace_type = fields.next()?;
+    let _flags = fields.next()?;
+    let rights = fields.next()?;
+    let _object_guid = fields.next()?;
+    let _inherit_object_guid = fields.next()?;
+    let trustee = fields.next()?;
+    if fields.next().is_some() {
+        return None;
+    }
+    Some((ace_type, rights, trustee))
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_rights_are_full_control(rights: &str) -> bool {
+    matches!(
+        rights.to_ascii_uppercase().as_str(),
+        "FA" | "GA" | "0X1F01FF" | "0X10000000"
+    )
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_trustee_is_broad(trustee: &str) -> bool {
+    matches!(
+        trustee.to_ascii_uppercase().as_str(),
+        "WD" | "AU" | "BU" | "S-1-1-0" | "S-1-5-11" | "S-1-5-32-545"
+    )
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
 fn sddl_has_protected_dacl(sddl: &str) -> bool {
     let upper = sddl.to_ascii_uppercase();
     upper.contains("D:P(") || upper.contains("D:PAI(") || upper.starts_with("D:P")
-}
-
-#[cfg_attr(not(windows), allow(dead_code))]
-fn sddl_grants_well_known_world(upper_sddl: &str) -> bool {
-    const WORLD: [&str; 6] = [
-        ";;;WD)",
-        ";;;AU)",
-        ";;;BU)",
-        ";;;S-1-1-0)",
-        ";;;S-1-5-11)",
-        ";;;S-1-5-32-545)",
-    ];
-    WORLD.iter().any(|token| upper_sddl.contains(token))
 }
 
 pub fn open_lock_file(path: &Path, policy: PathSecurityPolicy) -> Result<(File, PathBuf)> {
@@ -232,6 +283,7 @@ fn create_lock_directory(path: &Path) -> Result<()> {
         }
         windows_acl::apply_user_private_dacl(path)
             .with_context(|| format!("applying private DACL to {}", path.display()))?;
+        windows_acl::require_protected_user_private_dacl(path)?;
         Ok(())
     }
     #[cfg(not(any(unix, windows)))]
@@ -395,7 +447,7 @@ fn validate_opened_lock_file(file: &File, path: &Path, policy: PathSecurityPolic
             // every pre-existing rendezvous.
             windows_acl::apply_user_private_dacl(path)
                 .with_context(|| format!("applying private DACL to {}", path.display()))?;
-            windows_acl::require_user_private_dacl(path)?;
+            windows_acl::require_protected_user_private_dacl(path)?;
         }
     }
     Ok(())
@@ -429,7 +481,7 @@ mod windows_acl {
 
     use anyhow::{Result, bail};
 
-    use super::{sddl_is_user_private, user_private_sddl};
+    use super::{sddl_is_protected_user_private, sddl_is_user_private, user_private_sddl};
 
     const TOKEN_QUERY: u32 = 0x0008;
     const TOKEN_USER: u32 = 1;
@@ -664,6 +716,17 @@ mod windows_acl {
         Ok(())
     }
 
+    pub fn require_protected_user_private_dacl(path: &Path) -> Result<()> {
+        let sid = current_user_sid_string()?;
+        let sddl = read_dacl_sddl(path)?;
+        if !sddl_is_protected_user_private(&sddl, &sid) {
+            bail!(
+                "lock path DACL is not protected and user-private; refusing under the private path policy"
+            );
+        }
+        Ok(())
+    }
+
     fn read_dacl_sddl(path: &Path) -> Result<String> {
         let object = wide(path);
         unsafe {
@@ -735,16 +798,30 @@ mod tests {
     }
 
     #[test]
-    fn user_private_sddl_classifier_rejects_world_and_users() {
+    fn user_private_sddl_classifier_accepts_safe_inheritance_and_rejects_broad_trustees() {
         let sid = "S-1-5-21-1-2-3-1001";
         let private = user_private_sddl(sid);
         assert!(sddl_is_user_private(&private, sid));
+        assert!(sddl_is_protected_user_private(&private, sid));
+
+        let inherited = format!(
+            "D:AI(A;OICI;FA;;;{sid})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
+        );
+        assert!(sddl_is_user_private(&inherited, sid));
+        assert!(!sddl_is_protected_user_private(&inherited, sid));
+        assert!(sddl_is_user_private(
+            &format!("D:AI(A;ID;0x1f01ff;;;{sid})"),
+            sid
+        ));
+
         assert!(!sddl_is_user_private("D:(A;;FA;;;WD)", sid));
         assert!(!sddl_is_user_private(
-            &format!("D:P(A;;FA;;;{sid})(A;;FA;;;WD)"),
+            &format!("D:P(A;;FA;;;{sid})(A;ID;FR;;;WD)"),
             sid
         ));
         assert!(!sddl_is_user_private("D:P(A;;FA;;;AU)", sid));
+        assert!(!sddl_is_user_private("D:P(A;;FA;;;BU)", sid));
+        assert!(!sddl_is_user_private("D:P(A;;FA;;;", sid));
         assert!(!sddl_is_user_private("", sid));
     }
 
