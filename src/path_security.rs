@@ -123,8 +123,7 @@ pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
 
 #[cfg_attr(not(windows), allow(dead_code))]
 fn sddl_aces(sddl: &str) -> impl Iterator<Item = &str> {
-    sddl
-        .split('(')
+    sddl.split('(')
         .skip(1)
         .filter_map(|tail| tail.split_once(')').map(|(ace, _)| ace))
 }
@@ -804,9 +803,7 @@ mod tests {
         assert!(sddl_is_user_private(&private, sid));
         assert!(sddl_is_protected_user_private(&private, sid));
 
-        let inherited = format!(
-            "D:AI(A;OICI;FA;;;{sid})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
-        );
+        let inherited = format!("D:AI(A;OICI;FA;;;{sid})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)");
         assert!(sddl_is_user_private(&inherited, sid));
         assert!(!sddl_is_protected_user_private(&inherited, sid));
         assert!(sddl_is_user_private(
