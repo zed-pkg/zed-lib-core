@@ -87,7 +87,9 @@ pub fn user_private_sddl(sid: &str) -> String {
 /// Existing parent directories may safely inherit their ACL, so protection is
 /// checked separately from access. This classifier requires an allow ACE that
 /// grants full control to the current user, rejects malformed or unsupported
-/// ACEs, and rejects every allow ACE for a broad user group.
+/// ACEs, and rejects write-capable allow ACEs for broad user groups. Read and
+/// execute inheritance is allowed on parents, matching the Unix no-group/other-
+/// write directory policy.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn sddl_is_user_private(sddl: &str, sid: &str) -> bool {
     if sid.is_empty() || sddl.matches('(').count() != sddl.matches(')').count() {
@@ -105,7 +107,7 @@ pub fn sddl_is_user_private(sddl: &str, sid: &str) -> bool {
         if !ace_type.eq_ignore_ascii_case("A") {
             return false;
         }
-        if sddl_trustee_is_broad(trustee) {
+        if sddl_trustee_is_broad(trustee) && sddl_rights_can_modify(rights) {
             return false;
         }
         if trustee.eq_ignore_ascii_case(sid) && sddl_rights_are_full_control(rights) {
@@ -118,7 +120,9 @@ pub fn sddl_is_user_private(sddl: &str, sid: &str) -> bool {
 
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
-    sddl_has_protected_dacl(sddl) && sddl_is_user_private(sddl, sid)
+    sddl_has_protected_dacl(sddl)
+        && sddl_is_user_private(sddl, sid)
+        && !sddl_has_broad_allow_ace(sddl)
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -157,6 +161,45 @@ fn sddl_trustee_is_broad(trustee: &str) -> bool {
         trustee.to_ascii_uppercase().as_str(),
         "WD" | "AU" | "BU" | "S-1-1-0" | "S-1-5-11" | "S-1-5-32-545"
     )
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_rights_can_modify(rights: &str) -> bool {
+    const MODIFY_MASK: u32 = 0x0000_0002
+        | 0x0000_0004
+        | 0x0000_0010
+        | 0x0000_0040
+        | 0x0000_0100
+        | 0x0001_0000
+        | 0x0004_0000
+        | 0x0008_0000
+        | 0x1000_0000
+        | 0x4000_0000;
+
+    let upper = rights.to_ascii_uppercase();
+    if let Some(hex) = upper.strip_prefix("0X") {
+        return u32::from_str_radix(hex, 16)
+            .map(|mask| mask & MODIFY_MASK != 0)
+            .unwrap_or(true);
+    }
+    if upper.len() % 2 != 0 || !upper.is_ascii() {
+        return true;
+    }
+    upper.as_bytes().chunks_exact(2).any(|token| {
+        !matches!(
+            token,
+            b"FR" | b"FX" | b"GR" | b"GX" | b"RC" | b"LC" | b"RP" | b"LO"
+        )
+    })
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_has_broad_allow_ace(sddl: &str) -> bool {
+    sddl_aces(sddl).any(|ace| {
+        parse_sddl_ace(ace).is_some_and(|(ace_type, _rights, trustee)| {
+            ace_type.eq_ignore_ascii_case("A") && sddl_trustee_is_broad(trustee)
+        })
+    })
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -811,9 +854,21 @@ mod tests {
             sid
         ));
 
-        assert!(!sddl_is_user_private("D:(A;;FA;;;WD)", sid));
+        let inherited_with_broad_read = format!("D:AI(A;OICI;FA;;;{sid})(A;ID;0x1200a9;;;BU)");
+        assert!(sddl_is_user_private(&inherited_with_broad_read, sid));
+        assert!(!sddl_is_protected_user_private(
+            &inherited_with_broad_read,
+            sid
+        ));
         assert!(!sddl_is_user_private(
-            &format!("D:P(A;;FA;;;{sid})(A;ID;FR;;;WD)"),
+            &format!("D:AI(A;OICI;FA;;;{sid})(A;ID;0x120116;;;BU)"),
+            sid
+        ));
+        assert!(!sddl_is_user_private("D:(A;;FA;;;WD)", sid));
+        let protected_with_broad_read = format!("D:P(A;;FA;;;{sid})(A;ID;FR;;;WD)");
+        assert!(sddl_is_user_private(&protected_with_broad_read, sid));
+        assert!(!sddl_is_protected_user_private(
+            &protected_with_broad_read,
             sid
         ));
         assert!(!sddl_is_user_private("D:P(A;;FA;;;AU)", sid));
