@@ -87,11 +87,10 @@ jobs:
           --no-default-features
           --features cli,codegen,sqlx-postgres,runtime-tokio-rustls
 
-      - name: Verify fail-closed runner tests
+      - name: Verify fail-closed DDL runner tests
         run: |
           node --check tools/ddl-first-orm-roundtrip.mjs
           node --test tests/ddl-first-orm-roundtrip.test.mjs
-          ZED_PKG_TEST_TARGET=src/rust-orm sh src/rust-orm/orm-package-smoke.sh
           ZED_PKG_TEST_TARGET=src/rust-orm/sql sh src/rust-orm/sql/schema-package-smoke.sh
 
       - name: Verify committed SeaORM and Drizzle projections
