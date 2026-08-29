@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "OrgMember.json",
+    "type": "object",
+    "properties": {
+        "orgId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "userId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "role": {
+            "type": "string"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "orgId",
+        "userId",
+        "role",
+        "createdAt",
+        "updatedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

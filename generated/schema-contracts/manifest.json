@@ -1,0 +1,703 @@
+{
+  "authorityMode": "shadow-import",
+  "entityCount": 17,
+  "fieldCount": 213,
+  "fieldNumberLock": "schema/typespec-protobuf.lock.json",
+  "fieldNumberLockSha256": "b575a60058a2e74d4181dc13fd9f9e92968ab0b8d3fbf73d530e5ee8100f7222",
+  "generator": "tools/typespec-protobuf-parity.mjs",
+  "generatorFormatVersion": 1,
+  "generatorSha256": "f2bf215f8d23415f82523babd0b87b25c99d8443006a29fc9d544370e6217111",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "nullableFieldCount": 73,
+  "outputs": {
+    "README.md": "f841dfcb07a9f0b6565aa7459e436f046e57ed6eb8fa26af43aa8999980f5fc3",
+    "json-schema/ApiToken.json": "0259ce2b9e5e617fdf498c17cd52cff6fe263e57be210246d5a3240a326d661e",
+    "json-schema/AuditLog.json": "ee4d08057669d14ec2f807399316188c0b96d932f5a7ed7120df86980e8a1f33",
+    "json-schema/DependencyGraphArtifact.json": "17409a5aa196c1b5005f4299d218fa11d850fe182dce3c613e603667c612c580",
+    "json-schema/DependencyGraphEdge.json": "28325a6a00fc9f1d78f4e464487c3e26143c06bfe752c0362ce51ec9b35cc0be",
+    "json-schema/EntityEmbedding.json": "69083083b253498acbc9bf156562f73e2fd3ec2ab1aa675319e7ad69aa610abe",
+    "json-schema/Org.json": "faf269f0376d48cc897a7fed0a90aee65e73274e498a009fdd040ac572fbace0",
+    "json-schema/OrgInvitation.json": "44e4b075ad3e588beaa76a449a064e4ac958f31ae6c10c71a1d71fabbda3243a",
+    "json-schema/OrgMember.json": "6f253f6e8644c35dd17209dcd63f5a0e99405659de2aa2a1b4b66b5eb0b02c35",
+    "json-schema/Package.json": "1f48f619bf82599fdcc7c4a4402d24eee309a01170a5bc749d9cf5777b15804a",
+    "json-schema/PackageDownload.json": "80b1424e47afb3cba3c3f10296efda0209dca829e07f837a7146d0498caf0c2d",
+    "json-schema/PackageLicense.json": "0962e52b87c5ae6c7182356cb01714ba197f13addd1ac52f143708d0534b07ea",
+    "json-schema/PackageUpload.json": "8d99af99848e54568dd12a9dedb548d5e3e2b904fbb18c37b629d1a7a0666c8a",
+    "json-schema/PackageVersion.json": "a53950210c06e9d1791932cc524dc8c16f48c22e834cb01f2e1d00ff4ba61ac9",
+    "json-schema/Project.json": "5f3a9cd921fe9ce3bb412cdcb242e2a5f3294b3f3bb0fe93bd0c1beffa83662e",
+    "json-schema/ProjectInvitation.json": "28edfa0ed699dbe8622ac12cb3bf8dba1fe722f188e09e6ce068de98fb6671a2",
+    "json-schema/ProjectMember.json": "23201eedee2244b1f37004ac244513e27e4da4c79239dde1f70a9831f5d94033",
+    "json-schema/User.json": "61b3af70135b598e7a841a9e920774b23cc1ae81196c592a9237e3d72720ad2d",
+    "protobuf/zed/registry/v1.proto": "54189d7d748fd5d4c5adf2d86cd0f2b6a3f10dba90a39c091a6fe34a63cb11b7",
+    "typespec/main.tsp": "03c4062a3f37d1828a2076ec62d248683b2ad679cc293c4a15a9606b235b28db"
+  },
+  "productionSql": "src/rust-orm/sql/registry.sql",
+  "productionSqlBlobSha": "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9",
+  "protobufPackage": "zed.registry.v1",
+  "protobufPath": "protobuf/zed/registry/v1.proto",
+  "schemaSha256": "6ef4a26ebc5c7a74320736a5c2aa9c96eae9f27309e1146d5351fa34bc408ac4",
+  "source": "schema/persistence.schema.json",
+  "toolchain": {
+    "compiler": "1.15.0",
+    "jsonSchemaEmitter": "1.15.0",
+    "protobufEmitter": "0.85.0",
+    "protobufParser": "8.8.0"
+  },
+  "transformations": {
+    "counts": {
+      "int64-as-json-decimal-string": 5,
+      "json-object-as-opaque-bytes": 8,
+      "nullable-as-optional-presence": 73,
+      "timestamp-as-rfc3339-string": 42
+    },
+    "fields": [
+      {
+        "entity": "User",
+        "field": "email",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "User",
+        "field": "displayName",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "User",
+        "field": "avatarUrl",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "User",
+        "field": "settings",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "User",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "User",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Org",
+        "field": "description",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Org",
+        "field": "settings",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "Org",
+        "field": "createdByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Org",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Org",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "OrgMember",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "OrgMember",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "OrgInvitation",
+        "field": "expiresAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "OrgInvitation",
+        "field": "acceptedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "OrgInvitation",
+        "field": "acceptedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "OrgInvitation",
+        "field": "acceptedByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "OrgInvitation",
+        "field": "revokedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "OrgInvitation",
+        "field": "revokedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "OrgInvitation",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Project",
+        "field": "description",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Project",
+        "field": "settings",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "Project",
+        "field": "createdByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Project",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Project",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ProjectMember",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ProjectMember",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ProjectInvitation",
+        "field": "expiresAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ProjectInvitation",
+        "field": "acceptedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ProjectInvitation",
+        "field": "acceptedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ProjectInvitation",
+        "field": "acceptedByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ProjectInvitation",
+        "field": "revokedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ProjectInvitation",
+        "field": "revokedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ProjectInvitation",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Package",
+        "field": "projectId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Package",
+        "field": "description",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Package",
+        "field": "homepageUrl",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Package",
+        "field": "config",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "Package",
+        "field": "downloadCount",
+        "transformation": "int64-as-json-decimal-string"
+      },
+      {
+        "entity": "Package",
+        "field": "latestVersion",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Package",
+        "field": "firstPublishedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Package",
+        "field": "firstPublishedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Package",
+        "field": "visibilityChangedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Package",
+        "field": "visibilityChangedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Package",
+        "field": "createdByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "Package",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "Package",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "sizeBytes",
+        "transformation": "int64-as-json-decimal-string"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "vcsTag",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "vcsCommit",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "manifest",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "downloadCount",
+        "transformation": "int64-as-json-decimal-string"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "yankedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "yankedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "yankedReason",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "publishedByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageVersion",
+        "field": "publishedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "resolverName",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "resolverVersion",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "resolutionInputDigest",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "registryCheckpoint",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "target",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "document",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "sealedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "DependencyGraphArtifact",
+        "field": "sealedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "fromVersion",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "fromPackageId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "fromPackageVersionId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "toVersion",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "toPackageId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "toPackageVersionId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "requirement",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "target",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "DependencyGraphEdge",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageLicense",
+        "field": "packageVersionId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageLicense",
+        "field": "spdxId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageLicense",
+        "field": "name",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageLicense",
+        "field": "url",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageLicense",
+        "field": "textBody",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageLicense",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageLicense",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "packageVersionId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "storageKey",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "format",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "sizeBytes",
+        "transformation": "int64-as-json-decimal-string"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "sizeBytes",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "sha256",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "uploadedByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "apiTokenId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "clientIpHash",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "userAgent",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "error",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "startedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "completedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "completedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageUpload",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "packageVersionId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "downloadedByUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "apiTokenId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "format",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "bytesSent",
+        "transformation": "int64-as-json-decimal-string"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "bytesSent",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "clientIpHash",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "userAgent",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "PackageDownload",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "orgId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "userId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "lastUsedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "lastUsedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "expiresAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "expiresAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "revokedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "revokedAt",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "ApiToken",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "AuditLog",
+        "field": "orgId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "AuditLog",
+        "field": "actorUserId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "AuditLog",
+        "field": "apiTokenId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "AuditLog",
+        "field": "entityId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "AuditLog",
+        "field": "detail",
+        "transformation": "json-object-as-opaque-bytes"
+      },
+      {
+        "entity": "AuditLog",
+        "field": "clientIpHash",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "AuditLog",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "EntityEmbedding",
+        "field": "orgId",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "EntityEmbedding",
+        "field": "contentPreview",
+        "transformation": "nullable-as-optional-presence"
+      },
+      {
+        "entity": "EntityEmbedding",
+        "field": "createdAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      },
+      {
+        "entity": "EntityEmbedding",
+        "field": "updatedAt",
+        "transformation": "timestamp-as-rfc3339-string"
+      }
+    ]
+  },
+  "warnings": [
+    "SHADOW ONLY. Authored PostgreSQL DDL remains migration authority.",
+    "TypeSpec is generated from the locked persistence shadow; it is not an independently authored schema.",
+    "Nullable persistence fields project to optional presence; explicit JSON null is not preserved.",
+    "Proto3 does not enforce required presence for non-optional scalar fields.",
+    "JSON object contents project to opaque bytes and are not semantically cross-checked by Protobuf."
+  ]
+}

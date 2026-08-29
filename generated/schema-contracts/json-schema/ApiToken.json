@@ -1,0 +1,59 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ApiToken.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "name": {
+            "type": "string"
+        },
+        "tokenHash": {
+            "type": "string"
+        },
+        "orgId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "userId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "role": {
+            "type": "string"
+        },
+        "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "revokedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "name",
+        "tokenHash",
+        "role",
+        "createdAt",
+        "updatedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

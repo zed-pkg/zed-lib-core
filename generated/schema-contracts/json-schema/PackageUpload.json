@@ -1,0 +1,86 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "PackageUpload.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "packageId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "packageVersionId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "requestedVersion": {
+            "type": "string"
+        },
+        "status": {
+            "type": "string"
+        },
+        "storageBackend": {
+            "type": "string"
+        },
+        "storageKey": {
+            "type": "string"
+        },
+        "format": {
+            "type": "string"
+        },
+        "sizeBytes": {
+            "type": "string"
+        },
+        "sha256": {
+            "type": "string"
+        },
+        "uploadedByUserId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "apiTokenId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "clientIpHash": {
+            "type": "string"
+        },
+        "userAgent": {
+            "type": "string"
+        },
+        "error": {
+            "type": "string"
+        },
+        "startedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "completedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "packageId",
+        "requestedVersion",
+        "status",
+        "storageBackend",
+        "startedAt",
+        "createdAt",
+        "updatedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

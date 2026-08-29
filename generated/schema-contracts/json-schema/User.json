@@ -1,0 +1,54 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "User.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "sharedAuthSubject": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "authRealm": {
+            "type": "string"
+        },
+        "email": {
+            "type": "string"
+        },
+        "displayName": {
+            "type": "string"
+        },
+        "avatarUrl": {
+            "type": "string"
+        },
+        "settings": {
+            "type": "string",
+            "contentEncoding": "base64"
+        },
+        "isSoftDeleted": {
+            "type": "boolean"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "sharedAuthSubject",
+        "authRealm",
+        "settings",
+        "isSoftDeleted",
+        "createdAt",
+        "updatedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

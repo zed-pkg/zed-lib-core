@@ -1,0 +1,64 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityEmbedding.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "entityType": {
+            "type": "string"
+        },
+        "entityId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "orgId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "embeddingModel": {
+            "type": "string"
+        },
+        "embedding": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            }
+        },
+        "embeddingDimensions": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "contentSha256": {
+            "type": "string"
+        },
+        "contentPreview": {
+            "type": "string"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "entityType",
+        "entityId",
+        "embeddingModel",
+        "embedding",
+        "embeddingDimensions",
+        "contentSha256",
+        "createdAt",
+        "updatedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

@@ -1,0 +1,54 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AuditLog.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "orgId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "actorUserId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "apiTokenId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "action": {
+            "type": "string"
+        },
+        "entityType": {
+            "type": "string"
+        },
+        "entityId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "detail": {
+            "type": "string",
+            "contentEncoding": "base64"
+        },
+        "clientIpHash": {
+            "type": "string"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "action",
+        "entityType",
+        "detail",
+        "createdAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

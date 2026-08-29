@@ -1,0 +1,69 @@
+name: TypeSpec and Protobuf schema parity
+
+on:
+  pull_request:
+    paths:
+      - "schema/persistence.schema.json"
+      - "schema/typespec-protobuf.lock.json"
+      - "schema-tooling/package.json"
+      - "schema-tooling/package-lock.json"
+      - "tools/schema-shadow-codegen.mjs"
+      - "tools/typespec-protobuf-parity.mjs"
+      - "tests/typespec-protobuf-parity.test.mjs"
+      - "generated/schema-contracts/**"
+      - "docs/typespec-protobuf-shadow.md"
+      - "docs/ddl-first-schema-ownership.md"
+      - ".github/workflows/typespec-protobuf-parity.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "schema/persistence.schema.json"
+      - "schema/typespec-protobuf.lock.json"
+      - "schema-tooling/package.json"
+      - "schema-tooling/package-lock.json"
+      - "tools/schema-shadow-codegen.mjs"
+      - "tools/typespec-protobuf-parity.mjs"
+      - "tests/typespec-protobuf-parity.test.mjs"
+      - "generated/schema-contracts/**"
+      - "docs/typespec-protobuf-shadow.md"
+      - "docs/ddl-first-schema-ownership.md"
+      - ".github/workflows/typespec-protobuf-parity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typespec-protobuf-parity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: schema-tooling/package-lock.json
+
+      - name: Install pinned TypeSpec and Protobuf tooling
+        run: npm ci --prefix schema-tooling --ignore-scripts --no-audit
+
+      - name: Validate generator and fail-closed compatibility tests
+        run: |
+          node --check tools/typespec-protobuf-parity.mjs
+          node --test tests/typespec-protobuf-parity.test.mjs
+
+      - name: Verify committed TypeSpec, JSON Schema, and Protobuf projections
+        run: |
+          npm --prefix schema-tooling run contracts:check
+          schema-tooling/node_modules/.bin/tsp format --check generated/schema-contracts/typespec/main.tsp
+
+      - name: Refuse generated or field-number drift
+        run: git diff --exit-code -- schema/typespec-protobuf.lock.json generated/schema-contracts

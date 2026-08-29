@@ -1,0 +1,55 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "PackageDownload.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "packageId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "packageVersionId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "downloadedByUserId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "apiTokenId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "source": {
+            "type": "string"
+        },
+        "format": {
+            "type": "string"
+        },
+        "bytesSent": {
+            "type": "string"
+        },
+        "clientIpHash": {
+            "type": "string"
+        },
+        "userAgent": {
+            "type": "string"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "packageId",
+        "source",
+        "createdAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}
