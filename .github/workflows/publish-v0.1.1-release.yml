@@ -11,6 +11,9 @@ permissions:
 
 jobs:
   verify:
+    # The reviewed artifact embeds this workflow commit in its VCS metadata.
+    # Later archival-branch synchronization must not compare a new package.
+    if: github.sha == 'a7cf9f7a443f8f3c24a7df68f3ce1e56e6ef9ead'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:

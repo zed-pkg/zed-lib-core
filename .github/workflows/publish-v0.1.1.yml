@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   publish:
-    if: github.actor != 'github-actions[bot]'
+    # This one-shot workflow is bound to the reviewed release-automation
+    # commit. Advancing the archival branch must never republish v0.1.1.
+    if: github.actor != 'github-actions[bot]' && github.sha == 'e3a39cb5c60ec7f7be32f6724cb16f207f2f1992'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
