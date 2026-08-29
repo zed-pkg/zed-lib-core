@@ -102,7 +102,11 @@ an empty disposable PostgreSQL database:
 6. It fails unless the one current Drizzle empty-string introspection defect is
    the exact `zed_packages.repo_url` expression. The DDL is never weakened to
    suit the generator.
-7. It compares deterministic output with `generated/ddl-roundtrip/**`.
+7. It sorts named metadata and table declarations and removes Drizzle's
+   catalog-order-dependent implicit B-tree operator-class annotations. This is
+   allowed only while authored DDL declares no explicit operator class; adding
+   one fails closed until the shadow generator learns to preserve it.
+8. It compares deterministic output with `generated/ddl-roundtrip/**`.
 
 The generated Drizzle SQL intentionally lacks PostgreSQL functions, triggers,
 and `ZD001`-`ZD005`; that visible loss is a proof that it is not a replacement

@@ -5,8 +5,10 @@ import {
   assertAuthoredDdlSemantics,
   assertGeneratedSqlIsNonAuthoritative,
   canonicalizeDrizzleTableMetadata,
+  canonicalizeDrizzleTableOrder,
   normalizePulledDrizzleSchema,
   parseMode,
+  stripDrizzleImplicitOperatorClasses,
   validateDisposableDatabaseUrl,
 } from '../tools/ddl-first-orm-roundtrip.mjs';
 
@@ -41,6 +43,25 @@ export const zed_t${index} = pgTable("zed_t${index}", { id: uuid() }, (table) =>
   assert.equal(canonicalizeDrizzleTableMetadata(canonical), canonical);
 });
 
+test('sorts complete Drizzle table declarations without changing their bodies', () => {
+  const tables = ['zed_z', 'zed_a', 'zed_m'].map((name) => `export const ${name} = pgTable("${name}", {
+\tid: uuid().primaryKey(),
+});`).join('\n\n');
+  const canonical = canonicalizeDrizzleTableOrder(tables);
+  assert.ok(canonical.indexOf('export const zed_a') < canonical.indexOf('export const zed_m'));
+  assert.ok(canonical.indexOf('export const zed_m') < canonical.indexOf('export const zed_z'));
+  assert.equal(canonicalizeDrizzleTableOrder(canonical), canonical);
+});
+
+test('removes only implicit Drizzle operator-class calls', () => {
+  const source = 'index("idx").using("btree", table.id.asc().op("uuid_ops"))';
+  assert.equal(stripDrizzleImplicitOperatorClasses(source), 'index("idx").using("btree", table.id.asc())');
+  assert.throws(
+    () => stripDrizzleImplicitOperatorClasses('index("idx").using("btree", table.id.asc().op(customOperator))'),
+    /unrecognized operator-class expression/,
+  );
+});
+
 test('repairs only the one known Drizzle empty-string introspection defect', () => {
   const source = "export const zed_packages = pgTable('zed_packages', {\n\trepo_url: text().default(').notNull(),\n});\n";
   const normalized = normalizePulledDrizzleSchema(source);
@@ -59,6 +80,7 @@ test('keeps authored database behavior visibly outside generated SQL', () => {
     create trigger zed_guard before update on zed_t0 execute function zed_guard();
   `;
   assert.equal(assertAuthoredDdlSemantics(authored), 17);
+  assert.throws(() => assertAuthoredDdlSemantics(`${authored}\ncreate index x on zed_t0 (id text_pattern_ops);`), /explicit operator class/);
   const generated = Array.from({ length: 17 }, (_, index) => `CREATE TABLE "zed_t${index}" ("id" uuid);`).join('\n');
   assert.doesNotThrow(() => assertGeneratedSqlIsNonAuthoritative(generated));
   assert.throws(() => assertGeneratedSqlIsNonAuthoritative(`${generated}\nCREATE TRIGGER unsafe;`), /authored-only semantic/);

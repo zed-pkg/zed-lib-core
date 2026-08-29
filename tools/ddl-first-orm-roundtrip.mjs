@@ -101,6 +101,55 @@ function findClosingBracket(source, openingIndex) {
   fail('Drizzle table metadata array is unterminated');
 }
 
+function findClosingParenthesis(source, openingIndex) {
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+  for (let index = openingIndex; index < source.length; index += 1) {
+    const character = source[index];
+    const next = source[index + 1];
+    if (lineComment) {
+      if (character === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === '*' && next === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '/' && next === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '/' && next === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === '`') {
+      quote = character;
+      continue;
+    }
+    if (character === '(') depth += 1;
+    else if (character === ')') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  fail('Drizzle table declaration is unterminated');
+}
+
 function splitTopLevelEntries(source) {
   const entries = [];
   let start = 0;
@@ -176,6 +225,46 @@ export function canonicalizeDrizzleTableMetadata(source) {
   return canonical;
 }
 
+export function stripDrizzleImplicitOperatorClasses(source) {
+  const operatorCallCount = countOccurrences(source, '.op(');
+  const operatorPattern = /\.op\("[a-z0-9_]+_ops"\)/g;
+  const recognized = [...source.matchAll(operatorPattern)].length;
+  if (operatorCallCount !== recognized) {
+    fail(`Drizzle emitted an unrecognized operator-class expression: ${operatorCallCount} calls, ${recognized} implicit classes`);
+  }
+  const stripped = source.replace(operatorPattern, '');
+  if (stripped.includes('.op(')) fail('Drizzle schema still contains an operator-class expression');
+  return stripped;
+}
+
+export function canonicalizeDrizzleTableOrder(source) {
+  const declarationPattern = /^export const (zed_[a-z0-9_]+) = pgTable\(/gm;
+  const blocks = [];
+  let match;
+  while ((match = declarationPattern.exec(source)) !== null) {
+    const openingIndex = match.index + match[0].length - 1;
+    const closingIndex = findClosingParenthesis(source, openingIndex);
+    if (source[closingIndex + 1] !== ';') fail(`Drizzle table ${match[1]} is not terminated by a semicolon`);
+    blocks.push({
+      name: match[1],
+      start: match.index,
+      end: closingIndex + 2,
+      source: source.slice(match.index, closingIndex + 2),
+    });
+  }
+  if (blocks.length < 2) return source;
+  const names = new Set(blocks.map(({ name }) => name));
+  if (names.size !== blocks.length) fail('Drizzle schema contains duplicate table declarations');
+  for (let index = 1; index < blocks.length; index += 1) {
+    const gap = source.slice(blocks[index - 1].end, blocks[index].start);
+    if (gap.trim()) fail('Drizzle schema contains unsupported content between table declarations');
+  }
+  const prefix = source.slice(0, blocks[0].start);
+  const suffix = source.slice(blocks.at(-1).end);
+  const ordered = [...blocks].sort(({ name: left }, { name: right }) => left.localeCompare(right));
+  return `${prefix}${ordered.map(({ source: block }) => block).join('\n\n')}${suffix}`;
+}
+
 export function normalizePulledDrizzleSchema(source) {
   const knownBrokenLine = "\trepo_url: text().default(').notNull(),";
   const brokenDefault = ".default(').notNull()";
@@ -186,12 +275,17 @@ export function normalizePulledDrizzleSchema(source) {
   }
   const repaired = source.replace(knownBrokenLine, "\trepo_url: text().default('').notNull(),");
   if (repaired.includes(brokenDefault)) fail('Drizzle schema still contains an unterminated empty-string default');
-  const canonical = canonicalizeDrizzleTableMetadata(repaired);
+  const withoutOperatorClasses = stripDrizzleImplicitOperatorClasses(repaired);
+  const canonicalMetadata = canonicalizeDrizzleTableMetadata(withoutOperatorClasses);
+  const canonical = canonicalizeDrizzleTableOrder(canonicalMetadata);
   return `// SHADOW ONLY. Generated from authored DDL; never use this file as migration authority.\n${canonical}`;
 }
 
 export function assertAuthoredDdlSemantics(sql) {
   const lower = sql.toLowerCase();
+  if (/\b[a-z][a-z0-9_]*_ops\b/i.test(sql)) {
+    fail('authored DDL uses an explicit operator class that the Drizzle shadow canonicalizer must preserve');
+  }
   const tableCount = [...lower.matchAll(/create\s+table\s+if\s+not\s+exists\s+zed_[a-z0-9_]+\s*\(/g)].length;
   if (tableCount !== 17) fail(`authored DDL must define 17 Zed tables, found ${tableCount}`);
   for (const code of guardSqlstates) {
@@ -339,7 +433,12 @@ function writeOrCheck(files, mode) {
   }
   for (const [path, expected] of files) {
     const actual = readFileSync(join(outputRoot, path), 'utf8');
-    if (actual !== expected) fail(`generated DDL round-trip artifact drifted: ${path}`);
+    if (actual !== expected) {
+      const actualLines = actual.split('\n');
+      const expectedLines = expected.split('\n');
+      const line = expectedLines.findIndex((value, index) => value !== actualLines[index]) + 1;
+      fail(`generated DDL round-trip artifact drifted: ${path} at line ${line} (committed ${sha256(actual)}, generated ${sha256(expected)})`);
+    }
   }
 }
 
