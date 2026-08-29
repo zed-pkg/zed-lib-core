@@ -1,9 +1,9 @@
 //! SeaORM entities for the `zed_*` registry tables.
 //!
-//! Every entity here mirrors exactly one table in `registry.sql` from the
-//! pinned `k8s-libs-and-shared-defs` slice (see [`crate::schema`]). The SQL is
-//! the source of truth: this crate never invents a column, and a schema change
-//! lands there first.
+//! Every entity here mirrors exactly one table in the package-owned
+//! `sql/registry.sql` (see [`crate::schema`]). The authored SQL is the source
+//! of truth: SeaORM is regenerated from a disposable database, and a schema
+//! change lands in this repository first.
 
 pub mod api_token;
 pub mod audit_log;

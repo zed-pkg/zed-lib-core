@@ -10,6 +10,7 @@ temp
 
 # Language-slice tooling state
 node_modules/
+.ddl-roundtrip-*/
 .dart_tool/
 __pycache__/
 *.py[cod]

@@ -6,6 +6,13 @@
     "generate": "node ../tools/schema-shadow-codegen.mjs",
     "generate:check": "node ../tools/schema-shadow-codegen.mjs --check",
     "drift:check": "node ../tools/check-schema-shadow.mjs",
-    "test": "node --test ../tests/schema-shadow.test.mjs"
+    "ddl:roundtrip:check": "node ../tools/ddl-first-orm-roundtrip.mjs --check",
+    "ddl:roundtrip:write": "node ../tools/ddl-first-orm-roundtrip.mjs --write",
+    "test": "node --test ../tests/schema-shadow.test.mjs ../tests/ddl-first-orm-roundtrip.test.mjs"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.10",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0"
   }
 }

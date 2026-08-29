@@ -1,0 +1,19 @@
+[package]
+org = "zed-pkg"
+name = "zed-schema"
+version = "0.1.0"
+description = "Authored PostgreSQL DDL and forward migrations for the Zed registry"
+license = "MIT"
+keywords = ["database", "ddl", "migrations", "postgresql", "schema"]
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/zed-pkg/zed-lib-core"
+
+[publish]
+include_readme = true
+tag_format = "schema/v{version}"
+smoke_test = 'sh "$ZED_PKG_TEST_TARGET/schema-package-smoke.sh"'
+
+[install]
+adapter = "none"

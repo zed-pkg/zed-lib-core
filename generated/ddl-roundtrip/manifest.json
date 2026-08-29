@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "authority": {
+    "repository": "zed-pkg/zed-lib-core",
+    "package": "zed-pkg/zed-schema",
+    "packageManifest": "src/rust-orm/sql/.zpkg.toml",
+    "ddl": "src/rust-orm/sql/registry.sql",
+    "ddlSha256": "73429610175e9785ad66dc668652596ffadb00802f329c31dca4cccd6e0a88ff",
+    "generatedSqlMayBeApplied": false
+  },
+  "generators": {
+    "drizzleKit": "drizzle-kit: v0.31.10\ndrizzle-orm: v0.45.2",
+    "seaOrmCli": "sea-orm-cli 1.1.19"
+  },
+  "databaseProfile": {
+    "checks": 109,
+    "columns": 213,
+    "foreignKeys": 40,
+    "functions": 8,
+    "policies": 0,
+    "secondaryIndexes": 58,
+    "tables": 17,
+    "triggers": 15
+  },
+  "guardSqlstates": [
+    "ZD001",
+    "ZD002",
+    "ZD003",
+    "ZD004",
+    "ZD005"
+  ],
+  "authoredOnlySemantics": [
+    "functions",
+    "triggers",
+    "guard SQLSTATEs",
+    "grants and ownership",
+    "row-level security policies when present",
+    "migration ledger identity"
+  ],
+  "artifacts": [
+    "README.md",
+    "drizzle/schema.sql",
+    "drizzle/schema.ts",
+    "sea-orm/mod.rs",
+    "sea-orm/zed_api_tokens.rs",
+    "sea-orm/zed_audit_log.rs",
+    "sea-orm/zed_dependency_graph_artifacts.rs",
+    "sea-orm/zed_dependency_graph_edges.rs",
+    "sea-orm/zed_entity_embeddings.rs",
+    "sea-orm/zed_org_invitations.rs",
+    "sea-orm/zed_org_members.rs",
+    "sea-orm/zed_orgs.rs",
+    "sea-orm/zed_package_downloads.rs",
+    "sea-orm/zed_package_licenses.rs",
+    "sea-orm/zed_package_uploads.rs",
+    "sea-orm/zed_package_versions.rs",
+    "sea-orm/zed_packages.rs",
+    "sea-orm/zed_project_invitations.rs",
+    "sea-orm/zed_project_members.rs",
+    "sea-orm/zed_projects.rs",
+    "sea-orm/zed_users.rs"
+  ]
+}

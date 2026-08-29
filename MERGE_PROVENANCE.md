@@ -43,7 +43,7 @@ The merge was not a choose-one-side conflict resolution. The temporary verbatim 
 - bounded pool policy and statement timeouts;
 - compile-fail/default-surface proof that write symbols are absent without the write feature;
 - the requirement that a SELECT-only database role is the authoritative web-tier security boundary;
-- exact shared-definitions provenance rather than independently authored product DDL.
+- exact historical shared-definitions import provenance without retaining it as a runtime or package dependency.
 
 ## Reconciled decisions
 
@@ -55,18 +55,18 @@ The canonical Zed package is:
 zed-pkg/zed-lib-core@0.1.0
 ```
 
-Its Rust ORM target remains the crate/package identity `zed-orm-core` for consumer compatibility, but that crate now lives only inside this repository at `src/rust-orm`. The former standalone repositories are historical sources, not parallel release authorities.
+Its Rust ORM package remains the crate/package identity `zed-orm-core` for consumer compatibility, but that crate now lives only inside this repository at `src/rust-orm` and publishes from its nested manifest. The former standalone repositories are historical sources, not parallel release authorities.
 
 ### Canonical database ownership
 
-The declarative registry schema is owned by:
+The declarative registry schema is now owned by:
 
 ```text
-ORESoftware/k8s-libs-and-shared-defs
-pg-defs/schema/orgs/zed-pkg/registry.sql
+zed-pkg/zed-lib-core
+src/rust-orm/sql/registry.sql
 ```
 
-The exact merged revision and blob are recorded in `shared-defs.lock.json`. The vendored SQL in `src/rust-orm/sql/registry.sql` must remain byte-identical. This crate may apply that reviewed segment through an advisory-locked version ledger; it must not invent divergent DDL.
+The shared-definitions revision and blob recorded in `shared-defs.lock.json` are immutable historical import evidence. They continue to explain the original merge and deployed ledger identities, but new DDL is reviewed here. The dependency-free nested manifest under `src/rust-orm/sql` publishes as `zed-pkg/zed-schema`; that is the only package consumed by declarative-migrations. The sibling nested manifest under `src/rust-orm` publishes as `zed-pkg/zed-orm-core` for product servers.
 
 ### Existing VCS registry preserved
 
@@ -87,7 +87,7 @@ Cloudflare R2 stores immutable artifact bytes under content-addressed keys. Post
 ## Compatibility and release gates
 
 - No synthetic `.zpkg.lock` may be committed. A release lock must come from a successful immutable Zed resolution.
-- `zed-api-server.rs` consumes the write-enabled ORM target; `zed-web-server.rs` consumes the default read-only target.
+- `zed-api-server.rs` consumes the write-enabled ORM package; `zed-web-server.rs` consumes the same package with its default read-only features.
 - API and web consumers must pin the same reviewed `zed-lib-core` revision and route-contract version.
-- Shared-schema changes land in shared definitions first, regenerate adapters, and are then repinned here.
+- Zed schema changes land in this repository first, regenerate SeaORM and Drizzle shadow artifacts, and are released as one immutable Zed package before any consumer pin moves.
 - Database migration, API rollout, web rollout, and R2 activation remain separate reviewed deployment gates.

@@ -1,0 +1,100 @@
+name: DDL-first ORM parity
+
+on:
+  pull_request:
+    paths:
+      - "src/rust-orm/sql/**"
+      - "src/rust-orm/.zpkg.toml"
+      - "src/rust-orm/orm-package-smoke.sh"
+      - "src/rust-orm/entities/**"
+      - "generated/ddl-roundtrip/**"
+      - "schema-tooling/package.json"
+      - "schema-tooling/package-lock.json"
+      - "schema-tooling/drizzle.roundtrip.config.ts"
+      - "tools/ddl-first-orm-roundtrip.mjs"
+      - "tests/ddl-first-orm-roundtrip.test.mjs"
+      - "docs/ddl-first-schema-ownership.md"
+      - ".github/workflows/schema-sql-parity.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "src/rust-orm/sql/**"
+      - "src/rust-orm/.zpkg.toml"
+      - "src/rust-orm/orm-package-smoke.sh"
+      - "src/rust-orm/entities/**"
+      - "generated/ddl-roundtrip/**"
+      - "schema-tooling/package.json"
+      - "schema-tooling/package-lock.json"
+      - "schema-tooling/drizzle.roundtrip.config.ts"
+      - "tools/ddl-first-orm-roundtrip.mjs"
+      - "tests/ddl-first-orm-roundtrip.test.mjs"
+      - "docs/ddl-first-schema-ownership.md"
+      - ".github/workflows/schema-sql-parity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schema-sql-parity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zed_ddl_roundtrip_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zed_ddl_roundtrip_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DDL_ROUNDTRIP_ALLOW_WRITE: "1"
+      DDL_ROUNDTRIP_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zed_ddl_roundtrip_ci
+      SEA_ORM_CLI: ${{ github.workspace }}/.tools/sea-orm-cli/bin/sea-orm-cli
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: schema-tooling/package-lock.json
+
+      - name: Install pinned Drizzle tooling
+        run: npm ci --prefix schema-tooling --ignore-scripts --no-audit
+
+      - name: Install pinned SeaORM generator
+        run: >-
+          cargo install
+          --root "${{ github.workspace }}/.tools/sea-orm-cli"
+          sea-orm-cli
+          --version 1.1.19
+          --locked
+          --no-default-features
+          --features cli,codegen,sqlx-postgres,runtime-tokio-rustls
+
+      - name: Verify fail-closed DDL runner tests
+        run: |
+          node --check tools/ddl-first-orm-roundtrip.mjs
+          node --test tests/ddl-first-orm-roundtrip.test.mjs
+          ZED_PKG_TEST_TARGET=src/rust-orm/sql sh src/rust-orm/sql/schema-package-smoke.sh
+
+      - name: Verify committed SeaORM and Drizzle projections
+        run: npm --prefix schema-tooling run ddl:roundtrip:check
+
+      - name: Refuse generated drift
+        run: git diff --exit-code -- generated/ddl-roundtrip

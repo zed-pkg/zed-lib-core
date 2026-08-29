@@ -1,0 +1,32 @@
+[package]
+org = "zed-pkg"
+name = "zed-orm-core"
+version = "0.1.0"
+description = "Opaque role-aware SeaORM boundary and migration runner for the Zed registry"
+license = "MIT"
+keywords = ["database", "orm", "postgresql", "rust", "seaorm"]
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/zed-pkg/zed-lib-core"
+
+[dependencies]
+"zed-pkg/zed-interfaces" = "^0.1.0"
+
+[publish]
+include_readme = true
+tag_format = "orm/v{version}"
+smoke_test = 'sh "$ZED_PKG_TEST_TARGET/orm-package-smoke.sh"'
+exclude = [
+  "sql/.zpkg.toml",
+  "sql/LICENSE",
+  "sql/README.md",
+  "sql/schema-package-smoke.sh",
+]
+
+[install]
+dir = ".vendor/.zed"
+adapter = "rust"
+
+[scripts]
+test = "cargo test --all-targets --all-features --locked"
