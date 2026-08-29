@@ -129,7 +129,7 @@ pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
     sddl_has_protected_dacl(sddl) && sddl_is_exclusive_user_private(sddl, sid)
 }
 
-#[cfg_attr(not(windows), allow(dead_code))]
+#[allow(dead_code)]
 fn sddl_is_exclusive_user_private(sddl: &str, sid: &str) -> bool {
     sddl_is_user_private(sddl, sid)
         && sddl_grants_full_control_to_sid(sddl, sid)
@@ -800,13 +800,59 @@ mod windows_acl {
     pub fn require_protected_user_private_dacl(path: &Path) -> Result<()> {
         let sid = current_user_sid_string()?;
         let (sddl, descriptor_protected) = read_dacl_sddl_and_control(path)?;
-        let exclusive_user_private = super::sddl_is_exclusive_user_private(&sddl, &sid);
-        if !descriptor_protected || !exclusive_user_private {
+        let canonical_private_sddl = canonical_user_private_sddl(&sid)?;
+        let exact_user_private = sddl.eq_ignore_ascii_case(&canonical_private_sddl);
+        if !descriptor_protected || !exact_user_private {
             bail!(
-                "lock path DACL is not protected and user-private; refusing under the private path policy (descriptor_protected={descriptor_protected}, exclusive_user_private={exclusive_user_private})"
+                "lock path DACL is not protected and user-private; refusing under the private path policy (descriptor_protected={descriptor_protected}, exact_user_private={exact_user_private})"
             );
         }
         Ok(())
+    }
+
+    fn canonical_user_private_sddl(sid: &str) -> Result<String> {
+        let sddl = user_private_sddl(sid);
+        let sddl_wide = wide_str(&sddl);
+        unsafe {
+            let mut sd: PsecurityDescriptor = null_mut();
+            if ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                sddl_wide.as_ptr(),
+                SDDL_REVISION_1,
+                &mut sd,
+                null_mut(),
+            ) == 0
+            {
+                bail!("ConvertStringSecurityDescriptorToSecurityDescriptorW failed");
+            }
+            let rendered = render_dacl_sddl(sd);
+            LocalFree(sd);
+            rendered
+        }
+    }
+
+    unsafe fn render_dacl_sddl(sd: PsecurityDescriptor) -> Result<String> {
+        let mut string = core::ptr::null_mut();
+        // SAFETY: `sd` points to a live descriptor supplied by the caller and
+        // the output buffer is released with LocalFree before returning.
+        if unsafe {
+            ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                sd,
+                SDDL_REVISION_1,
+                DACL_SECURITY_INFORMATION,
+                &mut string,
+                null_mut(),
+            )
+        } == 0
+        {
+            bail!("ConvertSecurityDescriptorToStringSecurityDescriptorW failed");
+        }
+        // SAFETY: the successful conversion returned a NUL-terminated UTF-16
+        // buffer owned by the local allocator.
+        let rendered = unsafe { wide_to_string(string) };
+        unsafe {
+            LocalFree(string.cast());
+        }
+        rendered
     }
 
     fn read_dacl_sddl_and_control(path: &Path) -> Result<(String, bool)> {
@@ -832,20 +878,7 @@ mod windows_acl {
                 LocalFree(sd);
                 bail!("GetSecurityDescriptorControl failed");
             }
-            let mut string = core::ptr::null_mut();
-            if ConvertSecurityDescriptorToStringSecurityDescriptorW(
-                sd,
-                SDDL_REVISION_1,
-                DACL_SECURITY_INFORMATION,
-                &mut string,
-                null_mut(),
-            ) == 0
-            {
-                LocalFree(sd);
-                bail!("ConvertSecurityDescriptorToStringSecurityDescriptorW failed");
-            }
-            let rendered = wide_to_string(string);
-            LocalFree(string.cast());
+            let rendered = render_dacl_sddl(sd);
             LocalFree(sd);
             rendered.map(|sddl| (sddl, control & SE_DACL_PROTECTED != 0))
         }
