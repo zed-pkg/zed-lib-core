@@ -419,7 +419,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn canonical_artifact_key_is_content_addressed_not_a_guessable_alias() {
         let sha = "a".repeat(64);
         let canonical = format!("artifacts/{sha}.tar.gz");
@@ -447,6 +446,7 @@ mod tests {
         assert!(canonical.ends_with(".tar.gz"));
     }
 
+    #[test]
     fn immutable_fact_comparison_detects_drift() {
         let input = input();
         let now = chrono::Utc::now().fixed_offset();
