@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "owners": {
     "contract": "zed-pkg/zed-lib-core",
-    "database": "ORESoftware/k8s-libs-and-shared-defs",
+    "database": "zed-pkg/zed-lib-core:src/rust-orm/sql",
     "api": "zed-pkg/zed-api-server.rs",
     "web": "zed-pkg/zed-web-server.rs"
   },

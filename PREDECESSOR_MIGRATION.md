@@ -43,7 +43,7 @@ Certification and package/API/storage contracts merged through
 | Shared language-neutral vectors | `conformance` |
 | Opaque SeaORM crate `zed-orm-core` | `src/rust-orm` |
 | Canonical registry SQL evidence | `src/rust-orm/sql/registry.sql` |
-| Shared-definitions provenance | `shared-defs.lock.json` |
+| Historical shared-definitions import provenance | `shared-defs.lock.json` |
 | API/page/R2 contracts | `contracts` |
 
 ## `zed-lib#7`: one-time invitation acceptance

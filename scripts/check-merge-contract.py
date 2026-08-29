@@ -23,6 +23,11 @@ EXPECTED_DEPENDENCY_GRAPH_BLOB = "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2"
 EXPECTED_VISIBILITY_REVISION = "a1fb823890d4a36dfab67c311f0d728d7b22c1c9"
 EXPECTED_VISIBILITY_BLOB = "8612f037dce7de6d7db66ee96db7996b33b32ea9"
 EXPECTED_PACKAGE = "zed-pkg/zed-lib-core"
+EXPECTED_ORM_PACKAGE = "zed-pkg/zed-orm-core"
+EXPECTED_SCHEMA_PACKAGE = "zed-pkg/zed-schema"
+EXPECTED_SCHEMA_AUTHORITY = "zed-pkg/zed-lib-core:src/rust-orm/sql"
+EXPECTED_ORM_MANIFEST = "src/rust-orm/.zpkg.toml"
+EXPECTED_SCHEMA_MANIFEST = "src/rust-orm/sql/.zpkg.toml"
 
 DEPENDENCY_GRAPH_MIGRATION = (
     "pg-defs/schema/orgs/zed-pkg/migrations/"
@@ -100,7 +105,6 @@ def assert_package() -> None:
     required_targets = {
         "repository",
         "rust",
-        "rust-orm",
         "conformance",
         "dart",
         "typescript",
@@ -112,6 +116,42 @@ def assert_package() -> None:
         directory = ROOT / spec["dir"]
         if not directory.is_dir():
             fail(f"target {target} directory is missing: {directory}")
+
+    if {"rust-orm", "sql-schema"} & targets:
+        fail("ORM and schema packages must not inherit root target metadata")
+
+    orm_manifest = tomllib.loads((ROOT / EXPECTED_ORM_MANIFEST).read_text(encoding="utf-8"))
+    orm_package = orm_manifest.get("package", {})
+    orm_identity = f"{orm_package.get('org')}/{orm_package.get('name')}"
+    if orm_identity != EXPECTED_ORM_PACKAGE:
+        fail(f"unexpected ORM package identity: {orm_identity}")
+    if orm_package.get("version") != package.get("version"):
+        fail("ORM package version differs from the source release")
+    if orm_manifest.get("dependencies") != {"zed-pkg/zed-interfaces": "^0.1.0"}:
+        fail("ORM package dependency boundary differs")
+    if orm_manifest.get("install", {}).get("adapter") != "rust":
+        fail("ORM package adapter must remain rust")
+    if orm_manifest.get("publish", {}).get("smoke_test") != (
+        'sh "$ZED_PKG_TEST_TARGET/orm-package-smoke.sh"'
+    ):
+        fail("ORM package consumer smoke test differs")
+
+    schema_manifest = tomllib.loads((ROOT / EXPECTED_SCHEMA_MANIFEST).read_text(encoding="utf-8"))
+    schema_package = schema_manifest.get("package", {})
+    schema_identity = f"{schema_package.get('org')}/{schema_package.get('name')}"
+    if schema_identity != EXPECTED_SCHEMA_PACKAGE:
+        fail(f"unexpected schema package identity: {schema_identity}")
+    if schema_package.get("version") != package.get("version"):
+        fail("schema package version differs from the source release")
+    if schema_manifest.get("dependencies"):
+        fail("schema package must not have runtime package dependencies")
+    if schema_manifest.get("install", {}).get("adapter") != "none":
+        fail("schema package adapter must remain none")
+    if schema_manifest.get("publish", {}).get("smoke_test") != (
+        'sh "$ZED_PKG_TEST_TARGET/schema-package-smoke.sh"'
+    ):
+        fail("schema package consumer smoke test differs")
+
     if (ROOT / ".zpkg.lock").exists():
         lock = tomllib.loads((ROOT / ".zpkg.lock").read_text(encoding="utf-8"))
         packages = lock.get("package", [])
@@ -135,8 +175,12 @@ def assert_package() -> None:
                 fail("lock contains empty immutable provenance")
 
 
-def assert_shared_defs() -> None:
+def assert_schema_ownership() -> None:
     lock = read_json("shared-defs.lock.json")
+    if lock.get("mode") != "historical-import-only":
+        fail("shared-definitions record is not historical-only")
+    if lock.get("current_authority") != EXPECTED_SCHEMA_AUTHORITY:
+        fail("current schema authority differs")
     if lock.get("revision") != EXPECTED_SHARED_DEFS_REVISION:
         fail("shared-definitions revision differs")
     if lock.get("registry_blob_sha") != EXPECTED_REGISTRY_BLOB:
@@ -159,14 +203,14 @@ def assert_shared_defs() -> None:
         fail("visibility vendored migration path differs")
     source = ROOT / lock["vendored_copy"]
     if not source.is_file():
-        fail("vendored registry SQL is missing")
+        fail("package-owned registry SQL is missing")
     actual_blob = git("hash-object", str(source.relative_to(ROOT)))
     if actual_blob != EXPECTED_REGISTRY_BLOB:
-        fail(f"vendored registry SQL blob differs: {actual_blob}")
+        fail(f"package-owned registry SQL blob differs: {actual_blob}")
 
     graph_patch = ROOT / lock["vendored_dependency_graph_migration"]
     if not graph_patch.is_file():
-        fail("vendored dependency-graph migration is missing")
+        fail("package-owned dependency-graph migration is missing")
     actual_graph_blob = git("hash-object", str(graph_patch.relative_to(ROOT)))
     if actual_graph_blob != EXPECTED_DEPENDENCY_GRAPH_BLOB:
         fail(f"vendored dependency-graph migration blob differs: {actual_graph_blob}")
@@ -188,7 +232,7 @@ def assert_shared_defs() -> None:
 
     patch = ROOT / lock["vendored_visibility_immutability_migration"]
     if not patch.is_file():
-        fail("vendored visibility migration is missing")
+        fail("package-owned visibility migration is missing")
     actual_patch_blob = git("hash-object", str(patch.relative_to(ROOT)))
     if actual_patch_blob != EXPECTED_VISIBILITY_BLOB:
         fail(f"vendored visibility migration blob differs: {actual_patch_blob}")
@@ -217,7 +261,7 @@ def assert_shared_defs() -> None:
     }
     missing = sorted(table for table in required if f"create table if not exists {table}" not in text)
     if missing:
-        fail(f"vendored registry SQL is missing tables: {missing}")
+        fail(f"package-owned registry SQL is missing tables: {missing}")
     for required_fragment in (
         "zd001",
         "zd002",
@@ -230,16 +274,21 @@ def assert_shared_defs() -> None:
 
     schema = (ROOT / "src/rust-orm/schema.rs").read_text(encoding="utf-8")
     for name, expected in (
-        ("SHARED_DEFS_DEPENDENCY_GRAPH_REVISION", EXPECTED_DEPENDENCY_GRAPH_REVISION),
-        ("SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION", DEPENDENCY_GRAPH_MIGRATION),
+        ("SCHEMA_REPOSITORY", EXPECTED_PACKAGE),
+        ("SCHEMA_PACKAGE", EXPECTED_SCHEMA_PACKAGE),
+        ("SCHEMA_PACKAGE_MANIFEST", EXPECTED_SCHEMA_MANIFEST),
+        ("REGISTRY_DDL_PATH", "src/rust-orm/sql/registry.sql"),
+        ("REGISTRY_DDL_BLOB_SHA", EXPECTED_REGISTRY_BLOB),
+        ("DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX", EXPECTED_DEPENDENCY_GRAPH_REVISION),
+        ("DEPENDENCY_GRAPH_MIGRATION_PATH", VENDORED_DEPENDENCY_GRAPH_MIGRATION),
         (
-            "SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA",
+            "DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA",
             EXPECTED_DEPENDENCY_GRAPH_BLOB,
         ),
-        ("SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION", EXPECTED_VISIBILITY_REVISION),
-        ("SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION", VISIBILITY_MIGRATION),
+        ("VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX", EXPECTED_VISIBILITY_REVISION),
+        ("VISIBILITY_IMMUTABILITY_MIGRATION_PATH", VENDORED_VISIBILITY_MIGRATION),
         (
-            "SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA",
+            "VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA",
             EXPECTED_VISIBILITY_BLOB,
         ),
     ):
@@ -257,6 +306,10 @@ def assert_shared_defs() -> None:
     ):
         if f'include_str!("{vendored}")' not in migrations:
             fail(f"migration runner does not include {vendored}")
+
+    manifest = tomllib.loads((ROOT / ".zpkg.toml").read_text(encoding="utf-8"))
+    if "oresoftware/k8s-libs-and-shared-defs" in manifest.get("dependencies", {}):
+        fail("product package still depends on shared definitions")
 
 
 def assert_routes() -> None:
@@ -317,14 +370,16 @@ def assert_no_duplicate_orm() -> None:
 def main() -> None:
     assert_history()
     assert_package()
-    assert_shared_defs()
+    assert_schema_ownership()
     assert_routes()
     assert_no_duplicate_orm()
     summary = {
         "package": EXPECTED_PACKAGE,
+        "schemaPackage": EXPECTED_SCHEMA_PACKAGE,
+        "schemaAuthority": EXPECTED_SCHEMA_AUTHORITY,
         "merge": MERGE,
         "semanticFold": SEMANTIC_FOLD,
-        "sharedDefsRevision": EXPECTED_SHARED_DEFS_REVISION,
+        "historicalSharedDefsRevision": EXPECTED_SHARED_DEFS_REVISION,
         "registryBlob": EXPECTED_REGISTRY_BLOB,
         "dependencyGraphMigrationRevision": EXPECTED_DEPENDENCY_GRAPH_REVISION,
         "dependencyGraphMigrationBlob": EXPECTED_DEPENDENCY_GRAPH_BLOB,

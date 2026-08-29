@@ -1,4 +1,6 @@
 {
+  "mode": "historical-import-only",
+  "current_authority": "zed-pkg/zed-lib-core:src/rust-orm/sql",
   "repository": "https://github.com/ORESoftware/k8s-libs-and-shared-defs",
   "revision": "a1fb823890d4a36dfab67c311f0d728d7b22c1c9",
   "org_slice": "zed-pkg",
@@ -17,5 +19,5 @@
   "vendored_visibility_immutability_migration": "src/rust-orm/sql/2026-08-11-public-visibility-is-permanent.sql",
   "generated_adapter": "pg-defs/generated/rust/sea-orm",
   "generated_crate": "dd-pg-defs-sea-orm",
-  "policy": "The registry tables and forward-only compatibility migrations are defined in the exact reviewed shared-definitions revisions and applied verbatim by src/rust-orm/migrations.rs. Never replay the non-idempotent base segment when adding a migration. Do not author an independent schema in this crate. Schema changes are reviewed in ORESoftware/k8s-libs-and-shared-defs first, then vendored and repinned here."
+  "policy": "Historical import provenance only. The recorded revisions and blob identities explain the original merge and preserve deployed migration-ledger identities; they are not a package dependency or current schema authority. New Zed registry DDL and forward migrations are authored and reviewed in zed-pkg/zed-lib-core under src/rust-orm/sql. Never replay or edit an already-recorded migration."
 }

@@ -13,6 +13,7 @@ exact source commits are recorded in [`PREDECESSOR_MIGRATION.md`](PREDECESSOR_MI
 | Path | Package | What it is |
 | --- | --- | --- |
 | `src/rust-orm` | `zed-orm-core` | SeaORM registry entities, named data-plane operations, migration runner, and opaque connection boundary |
+| `src/rust-orm/sql` | `zed-schema` | Dependency-free authored DDL and immutable forward migrations for declarative-migrations |
 | `src/rust` | `zed-lib` | Version resolution and policy over the shared contract types |
 | `src/ts` | `@zed-pkg/zed-lib` | The same resolution behavior, natively in TypeScript |
 | `src/dart` | `zed_lib` | The same resolution behavior, natively in Dart |
@@ -26,12 +27,11 @@ authorities.
 
 Three rules define the crate:
 
-1. **The schema is not ours.** Every table is defined in
-   `pg-defs/schema/orgs/zed-pkg/registry.sql` in
-   [`k8s-libs-and-shared-defs`](https://github.com/ORESoftware/k8s-libs-and-shared-defs)
-   at the revision pinned in `shared-defs.lock.json`. That file is vendored to
-   `src/rust-orm/sql/registry.sql` and applied verbatim; this crate authors no
-   DDL of its own.
+1. **The schema belongs to this product package.** Zed registry DDL and
+   forward-only migrations are authored in `src/rust-orm/sql`. Its nested,
+   standalone Zed manifest exposes that narrow boundary to
+   declarative-migrations. `shared-defs.lock.json` now records historical
+   import provenance only; it is not a dependency or change path.
 2. **Raw sessions do not escape.** Consumers get an opaque `ReadContext` or
    `WriteContext` and call named operations in `read`, `registry`, `write`, and
    the feature-gated `invitations` module. SeaORM connections and query builders
@@ -135,8 +135,16 @@ the same contract without changing stored data or package interfaces.
 cargo test  -p zed-orm-core --all-features   # entities, policy, public surface
 cargo test  -p zed-orm-core                  # default read-only surface
 cargo clippy -p zed-orm-core --all-features -- -D warnings
+npm ci --prefix schema-tooling
+# Against an empty local database named zed_ddl_roundtrip_<purpose>:
+DDL_ROUNDTRIP_ALLOW_WRITE=1 DDL_ROUNDTRIP_DATABASE_URL=postgresql://... \
+  SEA_ORM_CLI=sea-orm-cli npm --prefix schema-tooling run ddl:roundtrip:check
 ```
 
 The live database probes (`ORM_CORE_TEST_DATABASE_URL`) are `#[ignore]` by
 default and must point at a disposable database — one of them attempts DDL to
 prove the read-only identity is denied.
+
+See [`docs/ddl-first-schema-ownership.md`](docs/ddl-first-schema-ownership.md)
+for the fleet ownership pattern, Drizzle/SeaORM roles, declarative-migrations
+handoff, and staged removal of product SQL from the shared repository.

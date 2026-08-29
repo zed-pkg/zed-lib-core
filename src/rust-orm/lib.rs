@@ -5,11 +5,10 @@
 //!
 //! Three rules define this crate:
 //!
-//! 1. **The schema is not ours.** Every table lives in
-//!    `pg-defs/schema/orgs/zed-pkg/registry.sql` in `k8s-libs-and-shared-defs`
-//!    at the revision pinned in [`schema::SHARED_DEFS_REVISION`] and
-//!    `shared-defs.lock.json`. [`migrations`] applies that reviewed base plus
-//!    exact-pinned forward migrations and authors no DDL of its own.
+//! 1. **The schema is package-owned.** Zed registry DDL and forward migrations
+//!    live under `src/rust-orm/sql` in this repository and ship as the
+//!    standalone `zed-pkg/zed-schema` package. [`migrations`] applies those reviewed files;
+//!    generated SeaORM and Drizzle projections remain non-authoritative.
 //! 2. **Raw sessions do not escape.** Consumers receive an opaque
 //!    [`ReadContext`] or [`WriteContext`] and call named operations in [`read`],
 //!    [`registry`], [`version_reads`], [`write`], and the feature-gated
@@ -70,12 +69,17 @@ pub use error::{
 };
 pub use policy::{PromotionRefusal, VisibilityLimits};
 pub use schema::{
-    qualified, ORG_SCHEMA, SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION,
-    SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA, SHARED_DEFS_DEPENDENCY_GRAPH_REVISION,
-    SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT, SHARED_DEFS_REVISION,
-    SHARED_DEFS_SEA_ORM_ADAPTER, SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION,
+    qualified, DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA, DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX,
+    DEPENDENCY_GRAPH_MIGRATION_PATH, ORG_SCHEMA, REGISTRY_DDL_BLOB_SHA, REGISTRY_DDL_PATH,
+    SCHEMA_PACKAGE, SCHEMA_PACKAGE_MANIFEST, SCHEMA_REPOSITORY,
+    SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION, SHARED_DEFS_DEPENDENCY_GRAPH_MIGRATION_BLOB_SHA,
+    SHARED_DEFS_DEPENDENCY_GRAPH_REVISION, SHARED_DEFS_ORG_SLICE, SHARED_DEFS_REGISTRY_SEGMENT,
+    SHARED_DEFS_REVISION, SHARED_DEFS_SEA_ORM_ADAPTER,
+    SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION,
     SHARED_DEFS_VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA,
     SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION, TABLE_PREFIX,
+    VISIBILITY_IMMUTABILITY_MIGRATION_BLOB_SHA, VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX,
+    VISIBILITY_IMMUTABILITY_MIGRATION_PATH,
 };
 
 /// Default consumers cannot import write symbols. This doctest is compiled only

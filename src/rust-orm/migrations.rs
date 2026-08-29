@@ -1,37 +1,39 @@
 //! Registry migrations — the `migrate` feature, and the discrete DPM job only.
 //!
-//! This runner applies the reviewed `registry.sql` base segment and separately
-//! versioned, forward-only compatibility migrations vendored from
-//! `k8s-libs-and-shared-defs`. It never authors DDL, so the canonical contract
-//! and what is actually deployed cannot drift.
+//! This runner applies the package-owned `registry.sql` desired state and
+//! separately versioned, forward-only compatibility migrations from the same
+//! standalone `zed-pkg/zed-schema` package. Generated ORM SQL is never applied.
 //!
 //! `registry.sql` is written to be idempotent — `create table if not exists`,
 //! `create index if not exists`, `create or replace function` — with one
 //! exception: `create trigger` and `alter table ... add constraint` are not
 //! idempotent in PostgreSQL 16, so re-application is guarded by the version
 //! ledger rather than by the SQL itself. The base ledger identity is therefore
-//! immutable: a new shared-definitions revision must not replay that segment.
+//! immutable: a new package release must not replay that segment.
 
 use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
 
 use crate::{
     connection::WriteContext,
     error::OrmError,
-    schema::{SHARED_DEFS_DEPENDENCY_GRAPH_REVISION, SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION},
+    schema::{
+        DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX,
+        VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX,
+    },
 };
 
-/// The vendored contract segment. Verified byte-for-byte against the
-/// shared-definitions repository in CI.
+/// The package-owned desired-state contract. Its committed Drizzle and SeaORM
+/// projections are regenerated from a disposable PostgreSQL database in CI.
 const REGISTRY_SQL: &str = include_str!("sql/registry.sql");
 
-/// Forward-only graph persistence migration reviewed in shared definitions.
+/// Forward-only graph persistence migration owned by this package.
 ///
 /// Fresh databases receive the same desired state from `registry.sql`, then
 /// execute this idempotent migration so every database records the same ordered
 /// ledger. Existing databases skip the base and receive these tables directly.
 const DEPENDENCY_GRAPH_SQL: &str = include_str!("sql/2026-08-11-dependency-graph-artifacts.sql");
 
-/// Additive migration reviewed in shared definitions. It only replaces the
+/// Additive migration owned by this package. It only replaces the
 /// function already targeted by the existing visibility trigger, so applying
 /// it cannot replay non-idempotent triggers or constraints.
 const VISIBILITY_IMMUTABILITY_SQL: &str =
@@ -46,12 +48,12 @@ const BASE_REGISTRY_VERSION: &str = "registry@c8bdc06d74746acc6439f9527ebd02697f
 
 /// Ledger identity for the forward-only dependency-graph upgrade.
 pub fn dependency_graph_version() -> String {
-    format!("registry-dependency-graph-artifacts@{SHARED_DEFS_DEPENDENCY_GRAPH_REVISION}")
+    format!("registry-dependency-graph-artifacts@{DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX}")
 }
 
 /// Ledger identity for the forward-only public-visibility upgrade.
 pub fn visibility_immutability_version() -> String {
-    format!("registry-visibility-immutability@{SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION}")
+    format!("registry-visibility-immutability@{VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX}")
 }
 
 /// Target version retained for compatibility with existing migration callers.
@@ -78,7 +80,7 @@ enum MigrationStep {
 
 impl MigrationStep {
     /// Deployment order is part of the contract. Never substitute a changing
-    /// shared-definitions revision for the historical base identity.
+    /// package revision for the historical base identity.
     const ORDERED: [Self; 3] = [
         Self::HistoricalBase,
         Self::DependencyGraph,
@@ -265,8 +267,8 @@ mod tests {
 
     #[test]
     fn every_forward_migration_has_an_independent_ledger_identity() {
-        assert!(dependency_graph_version().ends_with(SHARED_DEFS_DEPENDENCY_GRAPH_REVISION));
-        assert!(registry_version().ends_with(SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION));
+        assert!(dependency_graph_version().ends_with(DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
+        assert!(registry_version().ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
         assert_eq!(registry_version(), visibility_immutability_version());
         assert_ne!(
             dependency_graph_version(),
@@ -346,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn the_vendored_segment_defines_every_registry_table() {
+    fn the_owned_segment_defines_every_registry_table() {
         for table in [
             "zed_users",
             "zed_orgs",
@@ -368,7 +370,7 @@ mod tests {
         ] {
             assert!(
                 REGISTRY_SQL.contains(&format!("create table if not exists {table} (")),
-                "vendored registry.sql is missing {table}"
+                "package-owned registry.sql is missing {table}"
             );
         }
     }
@@ -443,9 +445,9 @@ mod tests {
     }
 
     #[test]
-    fn the_vendored_segment_declares_no_schema_of_its_own() {
-        // A `create schema` here would mean this crate had started authoring
-        // DDL instead of applying the reviewed contract.
+    fn the_owned_segment_keeps_the_deployed_public_schema() {
+        // Ownership transfer must not silently move deployed tables into a new
+        // PostgreSQL schema.
         assert!(!REGISTRY_SQL.contains("create schema"));
     }
 }

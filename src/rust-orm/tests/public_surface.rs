@@ -5,8 +5,8 @@ fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-/// The repository root, which owns `.zpkg.toml` and `shared-defs.lock.json`
-/// for every language slice rather than duplicating them per crate.
+/// The repository root, which owns the root package, nested schema package,
+/// and historical import record for every language slice.
 fn repo_root() -> PathBuf {
     root()
         .parent()
@@ -71,9 +71,11 @@ fn organization_invitations_use_one_typed_write_command() {
 }
 
 #[test]
-fn shared_schema_source_is_exact_and_external() {
+fn product_schema_is_local_and_historical_import_provenance_is_exact() {
     let lock = read_repo("shared-defs.lock.json");
     for contract in [
+        "\"mode\": \"historical-import-only\"",
+        "\"current_authority\": \"zed-pkg/zed-lib-core:src/rust-orm/sql\"",
         "a1fb823890d4a36dfab67c311f0d728d7b22c1c9",
         "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9",
         "86f1b1a0b3b0d8bee26cab98aa9bf67ece738de2",
@@ -90,7 +92,40 @@ fn shared_schema_source_is_exact_and_external() {
     }
 
     let zpkg = read_repo(".zpkg.toml");
-    assert!(zpkg.contains("\"oresoftware/k8s-libs-and-shared-defs\""));
+    assert!(!zpkg.contains("\"oresoftware/k8s-libs-and-shared-defs\""));
+    assert!(!zpkg.contains("[targets.sql-schema]"));
+    assert!(!zpkg.contains("[targets.rust-orm]"));
+
+    let orm_zpkg = read_repo("src/rust-orm/.zpkg.toml");
+    assert!(orm_zpkg.contains("name = \"zed-orm-core\""));
+    assert!(orm_zpkg.contains("\"zed-pkg/zed-interfaces\" = \"^0.1.0\""));
+    assert!(orm_zpkg.contains("adapter = \"rust\""));
+    assert!(orm_zpkg.contains("orm-package-smoke.sh"));
+
+    let schema_zpkg = read_repo("src/rust-orm/sql/.zpkg.toml");
+    assert!(schema_zpkg.contains("name = \"zed-schema\""));
+    assert!(schema_zpkg.contains("adapter = \"none\""));
+    assert!(schema_zpkg.contains("schema-package-smoke.sh"));
+    assert!(!schema_zpkg.contains("[dependencies]"));
+
+    assert_eq!(zed_orm_core::SCHEMA_REPOSITORY, "zed-pkg/zed-lib-core");
+    assert_eq!(zed_orm_core::SCHEMA_PACKAGE, "zed-pkg/zed-schema");
+    assert_eq!(
+        zed_orm_core::SCHEMA_PACKAGE_MANIFEST,
+        "src/rust-orm/sql/.zpkg.toml"
+    );
+    assert_eq!(
+        zed_orm_core::REGISTRY_DDL_PATH,
+        "src/rust-orm/sql/registry.sql"
+    );
+    assert_eq!(
+        zed_orm_core::DEPENDENCY_GRAPH_MIGRATION_PATH,
+        "src/rust-orm/sql/2026-08-11-dependency-graph-artifacts.sql"
+    );
+    assert_eq!(
+        zed_orm_core::VISIBILITY_IMMUTABILITY_MIGRATION_PATH,
+        "src/rust-orm/sql/2026-08-11-public-visibility-is-permanent.sql"
+    );
 
     assert_eq!(
         zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_REVISION,
@@ -134,8 +169,8 @@ fn migration_ledger_keeps_base_graph_and_visibility_distinct() {
 fn individual_migration_versions_are_public_and_distinct() {
     let graph = zed_orm_core::migrations::dependency_graph_version();
     let visibility = zed_orm_core::migrations::visibility_immutability_version();
-    assert!(graph.ends_with(zed_orm_core::SHARED_DEFS_DEPENDENCY_GRAPH_REVISION));
-    assert!(visibility.ends_with(zed_orm_core::SHARED_DEFS_VISIBILITY_IMMUTABILITY_REVISION));
+    assert!(graph.ends_with(zed_orm_core::DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
+    assert!(visibility.ends_with(zed_orm_core::VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
     assert_ne!(graph, visibility);
     assert_eq!(zed_orm_core::migrations::registry_version(), visibility);
 }
