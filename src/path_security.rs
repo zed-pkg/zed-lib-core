@@ -241,6 +241,22 @@ fn sddl_has_protected_dacl(sddl: &str) -> bool {
     upper.contains("D:P(") || upper.contains("D:PAI(") || upper.starts_with("D:P")
 }
 
+#[allow(dead_code)]
+fn sddl_has_same_dacl_aces(actual: &str, expected: &str) -> bool {
+    fn ace_section(sddl: &str) -> Option<&str> {
+        let first_ace = sddl.find('(')?;
+        sddl[..first_ace]
+            .to_ascii_uppercase()
+            .starts_with("D:")
+            .then_some(&sddl[first_ace..])
+    }
+
+    match (ace_section(actual), ace_section(expected)) {
+        (Some(actual), Some(expected)) => actual.eq_ignore_ascii_case(expected),
+        _ => false,
+    }
+}
+
 pub fn open_lock_file(path: &Path, policy: PathSecurityPolicy) -> Result<(File, PathBuf)> {
     refuse_parent_dir_components(path)?;
     if let Some(parent) = path
@@ -801,10 +817,10 @@ mod windows_acl {
         let sid = current_user_sid_string()?;
         let (sddl, descriptor_protected) = read_dacl_sddl_and_control(path)?;
         let canonical_private_sddl = canonical_user_private_sddl(&sid)?;
-        let exact_user_private = sddl.eq_ignore_ascii_case(&canonical_private_sddl);
-        if !descriptor_protected || !exact_user_private {
+        let exact_private_aces = super::sddl_has_same_dacl_aces(&sddl, &canonical_private_sddl);
+        if !descriptor_protected || !exact_private_aces {
             bail!(
-                "lock path DACL is not protected and user-private; refusing under the private path policy (descriptor_protected={descriptor_protected}, exact_user_private={exact_user_private})"
+                "lock path DACL is not protected and user-private; refusing under the private path policy (descriptor_protected={descriptor_protected}, exact_private_aces={exact_private_aces})"
             );
         }
         Ok(())
@@ -961,6 +977,19 @@ mod tests {
         assert!(!sddl_is_user_private("D:P(A;;FA;;;BU)", sid));
         assert!(!sddl_is_user_private("D:P(A;;FA;;;", sid));
         assert!(!sddl_is_user_private("", sid));
+    }
+
+    #[test]
+    fn canonical_dacl_comparison_ignores_only_control_flags() {
+        let expected = "D:P(A;;FA;;;LA)";
+        assert!(sddl_has_same_dacl_aces("D:PAI(A;;FA;;;LA)", expected));
+        assert!(sddl_has_same_dacl_aces("D:PAR(A;;FA;;;la)", expected));
+        assert!(!sddl_has_same_dacl_aces(
+            "D:PAI(A;;FA;;;LA)(A;;FR;;;SY)",
+            expected
+        ));
+        assert!(!sddl_has_same_dacl_aces("D:P", expected));
+        assert!(!sddl_has_same_dacl_aces("O:LA(A;;FA;;;LA)", expected));
     }
 
     #[test]
