@@ -122,10 +122,16 @@ pub fn sddl_is_user_private(sddl: &str, sid: &str) -> bool {
     grants_trusted_controller_full_control
 }
 
-#[cfg_attr(not(windows), allow(dead_code))]
+// Retained as a platform-independent classifier for parser tests. Production
+// Windows enforcement reads SE_DACL_PROTECTED from the descriptor control bits.
+#[allow(dead_code)]
 pub fn sddl_is_protected_user_private(sddl: &str, sid: &str) -> bool {
-    sddl_has_protected_dacl(sddl)
-        && sddl_is_user_private(sddl, sid)
+    sddl_has_protected_dacl(sddl) && sddl_is_exclusive_user_private(sddl, sid)
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sddl_is_exclusive_user_private(sddl: &str, sid: &str) -> bool {
+    sddl_is_user_private(sddl, sid)
         && sddl_grants_full_control_to_sid(sddl, sid)
         && !sddl_has_broad_allow_ace(sddl)
 }
@@ -229,7 +235,7 @@ fn sddl_has_broad_allow_ace(sddl: &str) -> bool {
     })
 }
 
-#[cfg_attr(not(windows), allow(dead_code))]
+#[allow(dead_code)]
 fn sddl_has_protected_dacl(sddl: &str) -> bool {
     let upper = sddl.to_ascii_uppercase();
     upper.contains("D:P(") || upper.contains("D:PAI(") || upper.starts_with("D:P")
@@ -550,7 +556,7 @@ mod windows_acl {
 
     use anyhow::{Result, bail};
 
-    use super::{sddl_is_protected_user_private, sddl_is_user_private, user_private_sddl};
+    use super::{sddl_is_user_private, user_private_sddl};
 
     const TOKEN_QUERY: u32 = 0x0008;
     const TOKEN_USER: u32 = 1;
@@ -559,6 +565,7 @@ mod windows_acl {
     const DACL_SECURITY_INFORMATION: u32 = 0x0000_0004;
     const PROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x8000_0000;
     const OWNER_SECURITY_INFORMATION: u32 = 0x0000_0001;
+    const SE_DACL_PROTECTED: u16 = 0x1000;
 
     type Handle = *mut core::ffi::c_void;
     type Psid = *mut core::ffi::c_void;
@@ -605,6 +612,11 @@ mod windows_acl {
             present: *mut i32,
             dacl: *mut Pacl,
             defaulted: *mut i32,
+        ) -> i32;
+        fn GetSecurityDescriptorControl(
+            sd: PsecurityDescriptor,
+            control: *mut u16,
+            revision: *mut u32,
         ) -> i32;
         fn SetNamedSecurityInfoW(
             object: *mut u16,
@@ -778,7 +790,7 @@ mod windows_acl {
 
     pub fn require_user_private_dacl(path: &Path) -> Result<()> {
         let sid = current_user_sid_string()?;
-        let sddl = read_dacl_sddl(path)?;
+        let (sddl, _) = read_dacl_sddl_and_control(path)?;
         if !sddl_is_user_private(&sddl, &sid) {
             bail!("lock path DACL is not user-private; refusing under the private path policy");
         }
@@ -787,16 +799,17 @@ mod windows_acl {
 
     pub fn require_protected_user_private_dacl(path: &Path) -> Result<()> {
         let sid = current_user_sid_string()?;
-        let sddl = read_dacl_sddl(path)?;
-        if !sddl_is_protected_user_private(&sddl, &sid) {
+        let (sddl, descriptor_protected) = read_dacl_sddl_and_control(path)?;
+        let exclusive_user_private = super::sddl_is_exclusive_user_private(&sddl, &sid);
+        if !descriptor_protected || !exclusive_user_private {
             bail!(
-                "lock path DACL is not protected and user-private; refusing under the private path policy"
+                "lock path DACL is not protected and user-private; refusing under the private path policy (descriptor_protected={descriptor_protected}, exclusive_user_private={exclusive_user_private})"
             );
         }
         Ok(())
     }
 
-    fn read_dacl_sddl(path: &Path) -> Result<String> {
+    fn read_dacl_sddl_and_control(path: &Path) -> Result<(String, bool)> {
         let object = wide(path);
         unsafe {
             let mut sd: PsecurityDescriptor = null_mut();
@@ -813,6 +826,12 @@ mod windows_acl {
             if status != 0 {
                 bail!("GetNamedSecurityInfoW failed with {status}");
             }
+            let mut control = 0u16;
+            let mut revision = 0u32;
+            if GetSecurityDescriptorControl(sd, &mut control, &mut revision) == 0 {
+                LocalFree(sd);
+                bail!("GetSecurityDescriptorControl failed");
+            }
             let mut string = core::ptr::null_mut();
             if ConvertSecurityDescriptorToStringSecurityDescriptorW(
                 sd,
@@ -828,7 +847,7 @@ mod windows_acl {
             let rendered = wide_to_string(string);
             LocalFree(string.cast());
             LocalFree(sd);
-            rendered
+            rendered.map(|sddl| (sddl, control & SE_DACL_PROTECTED != 0))
         }
     }
 }
