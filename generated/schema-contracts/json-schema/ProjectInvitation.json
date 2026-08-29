@@ -1,0 +1,61 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ProjectInvitation.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "projectId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "invitedByUserId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "email": {
+            "type": "string"
+        },
+        "role": {
+            "type": "string"
+        },
+        "tokenHash": {
+            "type": "string"
+        },
+        "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "acceptedByUserId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "revokedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "projectId",
+        "invitedByUserId",
+        "email",
+        "role",
+        "tokenHash",
+        "expiresAt",
+        "createdAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

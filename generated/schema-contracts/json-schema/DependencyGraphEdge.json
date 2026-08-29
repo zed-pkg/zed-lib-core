@@ -1,0 +1,110 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DependencyGraphEdge.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "graphArtifactId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "ordinal": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "fromRegistryId": {
+            "type": "string"
+        },
+        "fromOrgSlug": {
+            "type": "string"
+        },
+        "fromPackageName": {
+            "type": "string"
+        },
+        "fromVersion": {
+            "type": "string"
+        },
+        "fromPackageId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "fromPackageVersionId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "toRegistryId": {
+            "type": "string"
+        },
+        "toOrgSlug": {
+            "type": "string"
+        },
+        "toPackageName": {
+            "type": "string"
+        },
+        "toVersion": {
+            "type": "string"
+        },
+        "toPackageId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "toPackageVersionId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "requirement": {
+            "type": "string"
+        },
+        "dependencyKind": {
+            "type": "string"
+        },
+        "optional": {
+            "type": "boolean"
+        },
+        "defaultFeatures": {
+            "type": "boolean"
+        },
+        "features": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "target": {
+            "type": "string"
+        },
+        "minimumDepth": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "graphArtifactId",
+        "ordinal",
+        "fromRegistryId",
+        "fromOrgSlug",
+        "fromPackageName",
+        "toRegistryId",
+        "toOrgSlug",
+        "toPackageName",
+        "dependencyKind",
+        "optional",
+        "defaultFeatures",
+        "features",
+        "minimumDepth",
+        "createdAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

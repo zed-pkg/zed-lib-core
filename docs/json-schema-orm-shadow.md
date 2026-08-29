@@ -31,6 +31,11 @@ The same JSON Schema deterministically emits:
 - shared entity descriptors and stable identity metadata for Rust, TypeScript,
   Go, and Dart
 
+The same locked shadow also generates TypeSpec, Draft 2020-12 JSON Schema, and
+proto3 under `generated/schema-contracts/**`. That separate fan-out is checked
+by `tools/typespec-protobuf-parity.mjs`; its stable field-number and declared
+representation-loss rules are documented in `docs/typespec-protobuf-shadow.md`.
+
 The ORM files are adapters. They do not own migrations. In particular, Ent
 models use `entsql.Skip()` and composite-key tables are emitted as `ent.View`
 models so Ent cannot inject a synthetic key or mutate the schema.
@@ -87,6 +92,8 @@ node tools/schema-shadow-codegen.mjs
 node tools/schema-shadow-codegen.mjs --check
 node tools/check-schema-shadow.mjs . ../zed-interfaces
 node --test tests/schema-shadow.test.mjs
+npm --prefix schema-tooling run contracts:check
+node --test tests/typespec-protobuf-parity.test.mjs
 ```
 
 Generation requires Node.js and `gofmt`; it has no npm dependency install step.

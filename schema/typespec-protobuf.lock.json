@@ -1,0 +1,307 @@
+{
+  "formatVersion": 1,
+  "messages": {
+    "ApiToken": {
+      "fields": {
+        "createdAt": 10,
+        "expiresAt": 8,
+        "id": 1,
+        "lastUsedAt": 7,
+        "name": 2,
+        "orgId": 4,
+        "revokedAt": 9,
+        "role": 6,
+        "tokenHash": 3,
+        "updatedAt": 11,
+        "userId": 5
+      },
+      "reserved": []
+    },
+    "AuditLog": {
+      "fields": {
+        "action": 5,
+        "actorUserId": 3,
+        "apiTokenId": 4,
+        "clientIpHash": 9,
+        "createdAt": 10,
+        "detail": 8,
+        "entityId": 7,
+        "entityType": 6,
+        "id": 1,
+        "orgId": 2
+      },
+      "reserved": []
+    },
+    "DependencyGraphArtifact": {
+      "fields": {
+        "createdAt": 17,
+        "cycleCount": 16,
+        "document": 12,
+        "edgeCount": 14,
+        "enabledFeatures": 11,
+        "graphDigest": 5,
+        "graphKind": 3,
+        "id": 1,
+        "maxDepth": 15,
+        "nodeCount": 13,
+        "registryCheckpoint": 9,
+        "resolutionInputDigest": 8,
+        "resolverName": 6,
+        "resolverVersion": 7,
+        "rootPackageVersionId": 2,
+        "schemaVersion": 4,
+        "sealedAt": 18,
+        "target": 10
+      },
+      "reserved": []
+    },
+    "DependencyGraphEdge": {
+      "fields": {
+        "createdAt": 23,
+        "defaultFeatures": 19,
+        "dependencyKind": 17,
+        "features": 20,
+        "fromOrgSlug": 5,
+        "fromPackageId": 8,
+        "fromPackageName": 6,
+        "fromPackageVersionId": 9,
+        "fromRegistryId": 4,
+        "fromVersion": 7,
+        "graphArtifactId": 2,
+        "id": 1,
+        "minimumDepth": 22,
+        "optional": 18,
+        "ordinal": 3,
+        "requirement": 16,
+        "target": 21,
+        "toOrgSlug": 11,
+        "toPackageId": 14,
+        "toPackageName": 12,
+        "toPackageVersionId": 15,
+        "toRegistryId": 10,
+        "toVersion": 13
+      },
+      "reserved": []
+    },
+    "EntityEmbedding": {
+      "fields": {
+        "contentPreview": 9,
+        "contentSha256": 8,
+        "createdAt": 10,
+        "embedding": 6,
+        "embeddingDimensions": 7,
+        "embeddingModel": 5,
+        "entityId": 3,
+        "entityType": 2,
+        "id": 1,
+        "orgId": 4,
+        "updatedAt": 11
+      },
+      "reserved": []
+    },
+    "Org": {
+      "fields": {
+        "createdAt": 8,
+        "createdByUserId": 6,
+        "description": 4,
+        "id": 1,
+        "isSoftDeleted": 7,
+        "name": 3,
+        "settings": 5,
+        "slug": 2,
+        "updatedAt": 9
+      },
+      "reserved": []
+    },
+    "OrgInvitation": {
+      "fields": {
+        "acceptedAt": 8,
+        "acceptedByUserId": 9,
+        "createdAt": 11,
+        "email": 4,
+        "expiresAt": 7,
+        "id": 1,
+        "invitedByUserId": 3,
+        "orgId": 2,
+        "revokedAt": 10,
+        "role": 5,
+        "tokenHash": 6
+      },
+      "reserved": []
+    },
+    "OrgMember": {
+      "fields": {
+        "createdAt": 4,
+        "orgId": 1,
+        "role": 3,
+        "updatedAt": 5,
+        "userId": 2
+      },
+      "reserved": []
+    },
+    "Package": {
+      "fields": {
+        "config": 11,
+        "createdAt": 19,
+        "createdByUserId": 17,
+        "description": 5,
+        "downloadCount": 12,
+        "firstPublishedAt": 15,
+        "homepageUrl": 9,
+        "id": 1,
+        "isSoftDeleted": 18,
+        "keywords": 10,
+        "latestVersion": 14,
+        "name": 4,
+        "orgId": 2,
+        "projectId": 3,
+        "repoUrl": 8,
+        "updatedAt": 20,
+        "vcs": 7,
+        "versionCount": 13,
+        "visibility": 6,
+        "visibilityChangedAt": 16
+      },
+      "reserved": []
+    },
+    "PackageDownload": {
+      "fields": {
+        "apiTokenId": 5,
+        "bytesSent": 8,
+        "clientIpHash": 9,
+        "createdAt": 11,
+        "downloadedByUserId": 4,
+        "format": 7,
+        "id": 1,
+        "packageId": 2,
+        "packageVersionId": 3,
+        "source": 6,
+        "userAgent": 10
+      },
+      "reserved": []
+    },
+    "PackageLicense": {
+      "fields": {
+        "createdAt": 10,
+        "id": 1,
+        "isPrimary": 9,
+        "kind": 4,
+        "name": 6,
+        "packageId": 2,
+        "packageVersionId": 3,
+        "spdxId": 5,
+        "textBody": 8,
+        "updatedAt": 11,
+        "url": 7
+      },
+      "reserved": []
+    },
+    "PackageUpload": {
+      "fields": {
+        "apiTokenId": 12,
+        "clientIpHash": 13,
+        "completedAt": 17,
+        "createdAt": 18,
+        "error": 15,
+        "format": 8,
+        "id": 1,
+        "packageId": 2,
+        "packageVersionId": 3,
+        "requestedVersion": 4,
+        "sha256": 10,
+        "sizeBytes": 9,
+        "startedAt": 16,
+        "status": 5,
+        "storageBackend": 6,
+        "storageKey": 7,
+        "updatedAt": 19,
+        "uploadedByUserId": 11,
+        "userAgent": 14
+      },
+      "reserved": []
+    },
+    "PackageVersion": {
+      "fields": {
+        "artifactKey": 10,
+        "downloadCount": 12,
+        "format": 7,
+        "id": 1,
+        "manifest": 11,
+        "packageId": 2,
+        "publishedAt": 17,
+        "publishedByUserId": 16,
+        "sha256": 5,
+        "sizeBytes": 6,
+        "vcsCommit": 9,
+        "vcsTag": 8,
+        "version": 3,
+        "versionScheme": 4,
+        "yanked": 13,
+        "yankedAt": 14,
+        "yankedReason": 15
+      },
+      "reserved": []
+    },
+    "Project": {
+      "fields": {
+        "createdAt": 10,
+        "createdByUserId": 8,
+        "description": 5,
+        "id": 1,
+        "isSoftDeleted": 9,
+        "name": 4,
+        "orgId": 2,
+        "settings": 7,
+        "slug": 3,
+        "updatedAt": 11,
+        "visibility": 6
+      },
+      "reserved": []
+    },
+    "ProjectInvitation": {
+      "fields": {
+        "acceptedAt": 8,
+        "acceptedByUserId": 9,
+        "createdAt": 11,
+        "email": 4,
+        "expiresAt": 7,
+        "id": 1,
+        "invitedByUserId": 3,
+        "projectId": 2,
+        "revokedAt": 10,
+        "role": 5,
+        "tokenHash": 6
+      },
+      "reserved": []
+    },
+    "ProjectMember": {
+      "fields": {
+        "createdAt": 4,
+        "projectId": 1,
+        "role": 3,
+        "updatedAt": 5,
+        "userId": 2
+      },
+      "reserved": []
+    },
+    "User": {
+      "fields": {
+        "authRealm": 3,
+        "avatarUrl": 6,
+        "createdAt": 9,
+        "displayName": 5,
+        "email": 4,
+        "id": 1,
+        "isSoftDeleted": 8,
+        "settings": 7,
+        "sharedAuthSubject": 2,
+        "updatedAt": 10
+      },
+      "reserved": []
+    }
+  },
+  "package": "zed.registry.v1",
+  "retiredMessages": {},
+  "source": "schema/persistence.schema.json",
+  "sourceShapeSha256": "bfa3d54c5fc5d4f2fb3a448e7be01f8c99a3bb37169fd951ff148be7c87a085a"
+}

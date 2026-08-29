@@ -8,11 +8,17 @@
     "drift:check": "node ../tools/check-schema-shadow.mjs",
     "ddl:roundtrip:check": "node ../tools/ddl-first-orm-roundtrip.mjs --check",
     "ddl:roundtrip:write": "node ../tools/ddl-first-orm-roundtrip.mjs --write",
-    "test": "node --test ../tests/schema-shadow.test.mjs ../tests/ddl-first-orm-roundtrip.test.mjs"
+    "contracts:check": "node ../tools/typespec-protobuf-parity.mjs --check",
+    "contracts:write": "node ../tools/typespec-protobuf-parity.mjs --write",
+    "test": "node --test ../tests/schema-shadow.test.mjs ../tests/ddl-first-orm-roundtrip.test.mjs ../tests/typespec-protobuf-parity.test.mjs"
   },
   "devDependencies": {
+    "@typespec/compiler": "1.15.0",
+    "@typespec/json-schema": "1.15.0",
+    "@typespec/protobuf": "0.85.0",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
-    "pg": "8.23.0"
+    "pg": "8.23.0",
+    "protobufjs": "8.8.0"
   }
 }

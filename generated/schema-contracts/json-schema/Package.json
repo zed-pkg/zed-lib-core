@@ -1,0 +1,99 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Package.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "orgId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "projectId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "name": {
+            "type": "string"
+        },
+        "description": {
+            "type": "string"
+        },
+        "visibility": {
+            "type": "string"
+        },
+        "vcs": {
+            "type": "string"
+        },
+        "repoUrl": {
+            "type": "string"
+        },
+        "homepageUrl": {
+            "type": "string"
+        },
+        "keywords": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "config": {
+            "type": "string",
+            "contentEncoding": "base64"
+        },
+        "downloadCount": {
+            "type": "string"
+        },
+        "versionCount": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "latestVersion": {
+            "type": "string"
+        },
+        "firstPublishedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "visibilityChangedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "createdByUserId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "isSoftDeleted": {
+            "type": "boolean"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "orgId",
+        "name",
+        "visibility",
+        "vcs",
+        "repoUrl",
+        "keywords",
+        "config",
+        "downloadCount",
+        "versionCount",
+        "isSoftDeleted",
+        "createdAt",
+        "updatedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

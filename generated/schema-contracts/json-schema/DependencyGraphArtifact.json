@@ -1,0 +1,96 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DependencyGraphArtifact.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "rootPackageVersionId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "graphKind": {
+            "type": "string"
+        },
+        "schemaVersion": {
+            "type": "string"
+        },
+        "graphDigest": {
+            "type": "string"
+        },
+        "resolverName": {
+            "type": "string"
+        },
+        "resolverVersion": {
+            "type": "string"
+        },
+        "resolutionInputDigest": {
+            "type": "string"
+        },
+        "registryCheckpoint": {
+            "type": "string"
+        },
+        "target": {
+            "type": "string",
+            "contentEncoding": "base64"
+        },
+        "enabledFeatures": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "document": {
+            "type": "string",
+            "contentEncoding": "base64"
+        },
+        "nodeCount": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "edgeCount": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "maxDepth": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "cycleCount": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "sealedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "rootPackageVersionId",
+        "graphKind",
+        "schemaVersion",
+        "graphDigest",
+        "target",
+        "enabledFeatures",
+        "document",
+        "nodeCount",
+        "edgeCount",
+        "maxDepth",
+        "cycleCount",
+        "createdAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

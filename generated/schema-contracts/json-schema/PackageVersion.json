@@ -1,0 +1,81 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "PackageVersion.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "packageId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "version": {
+            "type": "string"
+        },
+        "versionScheme": {
+            "type": "string"
+        },
+        "sha256": {
+            "type": "string"
+        },
+        "sizeBytes": {
+            "type": "string"
+        },
+        "format": {
+            "type": "string"
+        },
+        "vcsTag": {
+            "type": "string"
+        },
+        "vcsCommit": {
+            "type": "string"
+        },
+        "artifactKey": {
+            "type": "string"
+        },
+        "manifest": {
+            "type": "string",
+            "contentEncoding": "base64"
+        },
+        "downloadCount": {
+            "type": "string"
+        },
+        "yanked": {
+            "type": "boolean"
+        },
+        "yankedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "yankedReason": {
+            "type": "string"
+        },
+        "publishedByUserId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "packageId",
+        "version",
+        "versionScheme",
+        "sha256",
+        "sizeBytes",
+        "format",
+        "artifactKey",
+        "manifest",
+        "downloadCount",
+        "yanked",
+        "publishedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

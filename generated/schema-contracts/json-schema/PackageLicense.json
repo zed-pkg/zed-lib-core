@@ -1,0 +1,56 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "PackageLicense.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "packageId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "packageVersionId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "kind": {
+            "type": "string"
+        },
+        "spdxId": {
+            "type": "string"
+        },
+        "name": {
+            "type": "string"
+        },
+        "url": {
+            "type": "string"
+        },
+        "textBody": {
+            "type": "string"
+        },
+        "isPrimary": {
+            "type": "boolean"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": [
+        "id",
+        "packageId",
+        "kind",
+        "isPrimary",
+        "createdAt",
+        "updatedAt"
+    ],
+    "unevaluatedProperties": {
+        "not": {}
+    }
+}

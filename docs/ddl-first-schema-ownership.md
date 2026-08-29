@@ -17,6 +17,8 @@ authority. SeaORM and Drizzle are projections with different jobs:
 | SeaORM CLI | PostgreSQL -> Rust entities | no | compile-time Rust query model used behind the opaque ORM boundary |
 | Drizzle Kit pull | PostgreSQL -> TypeScript schema | no | independent structural view of the applied DDL |
 | Drizzle Kit export | TypeScript schema -> SQL | no | proves that an ORM in the toolchain can emit SQL and exposes what that model loses |
+| TypeSpec | locked persistence shadow -> TypeSpec | no | one generated contract surface for standard JSON Schema and Protobuf emitters |
+| TypeSpec JSON Schema + Protobuf | TypeSpec -> cross-runtime artifacts | no | checks 17 messages, 213 fields, stable wire numbers, presence, and declared representation loss |
 | declarative-migrations | released desired DDL <-> live database | plan authority only | produces the reviewed drift plan; a separate job applies an approved plan |
 
 This deliberately does not promote `schema/persistence.schema.json` to
@@ -120,6 +122,16 @@ The current Zed desired state contains 17 tables, 213 columns, 40 foreign keys,
 profile records that zero so adding policies becomes an explicit reviewed
 change rather than an assumption.
 
+`tools/typespec-protobuf-parity.mjs` adds a second fan-out cross-check from the
+locked persistence shadow. The pinned official TypeSpec emitters generate Draft
+2020-12 JSON Schema and proto3, while an independent parser verifies every
+message, field, type, presence label, and field number. The compatibility lock
+reserves removed Protobuf names and numbers. Its manifest explicitly records
+nullable-as-optional, opaque JSON bytes, RFC 3339 timestamp strings, and JSON
+decimal-string `int64` transformations; none of those projections can weaken or
+replace the authored PostgreSQL semantics. See
+`docs/typespec-protobuf-shadow.md`.
+
 ## declarative-migrations handoff
 
 The deployment repository should contain configuration, not product SQL. A
@@ -161,7 +173,8 @@ flip:
 3. Import the exact reviewed files without rewriting applied migrations. Record
    the old repository revision and blob hashes as historical provenance.
 4. Add disposable-Postgres generation for SeaORM and the companion ORM, plus
-   catalog/guard/RLS tests. Generated SQL remains review evidence.
+   TypeSpec JSON Schema/Protobuf projection checks and catalog/guard/RLS tests.
+   Generated SQL and wire artifacts remain review evidence.
 5. Publish a real immutable Zed package and test it from an isolated consumer,
    including target path resolution and execution—not only source tests.
 6. Run declarative-migrations in plan-only mode against staging and production
