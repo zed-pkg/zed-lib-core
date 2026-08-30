@@ -12,8 +12,8 @@ exact source commits are recorded in [`PREDECESSOR_MIGRATION.md`](PREDECESSOR_MI
 
 | Path | Package | What it is |
 | --- | --- | --- |
-| `src/rust-orm` | `zed-orm-core` | SeaORM registry entities, named data-plane operations, migration runner, and opaque connection boundary |
-| `src/rust-orm/sql` | `zed-schema` | Dependency-free authored DDL and immutable forward migrations for declarative-migrations |
+| `src/rust-orm` | `zed-orm-core` | Current SeaORM entities and opaque named operations; target Diesel-primary/SeaORM-secondary runtime |
+| `src/rust-orm/sql` | `zed-schema` | Current immutable DDL baseline and forward migrations; target reviewed dual-source desired release for declarative-migrations |
 | `src/rust` | `zed-lib` | Version resolution and policy over the shared contract types |
 | `src/ts` | `@zed-pkg/zed-lib` | The same resolution behavior, natively in TypeScript |
 | `src/dart` | `zed_lib` | The same resolution behavior, natively in Dart |
@@ -27,15 +27,20 @@ authorities.
 
 Three rules define the crate:
 
-1. **The schema belongs to this product package.** Zed registry DDL and
-   forward-only migrations are authored in `src/rust-orm/sql`. Its nested,
-   standalone Zed manifest exposes that narrow boundary to
-   declarative-migrations. `shared-defs.lock.json` now records historical
-   import provenance only; it is not a dependency or change path.
+1. **The schema belongs to this product package.** The target sources are an
+   authored TypeSpec P0 canonical AST, an independently authored JSON Schema P1
+   secondary-primary veto, and a common PostgreSQL extension bundle. The
+   current DDL and forward-only migrations in `src/rust-orm/sql` remain the
+   immutable deployed baseline until the dual-source parity and migration
+   gates pass. Its nested Zed manifest exposes the narrow desired-release
+   boundary to declarative-migrations. `shared-defs.lock.json` records
+   historical import provenance only; it is not a dependency or change path.
 2. **Raw sessions do not escape.** Consumers get an opaque `ReadContext` or
    `WriteContext` and call named operations in `read`, `registry`, `write`, and
-   the feature-gated `invitations` module. SeaORM connections and query builders
-   stay private to the crate.
+   the feature-gated `invitations` module. The current SeaORM connections and
+   query builders stay private; the target Diesel connections and generated
+   schema are private too. Diesel becomes the primary runtime while SeaORM is
+   retained as a secondary DB-first parity surface.
 3. **Writes are opt-in.** Default builds cannot compile a write symbol
    (`compile_fail` doctests prove it). API servers enable `read-write`; only the
    discrete DPM migration job enables `migrate`. The feature split expresses
@@ -146,5 +151,6 @@ default and must point at a disposable database — one of them attempts DDL to
 prove the read-only identity is denied.
 
 See [`docs/ddl-first-schema-ownership.md`](docs/ddl-first-schema-ownership.md)
-for the fleet ownership pattern, Drizzle/SeaORM roles, declarative-migrations
-handoff, and staged removal of product SQL from the shared repository.
+for the dual TypeSpec/JSON-Schema authority model, Diesel/SeaORM roles,
+declarative-migrations handoff, and staged removal of product SQL from the
+shared repository.
