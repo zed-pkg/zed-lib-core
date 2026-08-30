@@ -287,6 +287,9 @@ pub async fn semantic_search(
     .await
 }
 
+/// Insert or refresh an embedding without changing the dimensions of an existing
+/// model/content identity. A different dimension is rejected atomically by the
+/// database; callers must not truncate, pad, or silently overwrite stored vectors.
 #[cfg(feature = "read-write")]
 pub async fn upsert_embedding(
     context: &WriteContext,
@@ -325,6 +328,7 @@ DO UPDATE SET
     embedding_dimensions = EXCLUDED.embedding_dimensions,
     content_preview = EXCLUDED.content_preview,
     updated_at = clock_timestamp()
+WHERE zed_entity_embeddings.embedding_dimensions = EXCLUDED.embedding_dimensions
 RETURNING id
 "#,
         [
@@ -344,7 +348,12 @@ RETURNING id
         .query_one(statement)
         .await
         .map_err(OrmError::from_db_err)?
-        .ok_or_else(|| OrmError::database("embedding upsert returned no id"))?
+        .ok_or_else(|| {
+            OrmError::policy(
+                "embedding dimensions conflict with the existing model/content identity; \
+                 retain the existing dimensions or use a distinct versioned model identity",
+            )
+        })?
         .try_get("", "id")
         .map_err(OrmError::database)
 }
