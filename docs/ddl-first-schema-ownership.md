@@ -1,201 +1,253 @@
-# DDL-first product schema ownership
+# Dual-source product schema ownership
 
-## Decision
+## Decision and transition status
 
-Each product organization owns its database schema in exactly one Zed package.
-The owner is the product's `*-orm-core` repository when that repository exists;
-otherwise it is a nested package beside the ORM implementation in `*-lib-core`.
-`zed-pkg/zed-lib-core` uses the second form because the former `zed-orm-core`
-history has already been merged here.
+Each product organization owns its persistence model, product SQL, generated
+ORM artifacts, and migration evidence. For Zed Pkg that owner is
+`zed-pkg/zed-lib-core`; the former standalone `zed-orm-core` history has already
+been merged here and must not be revived as a competing source.
 
-The authored PostgreSQL DDL and immutable forward migrations are the migration
-authority. SeaORM and Drizzle are projections with different jobs:
+The target has two independently authored model authorities:
 
-| Layer | Direction | Authority | Purpose |
-| --- | --- | --- | --- |
-| `src/rust-orm/sql/**` | authored files -> PostgreSQL | yes | tables, constraints, functions, triggers, grants, ownership, RLS, guard SQLSTATEs, and ledger-safe forward changes |
-| SeaORM CLI | PostgreSQL -> Rust entities | no | compile-time Rust query model used behind the opaque ORM boundary |
-| Drizzle Kit pull | PostgreSQL -> TypeScript schema | no | independent structural view of the applied DDL |
-| Drizzle Kit export | TypeScript schema -> SQL | no | proves that an ORM in the toolchain can emit SQL and exposes what that model loses |
-| TypeSpec | locked persistence shadow -> TypeSpec | no | one generated contract surface for standard JSON Schema and Protobuf emitters |
-| TypeSpec JSON Schema + Protobuf | TypeSpec -> cross-runtime artifacts | no | checks 17 messages, 213 fields, stable wire numbers, presence, and declared representation loss |
-| declarative-migrations | released desired DDL <-> live database | plan authority only | produces the reviewed drift plan; a separate job applies an approved plan |
+- **P0 — TypeSpec canonical AST.** TypeSpec carries the canonical names,
+  identity, references, wire contracts, annotations, and emitter extension
+  points.
+- **P1 — independently authored JSON Schema secondary-primary.** This tree is
+  maintained separately, is never overwritten by a TypeSpec emitter, and has
+  release-veto power when it exposes a semantic mismatch.
 
-This deliberately does not promote `schema/persistence.schema.json` to
-model-first authority. That shadow remains useful and round-trip capable, but a
-future promotion is a separate project with its own semantic-completeness gate.
+“Canonical” selects P0 for naming and conflict resolution; it does not reduce
+P1 to generated documentation. Both sources produce candidates, and an
+unexplained difference blocks promotion. A TypeSpec-emitted JSON Schema is a
+third, diagnostic artifact stored under a generated path, not the P1 input.
 
-## Repository boundary
+This repository is still in the DDL-first transition phase. The checked-in
+`src/rust-orm/sql/**` DDL and immutable forward migrations remain the deployed
+P2 baseline until the dual-source emitters, parity gates, live-catalog
+readback, and migration rehearsal are complete. Existing DDL must not be
+silently regenerated or applied migrations rewritten merely to declare the new
+architecture finished.
 
-The source repository exposes two independently installable Zed packages, so
-consumers do not have to know repository layout:
+## Authority and projection model
 
-- `src/rust-orm/.zpkg.toml` -> `zed-pkg/zed-orm-core`: the opaque SeaORM/query
-  boundary used by web, API, and admin servers. Default features are read-only;
-  writes and migrations remain separately gated.
-- `src/rust-orm/sql/.zpkg.toml` -> `zed-pkg/zed-schema`: only authored DDL,
-  immutable forward migrations, and package evidence used by the migration
-  planner/job.
+| Layer | Direction | Target role |
+| --- | --- | --- |
+| TypeSpec P0 | authored model -> SQL/IR/Diesel/wire candidates | canonical model AST and first release candidate |
+| JSON Schema P1 | independently authored model -> SQL/IR/Diesel/wire candidates | secondary-primary cross-check and independent release veto |
+| PostgreSQL extension E | authored SQL fragments -> both candidates | semantics the common model cannot safely express: RLS, grants, functions, triggers, special checks, indexes, ownership, and ledger rules |
+| Current `src/rust-orm/sql/**` P2 | reviewed DDL -> PostgreSQL | immutable deployed baseline during transition; later a generated-and-reviewed desired release plus authored E |
+| Diesel + `diesel-async` | normalized model -> primary Rust runtime | compile-time checked schema/models and named operations; schema diff may draft only the subset it represents |
+| SeaORM CLI | scratch PostgreSQL -> secondary Rust entities | independent DB-first catalog readback; never the DDL source |
+| Drizzle pull/export | scratch PostgreSQL <-> TypeScript shadow | additional lossy structural observer, not a migration authority |
+| TypeSpec JSON Schema/Protobuf emitters | P0 -> generated wire artifacts | diagnostic and cross-runtime compatibility evidence |
+| `declarative-migrations` | desired release <-> live database | reviewed plan, shadow verification, apply, and convergence evidence |
 
-The ORM and schema are intentionally nested standalone packages rather than
-root polyglot targets. Zed target fan-out currently preserves root dependencies
-and the root smoke test. Here that would give a data-only schema artifact an
-unnecessary `zed-interfaces` dependency and would give both artifacts a
-conformance-corpus smoke test for files they do not contain. Separate manifests
-let the ORM retain its real interface dependency while the schema remains
-dependency-free, and each package tests the files and behavior actually present
-in its installed artifact.
+The PostgreSQL extension bundle E is applied identically to both P0 and P1 SQL
+candidates. It must not contain two divergent copies of a table definition. If
+a PostgreSQL feature cannot be represented by both models, the parity manifest
+records the exact representation loss and the authored extension that restores
+the required database behavior.
+
+## Repository and Zed package boundary
+
+The source repository exposes independently installable artifacts so consumers
+do not need to know its directory layout:
+
+- `zed-pkg/zed-schema`: immutable desired SQL, forward migrations, ownership
+  manifest, source/candidate digests, and parity evidence for the migration
+  planner;
+- `zed-pkg/zed-orm-core`: opaque Diesel-primary/SeaORM-secondary runtime for
+  web, API, and admin services; and
+- root `zed-lib-core` targets: domain services and generation/certification
+  tooling, without copied SQL in downstream applications.
+
+The current nested manifests at `src/rust-orm/.zpkg.toml` and
+`src/rust-orm/sql/.zpkg.toml` remain the publication boundaries during the
+transition. One coordinated source release binds P0, P1, extension E, desired
+SQL, migrations, ORM manifests, and evidence to the same source commit, while
+each package retains its own immutable artifact digest.
+
+For organizations that keep lib-core and orm-core in separate repositories,
+the required dependency direction is:
+
+```text
+*-lib-core@schema-release
+       |
+       v
+*-orm-core@runtime-release
+       |
+       v
+web / api / admin consumers by explicit capability
+
+declarative-migrations job -> *-lib-core schema artifact
+```
+
+`*-orm-core` consumes an exact lib-core release through Zed. Lib-core must not
+depend back on orm-core merely to obtain its own model or desired SQL.
+Interfaces may be shared independently, but an interfaces repository does not
+own database behavior. In this merged Zed repository the same graph is
+expressed through separate nested package manifests and release coordinates.
 
 No consumer reads a GitHub raw URL, a submodule path, or
 `k8s-libs-and-shared-defs/pg-defs/schema/orgs/...`. It resolves an immutable
-`org/package@version` through Zed. One coordinated source release therefore
-binds the Rust entities, authored DDL, forward migrations, and generated parity
-evidence to the same source commit while each package keeps its own artifact
-digest.
-
-For organizations that keep `*-lib-core` and `*-orm-core` separate, use this
-one-way graph:
-
-```text
-*-interfaces
-      ^
-      |
-*-orm-core  -- nested <prefix>-orm-core + <prefix>-schema packages
-      ^
-      |
-*-lib-core  -- domain services, no copied DDL
-      ^
-      |
-web/api/admin/migration jobs
-```
-
-`*-lib-core` may depend on `*-orm-core` through Zed. The inverse edge is
-forbidden. If the repositories are merged, as they are here, the same logical
-boundary is expressed as independent ORM and schema manifests in the same
-source repository.
+`org/package@version` and verifies the published digest.
 
 ## What remains shared
 
-`ORESoftware/k8s-libs-and-shared-defs` should retain only genuinely
-cross-product database material: cluster bootstrap conventions, common role
-templates, extension policy, generic observability hooks, and compatibility
-shims that have multiple owners. Product tables, product functions, product RLS
-policies, product guard codes, and product migration histories belong to their
-organization package.
+`ORESoftware/k8s-libs-and-shared-defs` retains only genuinely cross-product
+database material: cluster bootstrap conventions, shared role templates,
+extension policy, generic observability hooks, and compatibility shims with
+multiple owners. Product tables, functions, RLS policies, guard codes, seed
+rules, and migration histories belong to Zed Pkg.
 
-The old Zed shared-definitions revision and blob hashes remain in
-`shared-defs.lock.json` as historical import evidence. They preserve the answer
-to “where did this exact deployed SQL come from?” and protect existing ledger
-identities. They no longer create a package dependency or require future schema
-changes to land in the shared repository first.
+The old shared-definitions revision and blob hashes remain in
+`shared-defs.lock.json` as historical import evidence. They answer where the
+deployed baseline came from and protect existing ledger identities; they do
+not create a current dependency or require new Zed schema work to land in the
+shared repository first.
 
-## Round-trip certification
+The central repository may later publish a generated fleet composition lock
+that lists product package coordinates and digests. It may not vendor editable
+copies of product SQL back into a second authority.
 
-`tools/ddl-first-orm-roundtrip.mjs` performs a fail-closed certification against
-an empty disposable PostgreSQL database:
+## Candidate generation and parity
 
-1. It accepts only a loopback PostgreSQL URL whose database name begins with
-   `zed_ddl_roundtrip_`, plus the explicit `DDL_ROUNDTRIP_ALLOW_WRITE=1` opt-in.
-2. It refuses a non-empty `public` schema, then applies only the authored
-   `registry.sql` with `ON_ERROR_STOP`.
-3. It verifies the live catalog and the `ZD001` through `ZD005` guard functions.
-4. It generates compact SeaORM entities with exactly `sea-orm-cli 1.1.19`.
-5. It introspects a Drizzle schema and exports SQL from that schema.
-6. It fails unless the one current Drizzle empty-string introspection defect is
-   the exact `zed_packages.repo_url` expression. The DDL is never weakened to
-   suit the generator.
-7. It sorts named metadata and table declarations and removes Drizzle's
-   catalog-order-dependent implicit B-tree operator-class annotations. This is
-   allowed only while authored DDL declares no explicit operator class; adding
-   one fails closed until the shadow generator learns to preserve it.
-8. It compares deterministic output with `generated/ddl-roundtrip/**`.
+The release pipeline builds two disposable databases from independent inputs:
 
-The generated Drizzle SQL intentionally lacks PostgreSQL functions, triggers,
-and `ZD001`-`ZD005`; that visible loss is a proof that it is not a replacement
-for authored DDL. RLS policies, grants, ownership, extensions, irreversible
-data transforms, and migration-ledger identity remain authored semantics even
-if a future Drizzle version can represent some of them.
+```text
+TypeSpec P0 -> SQL A + IR A + Diesel A
+JSON P1     -> SQL B + IR B + Diesel B
 
-The current Zed desired state contains 17 tables, 213 columns, 40 foreign keys,
-109 checks, 58 non-constraint secondary indexes, 15 application triggers, and
-8 `zed_*` functions. It currently has no `zed_*` RLS policies; the catalog
-profile records that zero so adding policies becomes an explicit reviewed
-change rather than an assumption.
+SQL A + extension E -> scratch PostgreSQL A -> SeaORM A + catalog A
+SQL B + extension E -> scratch PostgreSQL B -> SeaORM B + catalog B
+```
 
-`tools/typespec-protobuf-parity.mjs` adds a second fan-out cross-check from the
-locked persistence shadow. The pinned official TypeSpec emitters generate Draft
-2020-12 JSON Schema and proto3, while an independent parser verifies every
-message, field, type, presence label, and field number. The compatibility lock
-reserves removed Protobuf names and numbers. Its manifest explicitly records
-nullable-as-optional, opaque JSON bytes, RFC 3339 timestamp strings, and JSON
-decimal-string `int64` transformations; none of those projections can weaken or
-replace the authored PostgreSQL semantics. See
-`docs/typespec-protobuf-shadow.md`.
+Promotion requires normalized equivalence at five layers:
 
-## declarative-migrations handoff
+1. **source semantics:** entities, fields, identities, nullability, defaults,
+   constraints, relationships, deletion behavior, enums, and annotations;
+2. **database catalog:** tables, columns, types, sequences, keys, checks,
+   indexes, functions, triggers, policies, grants, ownership, extensions, and
+   publication membership;
+3. **ORM surfaces:** Diesel manifests A/B and SeaORM manifests A/B after
+   removing only documented generator-order noise;
+4. **behavior:** guard SQLSTATEs, RLS allow/deny matrices, transactions,
+   cascades, tenant/owner isolation, and invariant tests; and
+5. **wire compatibility:** TypeSpec, the independent JSON Schema tree,
+   TypeSpec-emitted JSON Schema, and Protobuf field numbers/presence/encoding.
 
-The deployment repository should contain configuration, not product SQL. A
-migration job receives these immutable inputs:
+Expected differences are classified as `equivalent`, `intentional-loss`,
+`extension-owned`, `temporary-transition`, or `blocking`. Every non-equivalent
+item needs a stable path, explanation, owner, test, and expiry/review condition.
+Normalization may remove ordering and formatting noise; it must never erase a
+default, constraint, RLS rule, function body, grant, identity, or wire-presence
+difference.
 
-- schema package coordinate (for Zed, `zed-pkg/zed-schema`), version, artifact
-  digest, and source commit;
-- destination database identity and engine version;
-- a read-only diff credential;
+Diesel is the primary Rust ORM because its explicit schema/model representation
+supports the main compile-time checked data path. `diesel migration generate
+--diff-schema` may propose structural migration fragments, but it does not
+cover all PostgreSQL defaults and custom constraints, much less every RLS
+policy, function, grant, or irreversible data step. Its output is a reviewed
+candidate, not the production plan.
+
+SeaORM remains deliberately useful as a secondary DB-first observer.
+`sea-orm-cli` is run only after each candidate is applied to scratch
+PostgreSQL. The generated entities test what the database actually accepted;
+they do not define the database in reverse.
+
+## Existing Zed certification during transition
+
+`tools/ddl-first-orm-roundtrip.mjs` remains a fail-closed certification of the
+current P2 baseline while the new emitters are built:
+
+1. it accepts only a loopback PostgreSQL database named with the
+   `zed_ddl_roundtrip_` prefix and explicit write opt-in;
+2. it refuses a non-empty `public` schema, applies `registry.sql`, and verifies
+   the catalog plus `ZD001` through `ZD005` guards;
+3. it generates SeaORM entities using the pinned CLI;
+4. it pulls and exports a Drizzle representation; and
+5. it compares deterministic generated evidence, allowing only explicitly
+   locked representation loss.
+
+The current desired state records 17 tables, 213 columns, 40 foreign keys, 109
+checks, 58 non-constraint secondary indexes, 15 application triggers, and 8
+`zed_*` functions. It records zero current `zed_*` RLS policies so that adding
+one is a visible reviewed change rather than an assumption.
+
+`tools/typespec-protobuf-parity.mjs` currently projects from the locked
+persistence shadow. That is valuable transition evidence, not yet the target
+P0/P1 architecture. Before promotion, TypeSpec must become the authored P0
+input and the JSON Schema tree must pass an independence/provenance audit so it
+can serve as P1. Stable Protobuf names and numbers remain locked, including
+reserved removed fields. See `docs/typespec-protobuf-shadow.md` for the current
+projection and its declared nullable, JSON, timestamp, and `int64` losses.
+
+## Declarative migration handoff
+
+The deployment repository stores configuration and package pins, not product
+SQL. A migration job receives:
+
+- the `zed-pkg/zed-schema` version, artifact digest, source commit, desired SQL
+  digest, and parity manifest digest;
+- the destination database identity and engine version;
+- a read-only diff credential; and
 - explicit environment and tenant scope.
 
-The planner resolves the Zed artifact, verifies its digest, and asks
-declarative-migrations to compare the desired DDL with the live catalog. It
-publishes a plan artifact keyed by the package digest, database fingerprint,
-and planner version. The apply job is separate: it requires the reviewed plan
-digest, rechecks the live fingerprint to reject stale plans, uses a migrator
-principal, and records the result. Web/API/admin servers never receive DDL
-credentials, and the diff job never receives apply credentials.
+The job resolves the Zed artifact, verifies all digests, dumps a fresh live
+catalog, and asks `declarative-migrations`/`dpm` for a plan. The plan artifact is
+bound to the package digest, live database fingerprint, and planner version.
+The separate apply job requires the reviewed plan digest, rejects a stale live
+fingerprint, uses the dedicated migrator principal, verifies convergence, and
+records evidence.
 
-This keeps coupling at three stable contracts:
-
-1. Zed package identity and immutable artifact resolution;
-2. the declarative-migrations plan/apply interface;
-3. PostgreSQL catalog semantics.
-
-Neither the planner nor the servers know the product repository's directory
-layout.
+Web/API/admin servers never receive DDL credentials and never migrate on
+startup. The diff job never receives apply credentials. Data backfills,
+ownership/role changes, irreversible transforms, and features outside the
+planner's catalog coverage are explicit companion steps; zero structural drift
+does not prove them correct.
 
 ## Fleet migration sequence
 
-Apply the move organization by organization, never as one fleet-wide pointer
-flip:
+Move one organization at a time:
 
-1. Inventory every SQL file, migration ledger, live database, writer, and
-   current shared-definition consumer. Classify shared platform SQL separately
-   from product SQL.
-2. Name one owner: `*-orm-core`, or a dependency-free nested schema package in
-   `*-lib-core`. Reject any domain schema that appears in both.
-3. Import the exact reviewed files without rewriting applied migrations. Record
-   the old repository revision and blob hashes as historical provenance.
-4. Add disposable-Postgres generation for SeaORM and the companion ORM, plus
-   TypeSpec JSON Schema/Protobuf projection checks and catalog/guard/RLS tests.
-   Generated SQL and wire artifacts remain review evidence.
-5. Publish a real immutable Zed package and test it from an isolated consumer,
-   including target path resolution and execution—not only source tests.
-6. Run declarative-migrations in plan-only mode against staging and production
-   with a read-only principal. Zero unexpected drift is the promotion gate.
-7. Pin web, API, and admin jobs to the released ORM package and the migration
-   job to the schema package from the same source release. Only the migration
-   job receives migration rights.
-8. Replace the shared repository's product SQL with a tombstone/ownership index
-   pointing to the package coordinate and last historical blob. Delete the
-   duplicate only after every consumer pin and deployment configuration has
-   moved.
-9. Rehearse an empty build, an upgrade from every deployed ledger version, and
-   rollback/restore. Then remove compatibility aliases in a later major
-   release.
+1. Inventory product SQL, live objects, ledgers, database topology, writers,
+   runtime roles, and every shared-definition consumer.
+2. Import exact deployed SQL and hashes as P2 historical provenance; do not
+   rewrite applied migrations or change namespaces during ownership transfer.
+3. Establish authored TypeSpec P0, independently maintained JSON Schema P1,
+   extension E, stable IDs, and the expected-divergence registry.
+4. Generate A/B candidates, apply each to disposable PostgreSQL, generate
+   Diesel and SeaORM surfaces, and pass source/catalog/ORM/behavior/wire parity.
+5. Publish candidate packages, test isolated Zed installation, and rehearse an
+   empty build plus upgrades from every deployed ledger version.
+6. Run `dpm` plan-only against staging and production with a read-only role;
+   review every expected and unexpected delta.
+7. Publish immutable schema and ORM releases, then pin migration and runtime
+   consumers to matching source/evidence digests.
+8. Replace the shared repository's product SQL with a generated ownership
+   pointer only after every consumer has moved and the live database converges.
+9. Remove compatibility aliases in a later reviewed major release.
 
 ## Release gates for this repository
 
-This repository is not consumable merely because the source branch is green.
-Both package manifests must validate with the fleet's Zed CLI, each package must
-be published to a working registry with an immutable digest/source commit, and
-isolated consumers must install both `zed-pkg/zed-orm-core` and
-`zed-pkg/zed-schema`. Only after that gate may server repositories replace
-their blocked ORM dependency coordinates or the shared repository remove its
-historical Zed SQL copy.
+The dual-source target is not complete until:
+
+- P0 and P1 are independently authored and protected from generator overwrite;
+- the A/B databases pass all five parity layers with reviewed divergences;
+- Zed manifests validate and isolated consumers install both packages by
+  immutable digest;
+- Diesel-primary named operations and SeaORM-secondary checks remain behind
+  the opaque capability boundary;
+- `dpm` plan, shadow verification, apply, and convergence evidence pass for the
+  deployed ledger lineage; and
+- server repositories no longer import Zed product SQL from the shared repo.
+
+Until those gates pass, current DDL remains the immutable deployed authority,
+and all generated dual-source output is candidate evidence only.
+
+## References
+
+- [Diesel schema-diff migration generation](https://diesel.rs/news/2_1_0_release.html)
+- [SeaORM database-to-entity generation](https://www.sea-ql.org/SeaORM/docs/0.12.x/generate-entity/sea-orm-cli/)
+- [TypeSpec custom emitters](https://typespec.io/docs/extending-typespec/emitters-basics/)
+- [Declarative Migrations](https://github.com/declarative-migrations/declarative-postgres-migrate.rs)
