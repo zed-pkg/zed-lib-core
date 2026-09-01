@@ -332,6 +332,19 @@ impl Default for LockManager {
     }
 }
 
+#[cfg(any(windows, test))]
+const WINDOWS_ERROR_SHARING_VIOLATION: i32 = 32;
+#[cfg(any(windows, test))]
+const WINDOWS_ERROR_LOCK_VIOLATION: i32 = 33;
+
+#[cfg(any(windows, test))]
+fn windows_lock_error_code_is_contention(raw_os_error: Option<i32>) -> bool {
+    matches!(
+        raw_os_error,
+        Some(WINDOWS_ERROR_SHARING_VIOLATION | WINDOWS_ERROR_LOCK_VIOLATION)
+    )
+}
+
 fn is_lock_contention(error: &std::io::Error) -> bool {
     if error.kind() == std::io::ErrorKind::WouldBlock {
         return true;
@@ -339,10 +352,11 @@ fn is_lock_contention(error: &std::io::Error) -> bool {
 
     #[cfg(windows)]
     {
-        // LockFileEx reports ordinary nonblocking contention through
-        // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
-        // `Other` rather than `WouldBlock`.
-        error.raw_os_error() == Some(33)
+        // Windows file-lock backends may report ordinary nonblocking
+        // contention as either ERROR_SHARING_VIOLATION (32) or
+        // ERROR_LOCK_VIOLATION (33). Rust does not consistently map
+        // either native code to ErrorKind::WouldBlock.
+        windows_lock_error_code_is_contention(error.raw_os_error())
     }
 
     #[cfg(not(windows))]
@@ -1162,11 +1176,39 @@ mod tests {
         assert!(!super::is_lock_contention(&error));
     }
 
+    #[test]
+    fn windows_native_contention_codes_are_classified_selectively() {
+        for code in [
+            super::WINDOWS_ERROR_SHARING_VIOLATION,
+            super::WINDOWS_ERROR_LOCK_VIOLATION,
+        ] {
+            assert!(
+                super::windows_lock_error_code_is_contention(Some(code)),
+                "Windows native error {code} must be treated as contention"
+            );
+        }
+        for code in [5, 6, 87] {
+            assert!(
+                !super::windows_lock_error_code_is_contention(Some(code)),
+                "unrelated Windows native error {code} must remain fatal"
+            );
+        }
+        assert!(!super::windows_lock_error_code_is_contention(None));
+    }
+
     #[cfg(windows)]
     #[test]
-    fn windows_lock_violation_is_classified_as_contention() {
-        let error = std::io::Error::from_raw_os_error(33);
-        assert!(super::is_lock_contention(&error));
+    fn windows_native_lock_errors_are_reported_as_contention() {
+        for code in [
+            super::WINDOWS_ERROR_SHARING_VIOLATION,
+            super::WINDOWS_ERROR_LOCK_VIOLATION,
+        ] {
+            let error = std::io::Error::from_raw_os_error(code);
+            assert!(
+                super::is_lock_contention(&error),
+                "Windows native error {code} must reach the contention path"
+            );
+        }
     }
 
     #[test]
