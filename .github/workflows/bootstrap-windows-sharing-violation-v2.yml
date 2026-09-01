@@ -1,0 +1,172 @@
+name: bootstrap Windows sharing-violation fix v2
+
+on:
+  push:
+    branches:
+      - fix/windows-sharing-violation-contention
+    paths:
+      - .github/workflows/bootstrap-windows-sharing-violation-v2.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-windows-sharing-violation-v2
+  cancel-in-progress: false
+
+jobs:
+  patch-test-and-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out the exact feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/windows-sharing-violation-contention
+          fetch-depth: 0
+
+      - name: Install the minimum supported Rust toolchain
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+        with:
+          toolchain: 1.88.0
+          components: rustfmt,clippy
+
+      - name: Apply the exact classifier and regression patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/lib.rs')
+          source = path.read_text(encoding='utf-8')
+          old_classifier = '''fn is_lock_contention(error: &std::io::Error) -> bool {
+              if error.kind() == std::io::ErrorKind::WouldBlock {
+                  return true;
+              }
+
+              #[cfg(windows)]
+              {
+                  // LockFileEx reports ordinary nonblocking contention through
+                  // ERROR_LOCK_VIOLATION (33), which Rust currently classifies as
+                  // `Other` rather than `WouldBlock`.
+                  error.raw_os_error() == Some(33)
+              }
+
+              #[cfg(not(windows))]
+              {
+                  false
+              }
+          }
+          '''
+          new_classifier = '''#[cfg(any(windows, test))]
+          const WINDOWS_ERROR_SHARING_VIOLATION: i32 = 32;
+          #[cfg(any(windows, test))]
+          const WINDOWS_ERROR_LOCK_VIOLATION: i32 = 33;
+
+          #[cfg(any(windows, test))]
+          fn windows_lock_error_code_is_contention(raw_os_error: Option<i32>) -> bool {
+              matches!(
+                  raw_os_error,
+                  Some(WINDOWS_ERROR_SHARING_VIOLATION | WINDOWS_ERROR_LOCK_VIOLATION)
+              )
+          }
+
+          fn is_lock_contention(error: &std::io::Error) -> bool {
+              if error.kind() == std::io::ErrorKind::WouldBlock {
+                  return true;
+              }
+
+              #[cfg(windows)]
+              {
+                  // Windows file-lock backends may report ordinary nonblocking
+                  // contention as either ERROR_SHARING_VIOLATION (32) or
+                  // ERROR_LOCK_VIOLATION (33). Rust does not consistently map
+                  // either native code to ErrorKind::WouldBlock.
+                  windows_lock_error_code_is_contention(error.raw_os_error())
+              }
+
+              #[cfg(not(windows))]
+              {
+                  false
+              }
+          }
+          '''
+          old_test = '''    #[cfg(windows)]
+              #[test]
+              fn windows_lock_violation_is_classified_as_contention() {
+                  let error = std::io::Error::from_raw_os_error(33);
+                  assert!(super::is_lock_contention(&error));
+              }
+          '''
+          new_test = '''    #[test]
+              fn windows_native_contention_codes_are_classified_selectively() {
+                  for code in [
+                      super::WINDOWS_ERROR_SHARING_VIOLATION,
+                      super::WINDOWS_ERROR_LOCK_VIOLATION,
+                  ] {
+                      assert!(
+                          super::windows_lock_error_code_is_contention(Some(code)),
+                          "Windows native error {code} must be treated as contention"
+                      );
+                  }
+                  for code in [5, 6, 87] {
+                      assert!(
+                          !super::windows_lock_error_code_is_contention(Some(code)),
+                          "unrelated Windows native error {code} must remain fatal"
+                      );
+                  }
+                  assert!(!super::windows_lock_error_code_is_contention(None));
+              }
+
+              #[cfg(windows)]
+              #[test]
+              fn windows_native_lock_errors_are_reported_as_contention() {
+                  for code in [
+                      super::WINDOWS_ERROR_SHARING_VIOLATION,
+                      super::WINDOWS_ERROR_LOCK_VIOLATION,
+                  ] {
+                      let error = std::io::Error::from_raw_os_error(code);
+                      assert!(
+                          super::is_lock_contention(&error),
+                          "Windows native error {code} must reach the contention path"
+                      );
+                  }
+              }
+          '''
+          if source.count(old_classifier) != 1:
+              raise SystemExit('expected exactly one current lock-contention classifier')
+          if source.count(old_test) != 1:
+              raise SystemExit('expected exactly one current Windows contention regression')
+          source = source.replace(old_classifier, new_classifier).replace(old_test, new_test)
+          path.write_text(source, encoding='utf-8', newline='\n')
+          PY
+          cargo fmt --all
+          git diff --check
+
+      - name: Run focused and complete validation
+        run: |
+          cargo test windows_native_contention_codes_are_classified_selectively -- --nocapture
+          cargo test --all-targets -- --nocapture
+          cargo clippy --all-targets -- -D warnings
+          python3 scripts/check-package-contract.py
+
+      - name: Commit only the reviewed Rust result
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f Cargo.lock
+          rm .github/workflows/bootstrap-windows-sharing-violation.yml
+          rm .github/workflows/bootstrap-windows-sharing-violation-v2.yml
+          git add src/lib.rs \
+            .github/workflows/bootstrap-windows-sharing-violation.yml \
+            .github/workflows/bootstrap-windows-sharing-violation-v2.yml
+          git diff --cached --check
+          test "$(git diff --cached --name-only | sort)" = "$(printf '%s\n' \
+            .github/workflows/bootstrap-windows-sharing-violation-v2.yml \
+            .github/workflows/bootstrap-windows-sharing-violation.yml \
+            src/lib.rs | sort)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(lock): classify Windows sharing violations as contention'
+          git push origin HEAD:fix/windows-sharing-violation-contention
