@@ -1,0 +1,129 @@
+name: retry or promote public intake persistence
+
+on:
+  push:
+    branches:
+      - feat/public-intake-persistence-clean
+    paths:
+      - .github/workflows/retry-or-promote-public-intake-persistence.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: promote-public-intake-persistence-clean
+  cancel-in-progress: false
+
+jobs:
+  retry-or-promote:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/public-intake-persistence-clean
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Retrigger unfinished materialization or create clean promotion head
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if test -e .github/workflows/finalize-public-intake-persistence.yml; then
+            printf '%s\n' "$(date -u +%FT%TZ)" > .finalize-public-intake-persistence-trigger
+            rm -f .github/workflows/retry-or-promote-public-intake-persistence.yml
+            git add -A
+            git diff --cached --check
+            git commit -m "ci(intake): retry final persistence verification"
+            git push origin HEAD:feat/public-intake-persistence-clean
+            echo "mode=retry" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if test -e .github/workflows/materialize-public-intake-persistence.yml; then
+            printf '%s\n' "$(date -u +%FT%TZ)" > .materialize-public-intake-persistence-trigger
+            rm -f .github/workflows/retry-or-promote-public-intake-persistence.yml
+            git add -A
+            git diff --cached --check
+            git commit -m "ci(intake): retry persistence materialization"
+            git push origin HEAD:feat/public-intake-persistence-clean
+            echo "mode=retry" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          test -s src/rust-orm/public_intake.rs
+          test -s src/rust-orm/sql/2026-09-02-public-intake.sql
+          test -s .github/workflows/public-intake-persistence.yml
+          grep -q "insert_public_intake_submission" src/rust-orm/write.rs
+          test ! -e .github/materialize
+
+          rm -f .github/workflows/retry-or-promote-public-intake-persistence.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "ci(intake): create clean persistence promotion head"
+          git push origin HEAD:feat/public-intake-persistence-clean
+          echo "mode=promote" >> "$GITHUB_OUTPUT"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Stop after a bounded retry
+        if: steps.prepare.outputs.mode == 'retry'
+        run: echo "Materialization was retriggered; no promotion was attempted."
+
+      - name: Verify base has not moved
+        if: steps.prepare.outputs.mode == 'promote'
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          PR_NUMBER=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/pulls?state=open&head=zed-pkg:feat/public-intake-persistence-clean" \
+            --jq '.[0].number')
+          test -n "$PR_NUMBER"
+          BASE_SHA=$(gh pr view "$PR_NUMBER" --json baseRefOid --jq .baseRefOid)
+          MAIN_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq .commit.sha)
+          test "$BASE_SHA" = "$MAIN_SHA"
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for exact clean-head checks
+        if: steps.prepare.outputs.mode == 'promote'
+        shell: bash
+        env:
+          CLEAN_HEAD: ${{ steps.prepare.outputs.head }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 80); do
+            JSON=$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/${GITHUB_REPOSITORY}/commits/${CLEAN_HEAD}/check-runs?per_page=100")
+            EXPECTED=$(jq '[.check_runs[] | select(.name == "rust-postgres-and-projections")] | length' <<<"$JSON")
+            EXPECTED_OK=$(jq '[.check_runs[] | select(.name == "rust-postgres-and-projections" and .status == "completed" and .conclusion == "success")] | length' <<<"$JSON")
+            BAD=$(jq '[.check_runs[] | select(.status == "completed" and (.conclusion | IN("failure", "cancelled", "timed_out", "action_required", "stale", "startup_failure")))] | length' <<<"$JSON")
+            PENDING=$(jq '[.check_runs[] | select(.status != "completed")] | length' <<<"$JSON")
+            if test "$EXPECTED" -ge 1 && test "$EXPECTED_OK" -ge 1 && test "$BAD" -eq 0 && test "$PENDING" -eq 0; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Exact clean-head checks did not reach an all-green terminal state" >&2
+          exit 1
+
+      - name: Mark ready and merge the exact checked head
+        if: steps.prepare.outputs.mode == 'promote'
+        shell: bash
+        env:
+          CLEAN_HEAD: ${{ steps.prepare.outputs.head }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh pr ready "$PR_NUMBER"
+          gh pr merge "$PR_NUMBER" --squash --match-head-commit "$CLEAN_HEAD"
