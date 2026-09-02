@@ -49,6 +49,7 @@ fn raw_orm_types_are_not_reexported() {
 fn every_write_symbol_is_feature_gated() {
     let library = read("lib.rs");
     assert!(library.contains("#[cfg(feature = \"read-write\")]\npub mod write;"));
+    assert!(library.contains("#[cfg(feature = \"read-write\")]\npub mod public_intake;"));
     assert!(library.contains("#[cfg(feature = \"read-write\")]\npub use connection"));
     assert!(library.contains("compile_fail"));
 
@@ -56,7 +57,7 @@ fn every_write_symbol_is_feature_gated() {
     assert!(cargo.contains("default = [\"read-only\"]"));
     assert!(cargo.contains("read-write = [\"read-only\"]"));
     assert!(cargo.contains(
-        "zed-interfaces = { git = \"https://github.com/zed-pkg/zed-interfaces.git\", rev = \"7d31f80dd8a310f218931165a3ad636a2f32b932\" }"
+        "zed-interfaces = { git = \"https://github.com/zed-pkg/zed-interfaces.git\", rev = \"70508770bc76bb4ea59a2e6da57a3c416044e96c\" }"
     ));
     assert!(!cargo.contains("../../../zed-interfaces"));
 }
@@ -154,14 +155,16 @@ fn product_schema_is_local_and_historical_import_provenance_is_exact() {
 }
 
 #[test]
-fn migration_ledger_keeps_base_graph_and_visibility_distinct() {
+fn migration_ledger_keeps_all_forward_steps_distinct() {
     let migrations = read("migrations.rs");
     assert!(migrations.contains("registry@c8bdc06d74746acc6439f9527ebd02697fdf028b"));
     assert!(migrations.contains("Self::HistoricalBase"));
     assert!(migrations.contains("Self::DependencyGraph"));
     assert!(migrations.contains("Self::VisibilityImmutability"));
+    assert!(migrations.contains("Self::PublicIntake"));
     assert!(migrations.contains("sql/2026-08-11-dependency-graph-artifacts.sql"));
     assert!(migrations.contains("sql/2026-08-11-public-visibility-is-permanent.sql"));
+    assert!(migrations.contains("sql/2026-09-02-public-intake.sql"));
 }
 
 #[cfg(feature = "migrate")]
@@ -169,10 +172,14 @@ fn migration_ledger_keeps_base_graph_and_visibility_distinct() {
 fn individual_migration_versions_are_public_and_distinct() {
     let graph = zed_orm_core::migrations::dependency_graph_version();
     let visibility = zed_orm_core::migrations::visibility_immutability_version();
+    let intake = zed_orm_core::migrations::public_intake_version();
     assert!(graph.ends_with(zed_orm_core::DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
     assert!(visibility.ends_with(zed_orm_core::VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
+    assert!(intake.starts_with("registry-public-intake@"));
     assert_ne!(graph, visibility);
-    assert_eq!(zed_orm_core::migrations::registry_version(), visibility);
+    assert_ne!(visibility, intake);
+    assert_ne!(graph, intake);
+    assert_eq!(zed_orm_core::migrations::registry_version(), intake);
 }
 
 #[test]
