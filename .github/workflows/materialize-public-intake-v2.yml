@@ -1,0 +1,224 @@
+name: materialize public intake persistence v2
+
+on:
+  push:
+    branches: [feat/public-intake-persistence-v1]
+    paths: [.public-intake-materialize-v2-trigger]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-public-intake-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out candidate branch with push credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: zed-lib
+          persist-credentials: true
+          show-progress: false
+
+      - name: Check out the exact merged public-intake contract
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: 70508770bc76bb4ea59a2e6da57a3c416044e96c
+          path: zed-interfaces
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+
+      - name: Materialize module exports, migration ledger, pins, formatting, and lockfile
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          CONTRACT = "70508770bc76bb4ea59a2e6da57a3c416044e96c"
+          OLD_CONTRACT = "7d31f80dd8a310f218931165a3ad636a2f32b932"
+          MIGRATION_SHA = "2abede6219ed71e08997a40076c34227cb65936c"
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one occurrence, found {count}: {old[:80]!r}")
+              target.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "src/rust-orm/Cargo.toml",
+              f'rev = "{OLD_CONTRACT}"',
+              f'rev = "{CONTRACT}"',
+          )
+
+          for path in sorted(Path(".github/workflows").glob("*.yml")):
+              if path.name.startswith("materialize-public-intake"):
+                  continue
+              text = path.read_text()
+              if OLD_CONTRACT in text:
+                  path.write_text(text.replace(OLD_CONTRACT, CONTRACT))
+
+          replace_once(
+              "src/rust-orm/lib.rs",
+              '#[cfg(feature = "read-write")]\npub mod publication;',
+              '#[cfg(feature = "read-write")]\npub mod public_intake;\n#[cfg(feature = "read-write")]\npub mod publication;',
+          )
+
+          public_intake = Path("src/rust-orm/public_intake.rs")
+          text = public_intake.read_text()
+          replace = "#[derive(Clone, Debug, PartialEq, Eq)]\npub struct NewPublicIntakeSubmission"
+          if text.count(replace) != 1:
+              raise SystemExit("public intake Debug derive anchor drifted")
+          text = text.replace(
+              replace,
+              "#[derive(Clone, PartialEq, Eq)]\npub struct NewPublicIntakeSubmission",
+              1,
+          )
+          marker = "impl NewPublicIntakeSubmission {"
+          debug_impl = '''impl fmt::Debug for NewPublicIntakeSubmission {
+              fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                  formatter
+                      .debug_struct("NewPublicIntakeSubmission")
+                      .field("request_id", &self.request_id)
+                      .field("kind", &self.kind)
+                      .field("source_host", &self.source_host)
+                      .field("consented_at", &self.consented_at)
+                      .field("marketing_consent", &self.marketing_consent)
+                      .finish_non_exhaustive()
+              }
+          }
+
+          '''
+          if text.count(marker) != 1:
+              raise SystemExit("public intake constructor anchor drifted")
+          public_intake.write_text(text.replace(marker, debug_impl + marker, 1))
+
+          migrations = Path("src/rust-orm/migrations.rs")
+          text = migrations.read_text()
+          visibility_sql = '''const VISIBILITY_IMMUTABILITY_SQL: &str =
+              include_str!("sql/2026-08-11-public-visibility-is-permanent.sql");'''
+          if text.count(visibility_sql) != 1:
+              raise SystemExit("visibility SQL anchor drifted")
+          text = text.replace(
+              visibility_sql,
+              visibility_sql + f'''
+
+          /// Forward-only encrypted commercial-intake storage.
+          const PUBLIC_INTAKE_SQL: &str = include_str!("sql/2026-09-02-public-intake.sql");
+          const PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX: &str = "{MIGRATION_SHA}";''',
+              1,
+          )
+
+          visibility_fn = '''pub fn visibility_immutability_version() -> String {
+              format!("registry-visibility-immutability@{VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX}")
+          }'''
+          if text.count(visibility_fn) != 1:
+              raise SystemExit("visibility version anchor drifted")
+          text = text.replace(
+              visibility_fn,
+              visibility_fn + '''
+
+          /// Ledger identity for the forward-only encrypted intake upgrade.
+          pub fn public_intake_version() -> String {
+              format!("registry-public-intake@{PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX}")
+          }''',
+              1,
+          )
+
+          replacements = [
+              (
+                  "/// [`dependency_graph_version`] and [`visibility_immutability_version`] when an\n/// individual migration identity is required.\npub fn registry_version() -> String {\n    visibility_immutability_version()\n}",
+                  "/// [`dependency_graph_version`], [`visibility_immutability_version`], and\n/// [`public_intake_version`] when an individual migration identity is required.\npub fn registry_version() -> String {\n    public_intake_version()\n}",
+              ),
+              (
+                  "    VisibilityImmutability,\n}",
+                  "    VisibilityImmutability,\n    PublicIntake,\n}",
+              ),
+              (
+                  "    const ORDERED: [Self; 3] = [\n        Self::HistoricalBase,\n        Self::DependencyGraph,\n        Self::VisibilityImmutability,\n    ];",
+                  "    const ORDERED: [Self; 4] = [\n        Self::HistoricalBase,\n        Self::DependencyGraph,\n        Self::VisibilityImmutability,\n        Self::PublicIntake,\n    ];",
+              ),
+              (
+                  "            Self::VisibilityImmutability => visibility_immutability_version(),\n",
+                  "            Self::VisibilityImmutability => visibility_immutability_version(),\n            Self::PublicIntake => public_intake_version(),\n",
+              ),
+              (
+                  "            Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,\n",
+                  "            Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,\n            Self::PublicIntake => PUBLIC_INTAKE_SQL,\n",
+              ),
+              (
+                  "        assert!(registry_version().ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));\n        assert_eq!(registry_version(), visibility_immutability_version());",
+                  "        assert!(visibility_immutability_version().ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));\n        assert!(public_intake_version().ends_with(PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX));\n        assert_eq!(registry_version(), public_intake_version());",
+              ),
+              (
+                  "        assert_ne!(dependency_graph_version(), BASE_REGISTRY_VERSION);\n        assert_ne!(registry_version(), BASE_REGISTRY_VERSION);",
+                  "        assert_ne!(public_intake_version(), visibility_immutability_version());\n        assert_ne!(dependency_graph_version(), BASE_REGISTRY_VERSION);\n        assert_ne!(registry_version(), BASE_REGISTRY_VERSION);",
+              ),
+              (
+                  "        assert_eq!(plan, vec![MigrationStep::DependencyGraph]);",
+                  "        assert_eq!(\n            plan,\n            vec![MigrationStep::DependencyGraph, MigrationStep::PublicIntake]\n        );",
+              ),
+          ]
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f"migration anchor drifted: {old[:80]!r} ({text.count(old)})")
+              text = text.replace(old, new, 1)
+          expected_vectors = text.count(
+              "                MigrationStep::VisibilityImmutability\n            ]"
+          )
+          if expected_vectors != 3:
+              raise SystemExit(f"expected three existing-base vectors, found {expected_vectors}")
+          text = text.replace(
+              "                MigrationStep::VisibilityImmutability\n            ]",
+              "                MigrationStep::VisibilityImmutability,\n                MigrationStep::PublicIntake\n            ]",
+          )
+          migrations.write_text(text)
+          PY
+
+          # The changed exact Git revision is the only manifest source change.
+          # An unlocked check lets Cargo replace that one locked source without
+          # upgrading unrelated registry packages; all subsequent gates lock.
+          cargo check -p zed-orm-core --features migrate
+          cargo fmt --all
+          cargo test --locked -p zed-orm-core --features migrate
+          cargo clippy --locked -p zed-orm-core --all-targets --features migrate -- -D warnings
+          git diff --check
+
+      - name: Commit exact generated state and remove both materializers
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          rm -f \
+            .public-intake-materialize-trigger \
+            .public-intake-materialize-v2-trigger \
+            .github/workflows/materialize-public-intake.yml \
+            .github/workflows/materialize-public-intake-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            Cargo.lock \
+            src/rust-orm/Cargo.toml \
+            src/rust-orm/lib.rs \
+            src/rust-orm/public_intake.rs \
+            src/rust-orm/migrations.rs \
+            .github/workflows
+          git add -u \
+            .public-intake-materialize-trigger \
+            .public-intake-materialize-v2-trigger \
+            .github/workflows/materialize-public-intake.yml \
+            .github/workflows/materialize-public-intake-v2.yml
+          git diff --cached --check
+          git commit -m "build(intake): materialize contract pin and migration ledger"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
