@@ -1,0 +1,88 @@
+name: materialize public intake persistence v8
+
+on:
+  push:
+    branches:
+      - feat/public-intake-persistence-v1
+    paths:
+      - .materialize-public-intake-v8-trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-public-intake-v8
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/public-intake-persistence-v1
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Execute reviewed materializer with durable failure evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          source = Path(".github/workflows/materialize-public-intake-v6.yml").read_text().splitlines()
+          marker = "        run: |"
+          indices = [index for index, line in enumerate(source) if line == marker]
+          if not indices:
+              raise SystemExit("v6 materializer run block not found")
+          lines = source[indices[-1] + 1 :]
+          script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines) + "\n"
+          old = "58572eb5d2cc00ec85c7793e606bab63ec9f5f3b"
+          new = "71db90c83b9113d91c3b5b862d0e4c497d4a646a"
+          if old not in script:
+              raise SystemExit("transient contract SHA not found in v6 materializer")
+          script = script.replace(old, new, 1)
+          needle = "git add -A\n"
+          position = script.rfind(needle)
+          if position < 0:
+              raise SystemExit("final staging command not found")
+          script = script[:position] + "git checkout HEAD -- .github/workflows || true\n" + script[position:]
+          Path("/tmp/materialize-public-intake-v8.sh").write_text(script)
+          PY
+
+          set +e
+          bash -x /tmp/materialize-public-intake-v8.sh >"$RUNNER_TEMP/public-intake-v8.log" 2>&1
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            {
+              echo "public-intake wrapper v8 failed"
+              echo
+              tail -n 320 "$RUNNER_TEMP/public-intake-v8.log"
+            } | sed -E 's/(ghp_|github_pat_|lin_api_)[A-Za-z0-9_]+/[REDACTED]/g' > .public-intake-v8-failure.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .public-intake-v8-failure.txt
+            git commit -m "ci(intake): record wrapper v8 failure" || true
+            git push origin HEAD:feat/public-intake-persistence-v1
+            cat "$RUNNER_TEMP/public-intake-v8.log"
+            exit "$status"
+          fi
+
+          cat "$RUNNER_TEMP/public-intake-v8.log"
