@@ -1,0 +1,26 @@
+public-intake wrapper v8 failed
+
++ set -euo pipefail
++ log=/home/runner/work/_temp/public-intake-v6.log
++ set +e
++ status=1
++ set -e
++ git config user.name 'github-actions[bot]'
++ git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
++ '[' 1 -ne 0 ']'
++ echo 'public-intake materialization v6 failed'
++ echo
++ tail -n 300 /home/runner/work/_temp/public-intake-v6.log
++ sed -E 's/(ghp_|github_pat_|lin_api_)[A-Za-z0-9_]+/[REDACTED]/g'
++ git add .public-intake-v6-failure.txt
++ git commit -m 'ci(intake): record materialization v6 failure'
+[feat/public-intake-persistence-v1 3768f44] ci(intake): record materialization v6 failure
+ 1 file changed, 2 insertions(+)
++ git push origin HEAD:feat/public-intake-persistence-v1
+To https://github.com/zed-pkg/zed-lib-core
+   24ba512..3768f44  HEAD -> feat/public-intake-persistence-v1
++ cat /home/runner/work/_temp/public-intake-v6.log
++ set -euo pipefail
++ python3
+expected three existing-base plan vectors, found 0
++ exit 1
