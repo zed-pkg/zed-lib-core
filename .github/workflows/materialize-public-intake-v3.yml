@@ -1,0 +1,97 @@
+name: materialize public intake persistence v3
+
+on:
+  push:
+    branches: [feat/public-intake-persistence-v1]
+    paths: [.public-intake-materialize-v3-trigger]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-public-intake-v3-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out candidate branch with push credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: zed-lib
+          persist-credentials: true
+          show-progress: false
+
+      - name: Check out the exact merged public-intake contract
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: 70508770bc76bb4ea59a2e6da57a3c416044e96c
+          path: zed-interfaces
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+
+      - name: Repair the isolated test typo and run the reviewed v2 materializer
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          source = Path("src/rust-orm/public_intake.rs")
+          text = source.read_text()
+          old = 'let rendered = format!("{submission():?}");'
+          new = 'let rendered = format!("{:?}", submission());'
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one public-intake format typo, found {text.count(old)}")
+          source.write_text(text.replace(old, new, 1))
+
+          workflow = Path(".github/workflows/materialize-public-intake-v2.yml")
+          lines = workflow.read_text().splitlines()
+          marker = "      - name: Materialize module exports, migration ledger, pins, formatting, and lockfile"
+          start_step = lines.index(marker)
+          start_run = next(
+              index for index in range(start_step + 1, len(lines))
+              if lines[index] == "        run: |"
+          )
+          end_step = next(
+              index for index in range(start_run + 1, len(lines))
+              if lines[index].startswith("      - name: Commit exact generated state")
+          )
+          body = []
+          for line in lines[start_run + 1:end_step]:
+              if line.startswith("          "):
+                  body.append(line[10:])
+              elif line == "":
+                  body.append("")
+              else:
+                  raise SystemExit(f"unexpected materializer indentation: {line!r}")
+          script = Path("/tmp/materialize-public-intake-v2.sh")
+          script.write_text("\n".join(body) + "\n")
+          PY
+          bash /tmp/materialize-public-intake-v2.sh
+
+      - name: Commit exact generated state and remove every one-shot materializer
+        working-directory: zed-lib
+        run: |
+          set -euo pipefail
+          rm -f \
+            .public-intake-materialize-trigger \
+            .public-intake-materialize-v2-trigger \
+            .public-intake-materialize-v3-trigger \
+            .github/workflows/materialize-public-intake.yml \
+            .github/workflows/materialize-public-intake-v2.yml \
+            .github/workflows/materialize-public-intake-v3.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "build(intake): materialize contract pin and migration ledger"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
