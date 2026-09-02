@@ -1,3 +1,5 @@
 public-intake materialization v6 failed
 
++ set -euo pipefail
++ python3
 expected three existing-base plan vectors, found 0
