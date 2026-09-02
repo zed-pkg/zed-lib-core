@@ -1,0 +1,52 @@
+name: repair public intake v6 contract pin
+
+on:
+  push:
+    branches:
+      - feat/public-intake-persistence-v1
+    paths:
+      - .repair-public-intake-v6-pin-trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-public-intake-v6-pin
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/public-intake-persistence-v1
+          persist-credentials: true
+          show-progress: false
+
+      - name: Pin the canonical merged contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/workflows/materialize-public-intake-v6.yml")
+          text = path.read_text()
+          old = "58572eb5d2cc00ec85c7793e606bab63ec9f5f3b"
+          new = "71db90c83b9113d91c3b5b862d0e4c497d4a646a"
+          if old not in text:
+              raise SystemExit("transient contract pin not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          rm -f \
+            .github/workflows/repair-public-intake-v6-pin.yml \
+            .repair-public-intake-v6-pin-trigger
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(intake): pin canonical merged interface contract"
+          git push origin HEAD:feat/public-intake-persistence-v1
