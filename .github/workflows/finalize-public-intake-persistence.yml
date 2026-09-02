@@ -1,0 +1,444 @@
+name: finalize public intake persistence
+
+on:
+  push:
+    branches:
+      - feat/public-intake-persistence-clean
+    paths:
+      - .finalize-public-intake-persistence-trigger
+      - .github/workflows/finalize-public-intake-persistence.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-public-intake-persistence-clean
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: zed_public_intake_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zed_public_intake_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PUBLIC_INTAKE_REQUIRE_POSTGRES: "1"
+      PUBLIC_INTAKE_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zed_public_intake_test
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/public-intake-persistence-clean
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@6d653acedea9b9aaf8b1d10a8d8b03ee8a4a20b1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Materialize final source and all generated projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .github/materialize/public_intake.rs
+          test -s .github/materialize/2026-09-02-public-intake.sql
+          cp .github/materialize/public_intake.rs src/rust-orm/public_intake.rs
+          cp .github/materialize/2026-09-02-public-intake.sql src/rust-orm/sql/2026-09-02-public-intake.sql
+
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          INTERFACES_REV = "71db90c83b9113d91c3b5b862d0e4c497d4a646a"
+
+          def section_insert(text: str, heading: str, lines: list[str]) -> str:
+              match = re.search(rf"(?m)^\[{re.escape(heading)}\]\s*$", text)
+              if not match:
+                  suffix = "" if text.endswith("\n") else "\n"
+                  return text + suffix + f"\n[{heading}]\n" + "\n".join(lines) + "\n"
+              next_heading = re.search(r"(?m)^\[[^\n]+\]\s*$", text[match.end():])
+              end = match.end() + (next_heading.start() if next_heading else len(text) - match.end())
+              body = text[match.end():end]
+              additions = [line for line in lines if not re.search(rf"(?m)^{re.escape(line.split('=', 1)[0].strip())}\s*=", body)]
+              if not additions:
+                  return text
+              return text[:end].rstrip() + "\n" + "\n".join(additions) + "\n\n" + text[end:].lstrip("\n")
+
+          cargo = Path("src/rust-orm/Cargo.toml")
+          text = cargo.read_text()
+          text = re.sub(
+              r'zed-interfaces\s*=\s*\{\s*git\s*=\s*"https://github\.com/zed-pkg/zed-interfaces\.git",\s*rev\s*=\s*"[0-9a-f]{40}"\s*\}',
+              f'zed-interfaces = {{ git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "{INTERFACES_REV}" }}',
+              text,
+              count=1,
+          )
+          text = section_insert(text, "dependencies", [
+              'aes-gcm = "0.10"',
+              'hex = "0.4"',
+              'hmac = "0.12"',
+              'rand = "0.9"',
+              'sha2 = "0.10"',
+              'zeroize = "1"',
+          ])
+          if not re.search(r"(?m)^tokio\s*=", text):
+              text = section_insert(text, "dev-dependencies", [
+                  'tokio = { version = "1", features = ["macros", "rt-multi-thread"] }',
+              ])
+          cargo.write_text(text)
+
+          surface = Path("src/rust-orm/tests/public_surface.rs")
+          text = surface.read_text()
+          text = re.sub(
+              r'pub const ZED_INTERFACES_GIT_REV: &str = "[0-9a-f]{40}";',
+              f'pub const ZED_INTERFACES_GIT_REV: &str = "{INTERFACES_REV}";',
+              text,
+              count=1,
+          )
+          surface.write_text(text)
+
+          library = Path("src/rust-orm/lib.rs")
+          text = library.read_text()
+          if "pub mod public_intake;" not in text:
+              text = text.replace(
+                  '#[cfg(feature = "read-write")]\npub mod write;\n',
+                  '#[cfg(feature = "read-write")]\npub mod write;\n#[cfg(feature = "read-write")]\npub mod public_intake;\n',
+                  1,
+              )
+          if "NewPublicIntakeSubmission" not in text:
+              anchor = 'pub use migrations::{\n    MigrationOutcome, RegistryMigrationStatus, registry_version, run_registry_migrations,\n};\n'
+              replacement = 'pub use migrations::{\n    MigrationOutcome, RegistryMigrationStatus, public_intake_version, registry_version,\n    run_registry_migrations,\n};\n#[cfg(feature = "read-write")]\npub use public_intake::{\n    NewPublicIntakeSubmission, PublicIntakeInsertResult, PublicIntakeStoreError,\n    PublicIntakeSubmissionKind, SecretBytes,\n};\n'
+              if anchor not in text:
+                  raise SystemExit("missing lib.rs migration export anchor")
+              text = text.replace(anchor, replacement, 1)
+          elif "public_intake_version" not in text:
+              text = text.replace("RegistryMigrationStatus, registry_version", "RegistryMigrationStatus, public_intake_version, registry_version", 1)
+          if "PUBLIC_INTAKE_MIGRATION_PATH" not in text:
+              anchor = "    DEPENDENCY_GRAPH_MIGRATION_PATH, ORG_SCHEMA, REGISTRY_DDL_BLOB_SHA, REGISTRY_DDL_PATH,\n"
+              replacement = "    DEPENDENCY_GRAPH_MIGRATION_PATH, ORG_SCHEMA, PUBLIC_INTAKE_MIGRATION_BLOB_SHA,\n    PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX, PUBLIC_INTAKE_MIGRATION_PATH,\n    REGISTRY_DDL_BLOB_SHA, REGISTRY_DDL_PATH,\n"
+              if anchor not in text:
+                  raise SystemExit("missing lib.rs schema export anchor")
+              text = text.replace(anchor, replacement, 1)
+          library.write_text(text)
+
+          write = Path("src/rust-orm/write.rs")
+          text = write.read_text()
+          if "insert_public_intake_submission(" not in text:
+              struct = re.search(r"pub struct WriteContext\s*\{(?P<body>[\s\S]*?)\n\}", text)
+              if struct:
+                  field = re.search(
+                      r"(?m)^\s*(?:pub(?:\([^)]*\))?\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?:std::sync::Arc<|Arc<)?DatabaseConnection>?\s*,?\s*$",
+                      struct.group("body"),
+                  )
+                  if not field:
+                      raise SystemExit("cannot locate WriteContext database field")
+                  database = f"&self.{field.group(1)}"
+              elif re.search(r"pub struct WriteContext\s*\(\s*DatabaseConnection\s*\)\s*;", text):
+                  database = "&self.0"
+              else:
+                  raise SystemExit("cannot locate WriteContext representation")
+              text += f'''\nimpl WriteContext {{
+              /// Persist a validated public commercial-intake request through the
+              /// named opaque write boundary. Raw database access remains private.
+              pub async fn insert_public_intake_submission(
+                  &self,
+                  input: crate::public_intake::NewPublicIntakeSubmission,
+              ) -> Result<
+                  crate::public_intake::PublicIntakeInsertResult,
+                  crate::public_intake::PublicIntakeStoreError,
+              > {{
+                  crate::public_intake::insert_public_intake_submission_on_database(
+                      {database},
+                      input,
+                  )
+                  .await
+              }}
+          }}
+          '''
+          write.write_text(text)
+
+          migration_sql_path = Path("src/rust-orm/sql/2026-09-02-public-intake.sql")
+          migration_sql = migration_sql_path.read_text().strip()
+          registry = Path("src/rust-orm/sql/registry.sql")
+          registry_text = registry.read_text()
+          marker = "create table if not exists zed_public_intake_submissions"
+          lower = registry_text.lower()
+          while marker in lower:
+              start = lower.rfind("-- append-only encrypted persistence", 0, lower.index(marker))
+              if start < 0:
+                  start = lower.index(marker)
+              end_marker = "revoke all on table zed_public_intake_submissions from public;"
+              end = lower.index(end_marker, lower.index(marker)) + len(end_marker)
+              registry_text = registry_text[:start].rstrip() + "\n" + registry_text[end:].lstrip("\n")
+              lower = registry_text.lower()
+          registry.write_text(registry_text.rstrip() + "\n\n" + migration_sql + "\n")
+
+          migration_blob = subprocess.check_output(["git", "hash-object", str(migration_sql_path)], text=True).strip()
+          registry_blob = subprocess.check_output(["git", "hash-object", str(registry)], text=True).strip()
+
+          schema = Path("src/rust-orm/schema.rs")
+          text = schema.read_text()
+          text, count = re.subn(
+              r'pub const REGISTRY_DDL_BLOB_SHA: &str = "[0-9a-f]{40}";',
+              f'pub const REGISTRY_DDL_BLOB_SHA: &str = "{registry_blob}";',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("missing registry blob constant")
+          block = f'''/// Package-local forward migration for encrypted public commercial intake.
+          pub const PUBLIC_INTAKE_MIGRATION_PATH: &str =
+              "src/rust-orm/sql/2026-09-02-public-intake.sql";
+
+          /// Immutable Git blob identity of the public-intake forward migration.
+          pub const PUBLIC_INTAKE_MIGRATION_BLOB_SHA: &str = "{migration_blob}";
+
+          /// Ledger suffix for the first public-intake migration.
+          pub const PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX: &str =
+              PUBLIC_INTAKE_MIGRATION_BLOB_SHA;
+
+          '''
+          existing = re.compile(
+              r"/// Package-local forward migration for encrypted public commercial intake\.[\s\S]*?PUBLIC_INTAKE_MIGRATION_BLOB_SHA;\n\n"
+          )
+          if existing.search(text):
+              text = existing.sub(block, text, count=1)
+          else:
+              anchor = "// Compatibility aliases retained for existing Rust consumers."
+              if anchor not in text:
+                  raise SystemExit("missing schema constant anchor")
+              text = text.replace(anchor, block + anchor, 1)
+          schema.write_text(text)
+
+          migrations = Path("src/rust-orm/migrations.rs")
+          text = migrations.read_text()
+          if "PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX" not in text.split(";", 1)[0]:
+              text = text.replace(
+                  "    SHARED_DEFS_REGISTRY_SEGMENT, VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX,\n",
+                  "    PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX, SHARED_DEFS_REGISTRY_SEGMENT,\n    VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX,\n",
+                  1,
+              )
+          if "const PUBLIC_INTAKE_SQL" not in text:
+              text = text.replace(
+                  'const VISIBILITY_IMMUTABILITY_SQL: &str =\n    include_str!("sql/2026-08-11-public-visibility-is-permanent.sql");\n',
+                  'const VISIBILITY_IMMUTABILITY_SQL: &str =\n    include_str!("sql/2026-08-11-public-visibility-is-permanent.sql");\nconst PUBLIC_INTAKE_SQL: &str = include_str!("sql/2026-09-02-public-intake.sql");\n',
+                  1,
+              )
+          if "pub fn public_intake_version" not in text:
+              text = text.replace(
+                  "/// Return the current registry migration identity.\n",
+                  '''/// Return the package-owned public-intake migration identity.
+          pub fn public_intake_version() -> String {
+              format!("registry-public-intake@{PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX}")
+          }
+
+          /// Return the current registry migration identity.
+          ''',
+                  1,
+              )
+          text = re.sub(
+              r"pub fn registry_version\(\) -> String \{\n\s*(?:visibility_immutability_version|public_intake_version)\(\)\n\}",
+              "pub fn registry_version() -> String {\n    public_intake_version()\n}",
+              text,
+              count=1,
+          )
+          enum = re.search(r"enum RegistryMigration\s*\{(?P<body>[\s\S]*?)\n\}", text)
+          if not enum:
+              raise SystemExit("missing RegistryMigration enum")
+          if "PublicIntake" not in enum.group("body"):
+              body = enum.group("body").replace("    VisibilityImmutability,", "    VisibilityImmutability,\n    PublicIntake,")
+              text = text[:enum.start("body")] + body + text[enum.end("body"):]
+          ordered = re.search(r"const ORDERED: \[Self; \d+\] = \[(?P<body>[\s\S]*?)\n\s*\];", text)
+          if not ordered:
+              raise SystemExit("missing ordered migration array")
+          body = ordered.group("body")
+          if "Self::PublicIntake" not in body:
+              body = body.replace("        Self::VisibilityImmutability,", "        Self::VisibilityImmutability,\n        Self::PublicIntake,")
+          count = body.count("Self::")
+          replacement = f"const ORDERED: [Self; {count}] = [" + body + "\n    ];"
+          text = text[:ordered.start()] + replacement + text[ordered.end():]
+          if "Self::PublicIntake => public_intake_version()" not in text:
+              text = text.replace(
+                  "            Self::VisibilityImmutability => visibility_immutability_version(),\n",
+                  "            Self::VisibilityImmutability => visibility_immutability_version(),\n            Self::PublicIntake => public_intake_version(),\n",
+                  1,
+              )
+          if "Self::PublicIntake => PUBLIC_INTAKE_SQL" not in text:
+              text = text.replace(
+                  "            Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,\n",
+                  "            Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,\n            Self::PublicIntake => PUBLIC_INTAKE_SQL,\n",
+                  1,
+              )
+          text = re.sub(
+              r"(RegistryMigration::VisibilityImmutability,\n)(\s*\])",
+              r"\1            RegistryMigration::PublicIntake,\n\2",
+              text,
+          )
+          text = re.sub(
+              r"(visibility_immutability_version\(\),\n)(\s*\];)",
+              r"\1            public_intake_version(),\n\2",
+              text,
+          )
+          text = text.replace("assert_eq!(registry_version(), visibility);", "assert_eq!(registry_version(), public_intake_version());")
+          migrations.write_text(text)
+          PY
+
+          cargo update -p zed-interfaces
+          cargo fmt --all
+
+          cat > .github/workflows/public-intake-persistence.yml <<'YAML'
+          name: public intake persistence
+
+          on:
+            pull_request:
+              paths:
+                - "src/rust-orm/public_intake.rs"
+                - "src/rust-orm/write.rs"
+                - "src/rust-orm/migrations.rs"
+                - "src/rust-orm/schema.rs"
+                - "src/rust-orm/sql/2026-09-02-public-intake.sql"
+                - "src/rust-orm/sql/registry.sql"
+                - "src/rust-orm/Cargo.toml"
+                - "Cargo.lock"
+                - "generated/**"
+                - ".github/workflows/public-intake-persistence.yml"
+            push:
+              branches: [main]
+              paths:
+                - "src/rust-orm/public_intake.rs"
+                - "src/rust-orm/write.rs"
+                - "src/rust-orm/migrations.rs"
+                - "src/rust-orm/schema.rs"
+                - "src/rust-orm/sql/2026-09-02-public-intake.sql"
+                - "src/rust-orm/sql/registry.sql"
+                - "src/rust-orm/Cargo.toml"
+                - "Cargo.lock"
+                - "generated/**"
+                - ".github/workflows/public-intake-persistence.yml"
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: public-intake-persistence-${{ github.workflow }}-${{ github.ref }}
+            cancel-in-progress: true
+
+          jobs:
+            rust-postgres-and-projections:
+              runs-on: ubuntu-24.04
+              timeout-minutes: 50
+              services:
+                postgres:
+                  image: postgres:17
+                  env:
+                    POSTGRES_DB: zed_public_intake_test
+                    POSTGRES_PASSWORD: postgres
+                    POSTGRES_USER: postgres
+                  ports:
+                    - 5432:5432
+                  options: >-
+                    --health-cmd "pg_isready -U postgres -d zed_public_intake_test"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 12
+              env:
+                PUBLIC_INTAKE_REQUIRE_POSTGRES: "1"
+                PUBLIC_INTAKE_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zed_public_intake_test
+              steps:
+                - name: Check out repository
+                  uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+                  with:
+                    persist-credentials: false
+                    show-progress: false
+
+                - name: Install Rust toolchain
+                  uses: dtolnay/rust-toolchain@6d653acedea9b9aaf8b1d10a8d8b03ee8a4a20b1
+                  with:
+                    toolchain: stable
+                    components: rustfmt, clippy
+
+                - name: Install Node.js
+                  uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+                  with:
+                    node-version: "22"
+                    package-manager-cache: false
+
+                - name: Verify Rust and real PostgreSQL behavior
+                  run: |
+                    cargo fmt --all -- --check
+                    cargo test --workspace --all-targets --all-features --locked
+                    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+                - name: Verify generated schema and ORM projections
+                  run: |
+                    npm ci --prefix schema-tooling --ignore-scripts --no-audit --no-fund
+                    npm --prefix schema-tooling run generate:check
+                    npm --prefix schema-tooling run drift:check
+                    npm --prefix schema-tooling run ddl:roundtrip:check
+                    npm --prefix schema-tooling run contracts:check
+                    npm --prefix schema-tooling test
+          YAML
+
+      - name: Verify final exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets --all-features
+          cargo test --workspace --all-targets --all-features
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+          npm ci --prefix schema-tooling --ignore-scripts --no-audit --no-fund
+          npm --prefix schema-tooling run generate
+          npm --prefix schema-tooling run ddl:roundtrip:write
+          npm --prefix schema-tooling run contracts:write
+          npm --prefix schema-tooling run generate:check
+          npm --prefix schema-tooling run drift:check
+          npm --prefix schema-tooling run ddl:roundtrip:check
+          npm --prefix schema-tooling run contracts:check
+          npm --prefix schema-tooling test
+
+          git diff --check
+          if git grep -nE '(ghp_|github_pat_|lin_api_)[A-Za-z0-9_]+' -- . ':!schema-tooling/node_modules'; then
+            echo "credential-shaped material found" >&2
+            exit 1
+          fi
+
+      - name: Remove materializers and publish verified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/materialize
+          rm -f \
+            .github/workflows/materialize-public-intake-persistence.yml \
+            .materialize-public-intake-persistence-trigger \
+            .github/workflows/finalize-public-intake-persistence.yml \
+            .finalize-public-intake-persistence-trigger
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(intake): finalize encrypted persistence boundary"
+          git push origin HEAD:feat/public-intake-persistence-clean
