@@ -33,7 +33,7 @@ sea-orm = { version = "1", default-features = false, features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
-zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "7d31f80dd8a310f218931165a3ad636a2f32b932" }
+zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "7d31f80c255c139bd61118f408b435bff24ab668" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
