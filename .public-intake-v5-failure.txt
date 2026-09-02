@@ -1,3 +1,0 @@
-public-intake materialization v5 failed
-
-registry.sql has no final COMMIT anchor
