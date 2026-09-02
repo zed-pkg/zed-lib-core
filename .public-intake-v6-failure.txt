@@ -1,0 +1,3 @@
+public-intake materialization v6 failed
+
+expected three existing-base plan vectors, found 0
