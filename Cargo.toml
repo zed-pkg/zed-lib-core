@@ -4,5 +4,10 @@
 # slice as its own package, and a target may not own `dir = "."`.
 [workspace]
 resolver = "3"
-members = ["src/rust", "src/rust-orm"]
+members = [
+  "src/rust",
+  "src/rust-orm",
+  "validation/rust",
+  "validation/rust-server",
+]
 default-members = ["src/rust", "src/rust-orm"]
