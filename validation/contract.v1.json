@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zed-pkg/zed-lib-core/validation/contract.v1.json",
+  "contractVersion": "ores.validation.v1",
+  "owner": "zed-pkg/zed-lib-core",
+  "publicAuthority": "https://github.com/zed-pkg/zed-interfaces/tree/main/validation",
+  "routeAuthority": "https://github.com/ORESoftware/api-docs",
+  "visibility": {
+    "public": ["request-meta", "page-query", "problem-details"],
+    "server": ["trusted-actor", "server-request-context", "internal-command"]
+  },
+  "languageBindings": {
+    "typescript": {"library": "zod", "publicPackage": "@zed-pkg/zed-validation", "serverPackage": "@zed-pkg/zed-validation-server"},
+    "rust": {"library": "garde", "publicPackage": "zed-validation", "serverPackage": "zed-validation-server"},
+    "golang": {"library": "go-playground/validator/v10", "publicPackage": "github.com/zed-pkg/zed-lib-core/validation/golang", "serverPackage": "github.com/zed-pkg/zed-lib-core/validation/golang-server"},
+    "gleam": {"library": "gleam/dynamic/decode", "publicPackage": "zed_validation", "serverPackage": "zed_validation_server"}
+  },
+  "rules": {
+    "clientExportsPublicOnly": true,
+    "serverMayImportPublic": true,
+    "serverDefinitionsNeverEmittedToClients": true,
+    "routeBindingsUseApiDocsOperationId": true,
+    "unknownFieldsRejectedWhereRuntimeSupportsIt": true
+  }
+}
