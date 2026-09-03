@@ -43,9 +43,14 @@ pub struct ProblemDetails {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn rejects_empty_request_id() {
-        let value = RequestMeta {request_id: String::new(), trace_id: "trace-1".into(), locale: None};
+        let value = RequestMeta {
+            request_id: String::new(),
+            trace_id: "trace-1".into(),
+            locale: None,
+        };
         assert!(value.validate().is_err());
     }
 }
