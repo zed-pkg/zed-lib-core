@@ -1,6 +1,6 @@
 # Blocking migration: remove `src/rust-orm`
 
-The nested ORM package predates `zed-pkg/zed-orm-core` and violates the current repository boundary. This PR prevents it from building or publishing as lib-core, but does not delete code before proving feature parity.
+The nested ORM package predates the restored `zed-pkg/zed-orm-core` boundary and violates the final repository model. This PR excludes it from the root Zed publication and adds a strict release blocker, but preserves the historical workspace build until behavior parity is proven.
 
 Before a zed-lib-core release:
 
@@ -9,6 +9,6 @@ Before a zed-lib-core release:
 3. Generate Diesel and SeaORM views independently from the accepted catalog and run shared positive/negative fixtures.
 4. Pin the same `zed-interfaces` and `zed-lib-core` revisions through Zed and native metadata.
 5. Produce complete TypeSpec/JSON Schema evidence and `artifacts/agreement.lock` in both repositories.
-6. Delete `src/rust-orm` and its nested package metadata from this repository.
+6. Remove `src/rust-orm` from the Cargo workspace, regenerate and verify `Cargo.lock`, then delete the directory and nested package metadata.
 
 No release waiver may retain executable ORM code in lib-core.
