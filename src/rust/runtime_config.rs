@@ -97,13 +97,22 @@ impl fmt::Display for ConfigError {
                 "configuration output key `{key}` must use lowercase ASCII letters, digits, dots, dashes, and underscores"
             ),
             Self::SensitivePublicKey { key } => {
-                write!(formatter, "public configuration key `{key}` is secret-shaped")
+                write!(
+                    formatter,
+                    "public configuration key `{key}` is secret-shaped"
+                )
             }
             Self::DuplicateSourceKey { key } => {
-                write!(formatter, "configuration source key `{key}` is declared twice")
+                write!(
+                    formatter,
+                    "configuration source key `{key}` is declared twice"
+                )
             }
             Self::DuplicateOutputKey { key } => {
-                write!(formatter, "configuration output key `{key}` is declared twice")
+                write!(
+                    formatter,
+                    "configuration output key `{key}` is declared twice"
+                )
             }
             Self::MissingRequiredValue { key } => {
                 write!(formatter, "required configuration value `{key}` is missing")
@@ -120,9 +129,7 @@ impl std::error::Error for ConfigError {}
 fn validate_public_key(key: &str) -> Result<(), ConfigError> {
     if key.is_empty()
         || !key.bytes().all(|byte| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || matches!(byte, b'.' | b'-' | b'_')
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'-' | b'_')
         })
     {
         return Err(ConfigError::InvalidOutputKey {
@@ -276,7 +283,9 @@ pub mod server {
 
         #[must_use]
         pub fn value(&self, key: &str) -> Option<&str> {
-            self.public.get(key).or_else(|| self.server.get(key).map(String::as_str))
+            self.public
+                .get(key)
+                .or_else(|| self.server.get(key).map(String::as_str))
         }
 
         #[must_use]
@@ -393,8 +402,14 @@ mod tests {
             ("service_name", "zed"),
         ])
         .expect("valid public config");
-        assert_eq!(config.get("registry_origin"), Some("https://registry.example"));
-        assert_eq!(config.iter().next(), Some(("registry_origin", "https://registry.example")));
+        assert_eq!(
+            config.get("registry_origin"),
+            Some("https://registry.example")
+        );
+        assert_eq!(
+            config.iter().next(),
+            Some(("registry_origin", "https://registry.example"))
+        );
     }
 
     #[cfg(feature = "server-config")]
@@ -411,13 +426,22 @@ mod tests {
                 FieldSpec::secret("DATABASE_URL"),
             ];
             let mut source = BTreeMap::from([
-                ("PUBLIC_BASE_URL".to_owned(), "https://registry.example".to_owned()),
+                (
+                    "PUBLIC_BASE_URL".to_owned(),
+                    "https://registry.example".to_owned(),
+                ),
                 ("DATABASE_URL".to_owned(), "postgres://private".to_owned()),
             ]);
             let config = ServerRuntimeConfig::materialize(&specs, &source).expect("materialize");
-            source.insert("PUBLIC_BASE_URL".to_owned(), "https://changed.example".to_owned());
+            source.insert(
+                "PUBLIC_BASE_URL".to_owned(),
+                "https://changed.example".to_owned(),
+            );
 
-            assert_eq!(config.value("public_base_url"), Some("https://registry.example"));
+            assert_eq!(
+                config.value("public_base_url"),
+                Some("https://registry.example")
+            );
             assert_eq!(config.value("db_max_connections"), Some("10"));
             assert_eq!(
                 config.secret("DATABASE_URL").expect("secret").expose(),
