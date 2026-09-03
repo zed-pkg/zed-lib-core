@@ -9,19 +9,36 @@ on:
 permissions:
   contents: write
 
+env:
+  ZED_INTERFACES_REF: 7d31f80dd8a310f218931165a3ad636a2f32b932
+
 jobs:
   refresh:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check out zed-lib-core
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          path: zed-lib
           fetch-depth: 0
+      - name: Check out the immutable sibling interfaces dependency
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_REF }}
+          path: zed-interfaces
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify immutable interfaces pin
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_REF"
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           toolchain: stable
       - name: Regenerate the root lockfile
+        working-directory: zed-lib
         run: cargo generate-lockfile
       - name: Commit only the generator-owned lockfile
+        working-directory: zed-lib
         run: |
           git diff --check
           changed="$(git diff --name-only)"
