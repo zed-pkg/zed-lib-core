@@ -28,8 +28,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - run: cargo test --manifest-path validation/rust/Cargo.toml
-      - run: cargo test --manifest-path validation/rust-server/Cargo.toml
+        with:
+          path: zed-lib
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: 97c802815d1923e0f08f193abaa54260f905c44d
+          path: zed-interfaces
+          persist-credentials: false
+      - run: test "$(git -C zed-interfaces rev-parse HEAD)" = "97c802815d1923e0f08f193abaa54260f905c44d"
+      - run: cargo test --manifest-path zed-lib/validation/rust/Cargo.toml
+      - run: cargo test --manifest-path zed-lib/validation/rust-server/Cargo.toml
   golang:
     runs-on: ubuntu-latest
     steps:
