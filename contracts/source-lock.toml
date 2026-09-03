@@ -1,0 +1,11 @@
+format = "ores.core-source-lock/v1"
+status = "bootstrap"
+interfaces_repository = "zed-pkg/zed-interfaces"
+typespec_commit = "UNPINNED"
+typespec_sha256 = "UNPINNED"
+json_schema_commit = "UNPINNED"
+json_schema_sha256 = "UNPINNED"
+comparator_version = "BOOTSTRAP"
+
+# Bootstrap placeholders block releases. Both lanes must pin the same reviewed
+# zed-interfaces revision while preserving independent authored sources.
