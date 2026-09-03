@@ -74,6 +74,6 @@ package = "@zed-pkg/zed-lib"
 tag_format = "ts/v{version}"
 
 [scripts]
-test = "cargo test --all-targets --locked"
+test = "cargo test --locked -p zed-lib --all-targets --all-features && cargo test --locked -p zed-lib --all-targets --no-default-features"
 boundary = "rustc --edition=2021 -D warnings tools/core-contract-guard.rs -o /tmp/core-contract-guard && /tmp/core-contract-guard --kind lib-core"
 release-gate = "rustc --edition=2021 -D warnings tools/core-contract-guard.rs -o /tmp/core-contract-guard && /tmp/core-contract-guard --kind lib-core --require-evidence"

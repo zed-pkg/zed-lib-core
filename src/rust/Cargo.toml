@@ -12,6 +12,11 @@ repository = "https://github.com/zed-pkg/zed-lib-core"
 [lib]
 path = "lib.rs"
 
+[features]
+default = ["public-config"]
+public-config = []
+server-config = ["public-config"]
+
 [dependencies]
 # Sibling checkout, matching the rest of the org (zed-web-server.rs, the Rust
 # client in zed-clients). Becomes a version requirement once zed-interfaces

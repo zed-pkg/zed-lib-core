@@ -1,0 +1,74 @@
+name: runtime-config-boundary
+
+on:
+  pull_request:
+    paths:
+      - "src/rust/runtime_config.rs"
+      - "src/rust/lib.rs"
+      - "src/rust/Cargo.toml"
+      - "server/runtime-config.md"
+      - "contracts/source-lock.toml"
+      - ".zpkg.toml"
+      - ".github/workflows/runtime-config-boundary.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/rust/runtime_config.rs"
+      - "src/rust/lib.rs"
+      - "src/rust/Cargo.toml"
+      - "server/runtime-config.md"
+      - "contracts/source-lock.toml"
+      - ".zpkg.toml"
+      - ".github/workflows/runtime-config-boundary.yml"
+
+permissions:
+  contents: read
+
+env:
+  ZED_INTERFACES_REF: 02e23b4862c670f197eb818733736b8f62375aae
+
+jobs:
+  boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out zed-lib-core
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: zed-lib
+          persist-credentials: false
+      - name: Check out exact parity-gated interfaces
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_REF }}
+          path: zed-interfaces
+          persist-credentials: false
+      - name: Verify immutable interfaces pin
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_REF"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+      - name: Reject environment effects in shared materializer
+        working-directory: zed-lib
+        shell: bash
+        run: |
+          if grep -nE 'std::env|env::var|args_os?\(' src/rust/runtime_config.rs; then
+            echo "runtime_config.rs must remain a pure map-to-snapshot transform" >&2
+            exit 1
+          fi
+      - name: Format
+        working-directory: zed-lib
+        run: cargo fmt --all -- --check
+      - name: Client/default feature boundary
+        working-directory: zed-lib
+        run: cargo check --locked -p zed-lib --no-default-features
+      - name: Public runtime configuration tests
+        working-directory: zed-lib
+        run: cargo test --locked -p zed-lib --all-targets
+      - name: Server runtime configuration tests and static analysis
+        working-directory: zed-lib
+        run: |
+          cargo clippy --locked -p zed-lib --all-targets --all-features -- -D warnings
+          cargo test --locked -p zed-lib --all-targets --all-features
