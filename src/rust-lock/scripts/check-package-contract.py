@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fail closed when the standalone Cargo and Zed package contracts drift."""
+"""Fail closed when the zed-lock Cargo and Zed package contracts drift.
+
+zed-lock is the `src/rust-lock` slice of zed-pkg/zed-lib-core: a workspace
+member and a nested Zed package, published under the `lock/v{version}` tag.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +28,7 @@ def main() -> int:
     zpkg_path = ROOT / ".zpkg.toml"
     provenance_path = ROOT / "PROVENANCE.md"
 
-    for path in (cargo_path, zpkg_path, provenance_path, ROOT / "src/lib.rs"):
+    for path in (cargo_path, zpkg_path, provenance_path, ROOT / "lib.rs"):
         if not path.is_file():
             try:
                 display = path.relative_to(ROOT)
@@ -61,8 +65,14 @@ def main() -> int:
         errors.append(
             "Cargo package.rust-version must be '1.88', the first supported compiler for the extracted let-chain implementation"
         )
-    if cargo_package.get("repository") != "https://github.com/zed-pkg/zed-lock":
-        errors.append("Cargo package.repository must point at zed-pkg/zed-lock")
+    if cargo_package.get("repository") != "https://github.com/zed-pkg/zed-lib-core":
+        errors.append("Cargo package.repository must point at zed-pkg/zed-lib-core")
+    lib_section = cargo.get("lib", {})
+    if lib_section.get("path") != "lib.rs" or lib_section.get("name") != "zed_lock":
+        errors.append(
+            "Cargo [lib] must be name = 'zed_lock', path = 'lib.rs': the crate root sits "
+            "beside the manifest like every other zed-lib-core slice"
+        )
 
     if zpkg_package.get("org") != "zed-pkg":
         errors.append("Zed package.org must be 'zed-pkg'")
@@ -72,26 +82,28 @@ def main() -> int:
     repository = zpkg_package.get("repository", {})
     if repository.get("vcs") != "git":
         errors.append("Zed package.repository.vcs must be 'git'")
-    if repository.get("url") != "https://github.com/zed-pkg/zed-lock":
-        errors.append("Zed package.repository.url must point at zed-pkg/zed-lock")
+    if repository.get("url") != "https://github.com/zed-pkg/zed-lib-core":
+        errors.append("Zed package.repository.url must point at zed-pkg/zed-lib-core")
 
-    targets = zpkg.get("targets", {})
-    if set(targets) != {"rust"}:
+    publish = zpkg.get("publish", {})
+    if publish.get("tag_format") != "lock/v{version}":
         errors.append(
-            f"Zed package must expose exactly the rust target, got {sorted(targets)}"
+            "Zed publish.tag_format must be 'lock/v{version}' so the nested package's "
+            "tags cannot collide with the repository package or the orm slice"
         )
-    else:
-        rust_target = targets["rust"]
-        if rust_target.get("dir") != ".":
-            errors.append("targets.rust.dir must be the repository root")
-        if rust_target.get("adapter") != "rust":
-            errors.append("targets.rust.adapter must be 'rust'")
-        if "native" in rust_target:
-            errors.append(
-                "targets.rust must not declare native release metadata: a dir='.' "
-                "target is the canonical Zed repository package, while cargo publish "
-                "remains an independent crates.io release operation"
-            )
+
+    # A nested slice is published by the repository package's `targets.rust-lock`
+    # entry; declaring its own targets (or a crates.io native route) would make
+    # two release authorities for one crate.
+    if "targets" in zpkg:
+        errors.append(
+            "nested Zed package must not declare targets: src/rust-lock is published "
+            "through zed-lib-core's root .zpkg.toml, and cargo publish remains an "
+            "independent crates.io release operation"
+        )
+    install = zpkg.get("install", {})
+    if install.get("adapter") != "rust":
+        errors.append("Zed install.adapter must be 'rust'")
 
     placeholder_lock = ROOT / ".zpkg.lock"
     if placeholder_lock.exists():
@@ -108,11 +120,13 @@ def main() -> int:
         "source repository: `zed-pkg/zed-cli`",
         f"source commit: `{EXPECTED_SOURCE_COMMIT}`",
         "source path: `crates/zed-lock`",
+        "folded into: `zed-pkg/zed-lib-core`",
+        "fold path: `src/rust-lock`",
     ):
         if required not in provenance:
             errors.append(f"PROVENANCE.md is missing {required!r}")
 
-    source = (ROOT / "src/lib.rs").read_text(encoding="utf-8")
+    source = (ROOT / "lib.rs").read_text(encoding="utf-8")
     production_source = source.split("\n#[cfg(test)]", 1)[0]
     if "FileExt::lock_exclusive" not in production_source:
         errors.append("source no longer contains the kernel descriptor-lock authority")

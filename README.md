@@ -1,9 +1,10 @@
 # zed-lib-core
 
 Canonical core library for the **zed-pkg** registry. This repository is the
-semantic merge of two predecessors — `zed-pkg/zed-lib` (resolution, polyglot
-behavior, and registry entities) and `zed-pkg/zed-orm-core` (the opaque
-role-aware query boundary) — with both histories preserved.
+semantic merge of three predecessors — `zed-pkg/zed-lib` (resolution, polyglot
+behavior, and registry entities), `zed-pkg/zed-orm-core` (the opaque
+role-aware query boundary), and `zed-pkg/zed-lock` (kernel-backed local
+locking) — with every history preserved.
 
 `zed-lib-core` is itself a zed package: see `.zpkg.toml`. Consumer migration and
 exact source commits are recorded in [`PREDECESSOR_MIGRATION.md`](PREDECESSOR_MIGRATION.md).
@@ -15,6 +16,7 @@ exact source commits are recorded in [`PREDECESSOR_MIGRATION.md`](PREDECESSOR_MI
 | `src/rust-orm` | `zed-orm-core` | Current SeaORM entities and opaque named operations; target Diesel-primary/SeaORM-secondary runtime |
 | `src/rust-orm/sql` | `zed-schema` | Current immutable DDL baseline and forward migrations; target reviewed dual-source desired release for declarative-migrations |
 | `src/rust` | `zed-lib` | Version resolution and policy over the shared contract types |
+| `src/rust-lock` | `zed-lock` | Kernel-backed, event-driven local file locking (folded in from `zed-pkg/zed-lock`) |
 | `src/ts` | `@zed-pkg/zed-lib` | The same resolution behavior, natively in TypeScript |
 | `src/dart` | `zed_lib` | The same resolution behavior, natively in Dart |
 | `conformance` | `zed-lib-conformance` | The shared corpus all three are held to |

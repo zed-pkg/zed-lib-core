@@ -9,11 +9,11 @@ language = "rust"
 
 [package.repository]
 vcs = "git"
-url = "https://github.com/zed-pkg/zed-lock"
+url = "https://github.com/zed-pkg/zed-lib-core"
 
 [publish]
 include_readme = true
-tag_format = "v{version}"
+tag_format = "lock/v{version}"
 smoke_test = "python3 \"$ZED_PKG_TEST_TARGET/scripts/check-package-contract.py\" && cargo test --manifest-path \"$ZED_PKG_TEST_TARGET/Cargo.toml\" --all-targets"
 exclude = [
   ".env",
@@ -27,11 +27,8 @@ exclude = [
   ".DS_Store",
 ]
 
-# Keep the repository's required Rust target. Because it spans the repository
-# root, Zed canonicalizes it to zed-pkg/zed-lock; crates.io publication remains
-# an independent release operation and must not be declared on this target.
-[targets.rust]
-dir = "."
+[install]
+dir = ".vendor/.zed"
 adapter = "rust"
 
 [scripts]

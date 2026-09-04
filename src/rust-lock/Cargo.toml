@@ -4,10 +4,17 @@ version = "0.1.1"
 edition = "2024"
 description = "Kernel-backed, event-driven file locking for zed-pkg"
 license = "MIT"
-repository = "https://github.com/zed-pkg/zed-lock"
+repository = "https://github.com/zed-pkg/zed-lib-core"
 rust-version = "1.88"
 keywords = ["locking", "flock", "lockfile", "concurrency", "zed-pkg"]
 categories = ["concurrency", "filesystem"]
+
+# The lock slice of zed-lib-core. Like `src/rust` and `src/rust-orm`, the
+# crate manifest sits inside its own slice and the library root is `lib.rs`
+# beside it, so `.zpkg.toml` can publish the slice as its own package.
+[lib]
+name = "zed_lock"
+path = "lib.rs"
 
 [dependencies]
 anyhow = "1"

@@ -16,9 +16,8 @@ CHECKER = REPOSITORY / "scripts/check-package-contract.py"
 class PackageContractTests(unittest.TestCase):
     def fixture(self) -> pathlib.Path:
         temporary = pathlib.Path(self.addCleanupTempDir())
-        for name in ("Cargo.toml", ".zpkg.toml", "PROVENANCE.md"):
+        for name in ("Cargo.toml", ".zpkg.toml", "PROVENANCE.md", "lib.rs", "path_security.rs"):
             shutil.copy2(REPOSITORY / name, temporary / name)
-        shutil.copytree(REPOSITORY / "src", temporary / "src")
         return temporary
 
     def addCleanupTempDir(self) -> str:
@@ -42,11 +41,14 @@ class PackageContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("contracts are consistent", result.stdout)
 
-    def test_root_target_native_release_route_is_rejected(self) -> None:
+    def test_nested_slice_targets_are_rejected(self) -> None:
         fixture = self.fixture()
         manifest = fixture / ".zpkg.toml"
         manifest.write_text(
             manifest.read_text(encoding="utf-8")
+            + "\n[targets.rust]\n"
+            + 'dir = "."\n'
+            + 'adapter = "rust"\n'
             + "\n[targets.rust.native]\n"
             + 'registry = "crates-io"\n'
             + 'package = "zed-lock"\n',
@@ -54,7 +56,20 @@ class PackageContractTests(unittest.TestCase):
         )
         result = self.run_checker(fixture)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("must not declare native release metadata", result.stderr)
+        self.assertIn("must not declare targets", result.stderr)
+
+    def test_release_tag_namespace_is_enforced(self) -> None:
+        fixture = self.fixture()
+        manifest = fixture / ".zpkg.toml"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8").replace(
+                'tag_format = "lock/v{version}"', 'tag_format = "v{version}"'
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_checker(fixture)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("lock/v{version}", result.stderr)
 
     def test_empty_zed_lock_placeholder_is_rejected(self) -> None:
         fixture = self.fixture()
@@ -65,7 +80,7 @@ class PackageContractTests(unittest.TestCase):
 
     def test_polling_regression_is_rejected(self) -> None:
         fixture = self.fixture()
-        source = fixture / "src/lib.rs"
+        source = fixture / "lib.rs"
         text = source.read_text(encoding="utf-8")
         marker = "\n#[cfg(test)]"
         self.assertIn(marker, text, "source fixture has no production/test boundary")
