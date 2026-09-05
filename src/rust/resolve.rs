@@ -189,22 +189,21 @@ pub fn latest_stable(metadata: &PackageMetadata) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zed_interfaces::vcs::Vcs;
 
     fn metadata(scheme: VersionScheme, versions: &[&str]) -> PackageMetadata {
-        PackageMetadata {
-            org: "acme".to_string(),
-            name: "http-kit".to_string(),
-            vcs: Vcs::Git,
-            repo_url: "https://github.com/acme/http-kit".to_string(),
-            description: None,
-            latest: versions.last().map(|v| v.to_string()),
-            versions: versions.iter().map(|v| v.to_string()).collect(),
-            version_scheme: scheme,
-            tags: Vec::new(),
-            mirrors: Vec::new(),
-            signing_keys: Vec::new(),
-        }
+        let versions: Vec<String> = versions.iter().map(|v| v.to_string()).collect();
+        serde_json::from_value(serde_json::json!({
+            "org": "acme",
+            "name": "http-kit",
+            "vcs": "git",
+            "repo_url": "https://github.com/acme/http-kit",
+            "description": null,
+            "latest": versions.last(),
+            "versions": versions,
+            "version_scheme": scheme,
+            "tags": [],
+        }))
+        .expect("metadata fixture matches the shared contract")
     }
 
     #[test]

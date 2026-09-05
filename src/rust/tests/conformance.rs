@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use zed_interfaces::registry::PackageMetadata;
-use zed_interfaces::vcs::Vcs;
 use zed_interfaces::version::VersionScheme;
 use zed_interfaces::{
     RegistryNamespaceAction, RegistryNamespaceAutomation, RegistryNamespaceDisposition,
@@ -111,19 +110,18 @@ fn metadata(case: &Case, latest_is_data: bool) -> PackageMetadata {
             .clone()
             .or_else(|| case.versions.last().cloned())
     };
-    PackageMetadata {
-        org: "acme".to_string(),
-        name: "conformance".to_string(),
-        vcs: Vcs::Git,
-        repo_url: "https://github.com/acme/conformance".to_string(),
-        description: None,
-        latest,
-        versions: case.versions.clone(),
-        version_scheme: VersionScheme::from_str_lenient(&case.scheme),
-        tags: Vec::new(),
-        mirrors: Vec::new(),
-        signing_keys: Vec::new(),
-    }
+    serde_json::from_value(serde_json::json!({
+        "org": "acme",
+        "name": "conformance",
+        "vcs": "git",
+        "repo_url": "https://github.com/acme/conformance",
+        "description": null,
+        "latest": latest,
+        "versions": case.versions,
+        "version_scheme": VersionScheme::from_str_lenient(&case.scheme),
+        "tags": [],
+    }))
+    .expect("metadata fixture matches the shared contract")
 }
 
 fn check_resolution(case: &Case, file: &str) {

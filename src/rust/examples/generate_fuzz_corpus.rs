@@ -18,7 +18,6 @@ use std::fs;
 use std::path::Path;
 
 use zed_interfaces::registry::PackageMetadata;
-use zed_interfaces::vcs::Vcs;
 use zed_interfaces::version::VersionScheme;
 use zed_lib::{latest_stable, resolve_version};
 
@@ -113,19 +112,18 @@ const SCHEMES: &[(&str, VersionScheme)] = &[
 ];
 
 fn metadata(scheme: VersionScheme, versions: Vec<String>) -> PackageMetadata {
-    PackageMetadata {
-        org: "acme".to_string(),
-        name: "conformance".to_string(),
-        vcs: Vcs::Git,
-        repo_url: "https://github.com/acme/conformance".to_string(),
-        description: None,
-        latest: versions.last().cloned(),
-        versions,
-        version_scheme: scheme,
-        tags: Vec::new(),
-        mirrors: Vec::new(),
-        signing_keys: Vec::new(),
-    }
+    serde_json::from_value(serde_json::json!({
+        "org": "acme",
+        "name": "conformance",
+        "vcs": "git",
+        "repo_url": "https://github.com/acme/conformance",
+        "description": null,
+        "latest": versions.last(),
+        "versions": versions,
+        "version_scheme": scheme,
+        "tags": [],
+    }))
+    .expect("metadata fixture matches the shared contract")
 }
 
 fn json_array(values: &[String]) -> String {
