@@ -1,0 +1,38 @@
+[package]
+org = "zed-pkg"
+name = "zed-lock"
+version = "0.1.1"
+description = "Kernel-backed, event-driven file locking for zed-pkg"
+license = "MIT"
+keywords = ["locking", "flock", "lockfile", "concurrency", "rust"]
+language = "rust"
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/zed-pkg/zed-lib-core"
+
+[publish]
+include_readme = true
+tag_format = "lock/v{version}"
+smoke_test = "python3 \"$ZED_PKG_TEST_TARGET/scripts/check-package-contract.py\" && cargo test --manifest-path \"$ZED_PKG_TEST_TARGET/Cargo.toml\" --all-targets"
+exclude = [
+  ".env",
+  ".env.*",
+  ".direnv/**",
+  ".zed/**",
+  ".zed-pack/**",
+  "target/**",
+  "tmp/**",
+  "**/*.log",
+  ".DS_Store",
+]
+
+[install]
+dir = ".vendor/.zed"
+adapter = "rust"
+
+[scripts]
+test = "cargo test --all-targets"
+lint = "cargo clippy --all-targets -- -D warnings"
+format = "cargo fmt --all --check"
+package-contract = "python3 scripts/check-package-contract.py"

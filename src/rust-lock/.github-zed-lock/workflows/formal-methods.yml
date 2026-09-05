@@ -1,0 +1,68 @@
+name: formal-methods
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  waiter-lifecycle:
+    name: waiter lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install Java 17 for TLC
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Validate the concrete refinement corpus
+        run: >-
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020
+          -s protocol/formal-waiter-lifecycle.schema.json
+          -d protocol/formal-waiter-lifecycle.json
+
+      # Keep these argv aligned with `fmctl --dry-run`. The repository-local
+      # schema-v1 manifest is the source of the claim and resource bounds.
+      - name: Typecheck the Quint specification
+        run: >-
+          npx --yes --package=@informalsystems/quint@0.32.0 quint typecheck
+          formal/waiter_lifecycle.qnt
+
+      - name: Simulate invariants and required witnesses
+        run: >-
+          npx --yes --package=@informalsystems/quint@0.32.0 quint run
+          formal/waiter_lifecycle.qnt
+          --main=waiter_lifecycle
+          --init=init
+          --step=step
+          --backend=typescript
+          --max-samples=10000
+          --max-steps=30
+          --invariants waiter_lifecycle_safety
+          --witnesses cancel_before_grant_reached timeout_before_grant_reached detached_grant_release_reached successful_transfer_reached waiter_cap_rejection_reached same_process_rejection_reached partial_lockset_unwind_reached
+
+      - name: Exhaustively verify the declared finite state space with TLC
+        run: >-
+          npx --yes --package=@informalsystems/quint@0.32.0 quint verify
+          formal/waiter_lifecycle.qnt
+          --main=waiter_lifecycle
+          --init=init
+          --step=step
+          --backend=tlc
+          --invariants waiter_lifecycle_safety

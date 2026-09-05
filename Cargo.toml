@@ -7,7 +7,8 @@ resolver = "3"
 members = [
   "src/rust",
   "src/rust-orm",
+  "src/rust-lock",
   "validation/rust",
   "validation/rust-server",
 ]
-default-members = ["src/rust", "src/rust-orm"]
+default-members = ["src/rust", "src/rust-orm", "src/rust-lock"]
