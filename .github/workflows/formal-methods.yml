@@ -91,3 +91,98 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+
+  rust-lock-waiter-lifecycle:
+    name: fmctl + Quint zed-lock waiter lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NO_COLOR: '1'
+      RUST_BACKTRACE: '1'
+    steps:
+      - name: Checkout zed-lib-core
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout the pinned fmctl incubator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: opto-sync/opto-sync-clients
+          ref: c2146ef9f054d24e1488c216547852aa148285cf
+          path: .formal-tools/opto-sync-clients
+          persist-credentials: false
+
+      - name: Install the fmctl Rust toolchain
+        uses: dtolnay/rust-toolchain@2eae45db285e407f22119950686d47e1101e071b
+
+      - name: Install Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e289664e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Install Java for TLC
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build the pinned fmctl runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/fmctl-source"
+          cp -R .formal-tools/opto-sync-clients/tools/fmctl/. "$RUNNER_TEMP/fmctl-source/"
+          cargo build \
+            --locked \
+            --release \
+            --manifest-path "$RUNNER_TEMP/fmctl-source/Cargo.toml"
+          echo "FMCTL=$RUNNER_TEMP/fmctl-source/target/release/fmctl" >> "$GITHUB_ENV"
+
+      - name: Validate the concrete refinement corpus
+        working-directory: src/rust-lock
+        run: >-
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020
+          -s protocol/formal-waiter-lifecycle.schema.json
+          -d protocol/formal-waiter-lifecycle.json
+
+      - name: Validate the zed-lock formal-methods manifest
+        working-directory: src/rust-lock
+        run: |
+          mkdir -p .formal-artifacts/fmctl
+          "$FMCTL" --format json validate \
+            | tee .formal-artifacts/fmctl/validate.json
+
+      - name: Record and validate the formal toolchain
+        working-directory: src/rust-lock
+        run: |
+          "$FMCTL" --format json doctor \
+            | tee .formal-artifacts/fmctl/doctor.json
+
+      - name: Type-check the declared waiter lifecycle model
+        working-directory: src/rust-lock
+        run: |
+          "$FMCTL" check
+
+      - name: Reach every configured waiter lifecycle witness
+        working-directory: src/rust-lock
+        run: |
+          "$FMCTL" simulate
+
+      - name: Exhaust the declared finite waiter lifecycle state graph
+        working-directory: src/rust-lock
+        run: |
+          "$FMCTL" verify
+
+      - name: Upload model-checker evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zed-lib-core-rust-lock-formal-methods
+          path: |
+            src/rust-lock/.formal-artifacts/
+            src/rust-lock/formal/fm.toml
+            src/rust-lock/formal/waiter_lifecycle.qnt
+            src/rust-lock/protocol/formal-waiter-lifecycle.schema.json
+            src/rust-lock/protocol/formal-waiter-lifecycle.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
