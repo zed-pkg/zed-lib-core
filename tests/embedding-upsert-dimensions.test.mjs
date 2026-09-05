@@ -87,12 +87,19 @@ DO $$ BEGIN
 END $$;
 ROLLBACK;
 `;
-  const result = spawnSync('psql', ['-X', '--set=ON_ERROR_STOP=1', '--quiet', '--no-align', '--tuples-only'], {
+  const result = spawnSync('psql', [
+    '-X',
+    '--set=ON_ERROR_STOP=1',
+    '--quiet',
+    '--no-align',
+    '--tuples-only',
+    databaseUrl,
+  ], {
     input: script,
     encoding: 'utf8',
     timeout: 25_000,
     maxBuffer: 1024 * 1024,
-    env: { ...process.env, PGDATABASE: databaseUrl, PGCONNECT_TIMEOUT: '5' },
+    env: { ...process.env, PGCONNECT_TIMEOUT: '5' },
   });
   assert.ifError(result.error);
   assert.equal(result.status, 0, `PostgreSQL regression failed with exit status ${result.status}`);
