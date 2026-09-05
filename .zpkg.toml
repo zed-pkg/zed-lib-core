@@ -2,9 +2,9 @@
 org = "zed-pkg"
 name = "zed-lib-core"
 version = "0.1.0"
-description = "Canonical zed-pkg core: SeaORM registry entities, migrations, and the role-aware query boundary, plus the polyglot resolution slices"
+description = "Canonical zed-pkg core: SeaORM registry entities, migrations, the role-aware query boundary, the polyglot resolution slices, and the kernel-backed local lock crate"
 license = "MIT"
-keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot"]
+keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot", "locking"]
 
 [package.repository]
 vcs = "git"
@@ -40,6 +40,13 @@ exclude = [
   "src/rust-orm/sql/LICENSE",
   "src/rust-orm/sql/README.md",
   "src/rust-orm/sql/schema-package-smoke.sh",
+  # `zed-lock` is a standalone nested package too (folded from zed-pkg/zed-lock).
+  "src/rust-lock/.zpkg.toml",
+  "src/rust-lock/LICENSE",
+  "src/rust-lock/README.md",
+  "src/rust-lock/CHANGELOG.md",
+  "src/rust-lock/SECURITY.md",
+  "src/rust-lock/.github-zed-lock/**",
   "tmp/**",
   "**/*.log",
   ".DS_Store",
@@ -62,6 +69,15 @@ adapter = "rust"
 [targets.rust.native]
 registry = "crates-io"
 package = "zed-lib"
+
+# The local lock crate, folded in from zed-pkg/zed-lock. It keeps its crate
+# name so consumers change only where they fetch it from; it never depends on
+# the ORM slice or on the network. Distributed lease + Postgres advisory
+# composition lives in ORESoftware/ores-locks-and-leases, not here.
+[targets.rust-lock]
+dir = "src/rust-lock"
+name = "zed-lock"
+adapter = "rust"
 
 # The corpus is consumable on its own: an implementation in a language zed-lib
 # does not ship yet still has something to be correct against.

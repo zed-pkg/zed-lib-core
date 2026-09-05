@@ -1,0 +1,12 @@
+/target/
+/.formal-artifacts/
+/_apalache-out/
+Cargo.lock
+__pycache__/
+*.py[cod]
+**/*.rs.bk
+.DS_Store
+tmp/
+temp/
+tmp/worktrees/
+temp/worktrees/

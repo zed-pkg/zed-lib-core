@@ -1,32 +1,47 @@
-# TypeSpec and Protobuf persistence cross-checks
+# TypeSpec, JSON Schema, and Protobuf persistence cross-checks
 
-TypeSpec fans the locked persistence shadow into JSON Schema and Protobuf 3 so
-two independent standard emitters can disagree visibly with the ORM projections.
-It does not replace the authored PostgreSQL DDL, the immutable migration ledger,
-or the public DTOs owned by `zed-pkg/zed-interfaces`.
+This document records both the current transition tooling and the target
+peer-source contract. In the target, TypeSpec and JSON Schema/OpenAPI are
+co-equal, independently authored sources. Neither is canonical over, generated
+from, or a fallback for the other; each has release-veto power when normalized
+semantics disagree. Optional cross-translations are diagnostic witnesses only
+and cannot feed production SQL, Protobuf, OpenAPI, clients, ORM code,
+migrations, or releases.
+
+The current tool still fans the locked persistence JSON shadow into generated
+TypeSpec, JSON Schema, and Protobuf. That direction is useful legacy evidence;
+it is not the completed peer-source architecture and must not be mislabeled as
+such. The immutable DDL/migration lineage remains the deployed baseline until the
+authored sources and all parity/migration gates pass. Public DTOs remain owned
+by `zed-pkg/zed-interfaces`.
 
 ## Authority and data flow
 
 ```text
-authored PostgreSQL DDL (migration authority)
-        |
-        +--> disposable PostgreSQL --> SeaORM + Drizzle round-trip
-        |
-        +--> locked persistence JSON shadow
-                    |
-                    +--> generated TypeSpec
-                              |
-                              +--> Draft 2020-12 JSON Schema
-                              +--> Protobuf 3
+target:
+  authored TypeSpec peer -----> SQL/ORM candidate A
+          +--------------------> Protobuf 3 / gRPC / wire clients
+
+  authored JSON Schema/OpenAPI peer -> SQL/ORM candidate B
+          +--------------------------> interfaces/validators/HTTP clients
+
+  candidate A/B + common PostgreSQL extension
+          -> disposable PostgreSQL A/B -> Diesel/SeaORM/catalog parity
+
+current transition:
+  deployed DDL -> locked JSON shadow -> generated TypeSpec/JSON/Protobuf
 ```
 
-`schema/persistence.schema.json` remains an imported shadow whose table, column,
-type, nullability, interface revision, SeaORM source blobs, and production SQL
-blob are checked elsewhere. `tools/typespec-protobuf-parity.mjs` generates one
-TypeSpec model surface from that locked shadow, invokes the pinned official
-JSON Schema and Protobuf emitters, then independently parses and checks both
-outputs. The TypeSpec file is generated evidence, not another hand-authored
-schema.
+`schema/persistence.schema.json` is currently an imported shadow whose table,
+column, type, nullability, interface revision, SeaORM source blobs, and
+production SQL blob are checked elsewhere.
+`tools/typespec-protobuf-parity.mjs` currently generates TypeSpec from that
+shadow, invokes the pinned official JSON Schema and Protobuf emitters, and
+independently parses both outputs. Before peer promotion, the JSON Schema tree
+needs an independence/provenance audit and a protected authored workflow, while
+TypeSpec must move from generated evidence to a separately authored source.
+Legacy cross-generated output remains isolated below generated paths and cannot
+become an input to either production lane.
 
 ## Explicit wire transformations
 
@@ -90,8 +105,13 @@ wire identities as a side effect.
 
 ## Release gate
 
-The TypeSpec/Protobuf check is tied to the same source commit as the ORM and
-schema Zed packages. A green check proves deterministic cross-projection at that
-commit. It does not make the generated files package authority, and it does not
-replace the read-only declarative-migrations plan against the live PostgreSQL
-catalog.
+The current TypeSpec/Protobuf check is tied to the same source commit as the ORM
+and schema Zed packages. A green check proves deterministic legacy
+cross-projection at that commit; it does not prove independent peer-source agreement.
+
+The target gate additionally requires independently reviewed TypeSpec and JSON
+Schema/OpenAPI inputs,
+normalized source/catalog/Diesel/SeaORM/behavior/wire parity, stable Protobuf
+identity, and a reviewed expected-divergence registry. Neither emitter output
+nor ORM code replaces the `declarative-migrations` plan against a fresh live
+PostgreSQL catalog.

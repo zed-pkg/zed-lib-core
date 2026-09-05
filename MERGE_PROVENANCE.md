@@ -84,6 +84,48 @@ The broad public API lives under `/api/v1`. Registry operations are the special 
 
 Cloudflare R2 stores immutable artifact bytes under content-addressed keys. Postgres remains authoritative for package identity, visibility, versions, digest/size/format, upload state, download facts, and authorization. The API commits the download ledger before returning a signed R2 redirect. Neither the API nor app.zpkg.net proxies artifact bytes.
 
+## Third lineage: zed-lock (2026-09-04)
+
+`zed-pkg/zed-lock` — the kernel-backed, event-driven local file-lock crate
+extracted from `zed-cli` — was folded in as the `src/rust-lock` slice. Its
+history is a parent of the fold merge commit recorded in
+`PREDECESSOR_MIGRATION.md` ("zed-lock lineage"); the lineage's tip on the
+standalone repository was `7818d0140f9947352f803d4a50aabb8e0b26265a`, followed
+by one mechanical relocation commit that moved every tracked file under
+`src/rust-lock` so the merge itself carries no content changes.
+
+### Retained from zed-lock
+
+- the crate name `zed-lock` and its entire public API (`LockManager`,
+  `LockRequest`, `LockClass`, `PathSecurityPolicy`, guards and waiters);
+- the descriptor lock as the sole local ownership authority — no polling, no
+  PID files, no network in the local path;
+- the Quint waiter-lifecycle model under `src/rust-lock/formal` and the
+  protocol corpus it is checked against;
+- the package-contract checker and its negative-case tests, re-pointed at the
+  nested-slice invariants;
+- the standalone workflows, kept under `src/rust-lock/.github-zed-lock` as
+  reference only (the repository's `ci.yml` runs the crate).
+
+### Reconciled decisions
+
+**One crate, one release authority.** The crate keeps its name so consumers
+change only where they fetch it from. It is published as the nested
+`zed-pkg/zed-lock` package through the root manifest's `targets.rust-lock`
+under the `lock/v{version}` tag namespace; the nested `.zpkg.toml` declares
+no targets of its own. `cargo publish` to crates.io stays an independent
+operation, as before.
+
+**Local locking stays local.** `zed-lock` still has no dependency on the ORM
+slice, on `sea-orm`, or on the network. Fiducia leases and Postgres advisory
+locks are composed *around* it, not inside it — that composition is the job of
+[`ORESoftware/ores-locks-and-leases`](https://github.com/ORESoftware/ores-locks-and-leases),
+which zed-lib-core will import rather than reimplement.
+
+**The standalone repository is retired, not deleted.** `zed-pkg/zed-lock` is
+archived with a pointer here; its tags remain valid for the versions they
+named.
+
 ## Compatibility and release gates
 
 - No synthetic `.zpkg.lock` may be committed. A release lock must come from a successful immutable Zed resolution.
