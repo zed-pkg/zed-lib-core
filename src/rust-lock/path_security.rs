@@ -218,7 +218,7 @@ fn sddl_rights_can_modify(rights: &str) -> bool {
     if !upper.len().is_multiple_of(2) || !upper.is_ascii() {
         return true;
     }
-    upper.as_bytes().chunks_exact(2).any(|token| {
+    upper.as_bytes().as_chunks::<2>().0.iter().any(|token| {
         !matches!(
             token,
             b"FR" | b"FX" | b"GR" | b"GX" | b"RC" | b"LC" | b"RP" | b"LO"
