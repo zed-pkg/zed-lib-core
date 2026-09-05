@@ -108,6 +108,11 @@ ORDER BY score DESC, label ASC
 LIMIT $3
 "#;
 
+// The unique key includes content_sha256, so an entity/model pair can retain
+// several historical rows. Rank those rows before resolving visibility to
+// make the logical result one current row per model; this is duplicate
+// suppression, not a proof that the selected digest matches every source
+// mutation. DEN-1165 tracks the model registry and freshness lifecycle.
 const SEMANTIC_SEARCH_SQL: &str = r#"
 WITH query_values AS (
     SELECT ordinality::integer AS position, value::double precision AS value
@@ -125,6 +130,8 @@ WITH query_values AS (
         e.entity_type,
         e.entity_id,
         e.org_id,
+        e.embedding_model,
+        e.updated_at AS embedding_updated_at,
         sum(component.value::double precision * query_values.value) AS dot_product,
         sqrt(sum(power(component.value::double precision, 2))) AS entity_norm,
         max(query_norm.norm) AS query_norm
@@ -135,72 +142,83 @@ WITH query_values AS (
     CROSS JOIN query_norm
     WHERE e.embedding_model = $2
       AND e.embedding_dimensions = $3
-    GROUP BY e.id, e.entity_type, e.entity_id, e.org_id
+    GROUP BY e.id, e.entity_type, e.entity_id, e.org_id, e.embedding_model, e.updated_at
+), ranked AS (
+    SELECT
+        scored.*,
+        row_number() OVER (
+            PARTITION BY scored.entity_type, scored.entity_id, scored.embedding_model
+            ORDER BY scored.embedding_updated_at DESC, scored.id DESC
+        ) AS embedding_rank
+    FROM scored
 ), resolved AS (
     SELECT
-        scored.entity_type,
-        scored.entity_id,
-        CASE scored.entity_type
+        ranked.entity_type,
+        ranked.entity_id,
+        CASE ranked.entity_type
             WHEN 'org' THEN embedded_org.slug
             WHEN 'project' THEN project_org.slug || '/' || embedded_project.slug
             WHEN 'package' THEN package_org.slug || '/' || embedded_package.name
             WHEN 'package_version' THEN version_org.slug || '/' || version_package.name || '@' || embedded_version.version
         END AS label,
-        CASE scored.entity_type
+        CASE ranked.entity_type
             WHEN 'org' THEN embedded_org.description
             WHEN 'project' THEN embedded_project.description
             WHEN 'package' THEN embedded_package.description
             WHEN 'package_version' THEN version_package.description
         END AS description,
-        scored.dot_product / nullif(scored.entity_norm * scored.query_norm, 0) AS score
-    FROM scored
+        ranked.dot_product / nullif(ranked.entity_norm * ranked.query_norm, 0) AS score
+    FROM ranked
     LEFT JOIN zed_orgs embedded_org
-      ON scored.entity_type = 'org' AND embedded_org.id = scored.entity_id
+      ON ranked.entity_type = 'org' AND embedded_org.id = ranked.entity_id
     LEFT JOIN zed_projects embedded_project
-      ON scored.entity_type = 'project' AND embedded_project.id = scored.entity_id
+      ON ranked.entity_type = 'project' AND embedded_project.id = ranked.entity_id
     LEFT JOIN zed_orgs project_org ON project_org.id = embedded_project.org_id
     LEFT JOIN zed_packages embedded_package
-      ON scored.entity_type = 'package' AND embedded_package.id = scored.entity_id
+      ON ranked.entity_type = 'package' AND embedded_package.id = ranked.entity_id
     LEFT JOIN zed_orgs package_org ON package_org.id = embedded_package.org_id
     LEFT JOIN zed_package_versions embedded_version
-      ON scored.entity_type = 'package_version' AND embedded_version.id = scored.entity_id
+      ON ranked.entity_type = 'package_version' AND embedded_version.id = ranked.entity_id
     LEFT JOIN zed_packages version_package ON version_package.id = embedded_version.package_id
     LEFT JOIN zed_orgs version_org ON version_org.id = version_package.org_id
     WHERE
-        (
-            scored.entity_type = 'org'
-            AND embedded_org.id IN (SELECT org_id FROM visible_orgs)
-            AND embedded_org.is_soft_deleted = false
-        )
-        OR (
-            scored.entity_type = 'project'
-            AND embedded_project.org_id IN (SELECT org_id FROM visible_orgs)
-            AND embedded_project.is_soft_deleted = false
-            AND project_org.is_soft_deleted = false
-        )
-        OR (
-            scored.entity_type = 'package'
-            AND (
-                embedded_package.visibility = 'public'
-                OR embedded_package.org_id IN (SELECT org_id FROM visible_orgs)
+        ranked.embedding_rank = 1
+        AND (
+            (
+                ranked.entity_type = 'org'
+                AND embedded_org.id IN (SELECT org_id FROM visible_orgs)
+                AND embedded_org.is_soft_deleted = false
             )
-            AND embedded_package.is_soft_deleted = false
-            AND package_org.is_soft_deleted = false
-        )
-        OR (
-            scored.entity_type = 'package_version'
-            AND (
-                version_package.visibility = 'public'
-                OR version_package.org_id IN (SELECT org_id FROM visible_orgs)
+            OR (
+                ranked.entity_type = 'project'
+                AND embedded_project.org_id IN (SELECT org_id FROM visible_orgs)
+                AND embedded_project.is_soft_deleted = false
+                AND project_org.is_soft_deleted = false
             )
-            AND version_package.is_soft_deleted = false
-            AND version_org.is_soft_deleted = false
+            OR (
+                ranked.entity_type = 'package'
+                AND (
+                    embedded_package.visibility = 'public'
+                    OR embedded_package.org_id IN (SELECT org_id FROM visible_orgs)
+                )
+                AND embedded_package.is_soft_deleted = false
+                AND package_org.is_soft_deleted = false
+            )
+            OR (
+                ranked.entity_type = 'package_version'
+                AND (
+                    version_package.visibility = 'public'
+                    OR version_package.org_id IN (SELECT org_id FROM visible_orgs)
+                )
+                AND version_package.is_soft_deleted = false
+                AND version_org.is_soft_deleted = false
+            )
         )
 )
 SELECT entity_type, entity_id, label, description, score
 FROM resolved
 WHERE label IS NOT NULL AND score IS NOT NULL
-ORDER BY score DESC, label ASC
+ORDER BY score DESC, label ASC, entity_type ASC, entity_id ASC
 LIMIT $5
 "#;
 
@@ -403,6 +421,23 @@ mod tests {
         assert!(SEMANTIC_SEARCH_SQL.contains("jsonb_array_elements_text"));
         assert!(!SEMANTIC_SEARCH_SQL.contains("::vector"));
         assert!(!SEMANTIC_SEARCH_SQL.contains("<=>"));
+    }
+
+    #[test]
+    fn semantic_search_deduplicates_by_latest_model_row_before_visibility() {
+        assert!(SEMANTIC_SEARCH_SQL.contains("row_number() OVER"));
+        assert!(SEMANTIC_SEARCH_SQL
+            .contains("PARTITION BY scored.entity_type, scored.entity_id, scored.embedding_model"));
+        assert!(SEMANTIC_SEARCH_SQL
+            .contains("ORDER BY scored.embedding_updated_at DESC, scored.id DESC"));
+        assert!(SEMANTIC_SEARCH_SQL.contains("FROM ranked"));
+        assert!(SEMANTIC_SEARCH_SQL.contains("ranked.embedding_rank = 1"));
+    }
+
+    #[test]
+    fn semantic_search_has_a_total_order_for_stable_pagination() {
+        assert!(SEMANTIC_SEARCH_SQL
+            .contains("ORDER BY score DESC, label ASC, entity_type ASC, entity_id ASC"));
     }
 
     #[test]

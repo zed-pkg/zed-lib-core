@@ -15,6 +15,8 @@ node_modules/
 __pycache__/
 *.py[cod]
 .DS_Store
+.formal-artifacts/
+_apalache-out/
 
 # Slice tooling state
 src/dart/pubspec.lock
