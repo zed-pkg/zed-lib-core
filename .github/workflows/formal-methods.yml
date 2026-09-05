@@ -42,7 +42,7 @@ jobs:
         uses: dtolnay/rust-toolchain@2eae45db285e407f22119950686d47e1101e071b
 
       - name: Install Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -117,7 +117,7 @@ jobs:
         uses: dtolnay/rust-toolchain@2eae45db285e407f22119950686d47e1101e071b
 
       - name: Install Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e289664e5dc5ba9c38 # v6
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
