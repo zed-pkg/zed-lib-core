@@ -19,3 +19,7 @@ __pycache__/
 # Slice tooling state
 src/dart/pubspec.lock
 src/ts/package-lock.json
+
+# Repository-local temporary data and authorized Git worktrees
+tmp/worktrees
+temp/worktrees
