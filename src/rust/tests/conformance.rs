@@ -121,6 +121,8 @@ fn metadata(case: &Case, latest_is_data: bool) -> PackageMetadata {
         versions: case.versions.clone(),
         version_scheme: VersionScheme::from_str_lenient(&case.scheme),
         tags: Vec::new(),
+        mirrors: Vec::new(),
+        signing_keys: Vec::new(),
     }
 }
 

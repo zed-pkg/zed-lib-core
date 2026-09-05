@@ -123,6 +123,8 @@ fn metadata(scheme: VersionScheme, versions: Vec<String>) -> PackageMetadata {
         versions,
         version_scheme: scheme,
         tags: Vec::new(),
+        mirrors: Vec::new(),
+        signing_keys: Vec::new(),
     }
 }
 

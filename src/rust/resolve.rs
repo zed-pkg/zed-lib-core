@@ -202,6 +202,8 @@ mod tests {
             versions: versions.iter().map(|v| v.to_string()).collect(),
             version_scheme: scheme,
             tags: Vec::new(),
+            mirrors: Vec::new(),
+            signing_keys: Vec::new(),
         }
     }
 

@@ -1,0 +1,93 @@
+name: Formal methods
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  embedding-search-safety:
+    name: fmctl + Quint embedding-search safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NO_COLOR: '1'
+      RUST_BACKTRACE: '1'
+    steps:
+      - name: Checkout zed-lib-core
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # fmctl is incubating in opto-sync while the standalone formal-methods
+      # runner is extracted. Keep the exact source revision in the workflow so
+      # verifier behavior cannot drift between pull requests.
+      - name: Checkout the pinned fmctl incubator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: opto-sync/opto-sync-clients
+          ref: c2146ef9f054d24e1488c216547852aa148285cf
+          path: .formal-tools/opto-sync-clients
+          persist-credentials: false
+
+      - name: Install the fmctl Rust toolchain
+        uses: dtolnay/rust-toolchain@2eae45db285e407f22119950686d47e1101e071b
+
+      - name: Install Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Install Java for TLC
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build the pinned fmctl runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/fmctl-source"
+          cp -R .formal-tools/opto-sync-clients/tools/fmctl/. "$RUNNER_TEMP/fmctl-source/"
+          cargo build \
+            --locked \
+            --release \
+            --manifest-path "$RUNNER_TEMP/fmctl-source/Cargo.toml"
+          echo "FMCTL=$RUNNER_TEMP/fmctl-source/target/release/fmctl" >> "$GITHUB_ENV"
+
+      - name: Validate and type-check the embedding-search model
+        run: |
+          mkdir -p .formal-artifacts/embedding-search-selection
+          "$FMCTL" \
+            --manifest formal/embedding_search_selection.fm.toml \
+            --format json validate \
+            | tee .formal-artifacts/embedding-search-selection/validate.json
+          "$FMCTL" --manifest formal/embedding_search_selection.fm.toml check
+
+      - name: Reach every configured witness
+        run: |
+          "$FMCTL" --manifest formal/embedding_search_selection.fm.toml simulate
+
+      - name: Exhaust the finite embedding-search state graph
+        run: |
+          "$FMCTL" --manifest formal/embedding_search_selection.fm.toml verify
+
+      - name: Upload model-checker evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zed-lib-core-formal-methods
+          path: |
+            .formal-artifacts/
+            formal/embedding_search_selection.fm.toml
+            formal/embedding_search_selection.qnt
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
