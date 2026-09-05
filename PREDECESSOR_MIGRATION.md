@@ -45,6 +45,8 @@ Certification and package/API/storage contracts merged through
 | Canonical registry SQL evidence | `src/rust-orm/sql/registry.sql` |
 | Historical shared-definitions import provenance | `shared-defs.lock.json` |
 | API/page/R2 contracts | `contracts` |
+| Local file-lock crate `zed-lock` | `src/rust-lock` |
+| zed-lock formal model and protocol corpus | `src/rust-lock/formal`, `src/rust-lock/protocol` |
 
 ## `zed-lib#7`: one-time invitation acceptance
 
@@ -107,7 +109,32 @@ raw SeaORM sessions. Its substantive requirements map as follows.
 | `search_document` / pgvector assumptions | Retired; neither exists in the canonical shared contract |
 | raw `DatabaseConnection` / `DbErr` public API | Retired; consumers receive opaque contexts and public `OrmError` |
 
+## `zed-lock`: local locking lineage
+
+Predecessor head (standalone `zed-pkg/zed-lock` main):
+
+```text
+7818d0140f9947352f803d4a50aabb8e0b26265a
+```
+
+Folded through the `feat/absorb-zed-lock` branch as a two-history merge whose
+second parent is that head plus one relocation commit. The crate keeps its
+name, version (`0.1.1`), MSRV (`1.88`), and public API.
+
 ## Consumer migration
+
+### Local lock users
+
+```toml
+# before
+zed-lock = { git = "https://github.com/zed-pkg/zed-lock.git", tag = "v0.1.1" }
+# after — same crate name, same API
+zed-lock = { git = "https://github.com/zed-pkg/zed-lib-core.git", tag = "lock/v0.1.1" }
+```
+
+`use zed_lock::…` paths are unchanged. Zed consumers keep depending on
+`"zed-pkg/zed-lock"`; the resolver now finds it as a nested target of
+`zed-pkg/zed-lib-core`.
 
 ### Behavioral library users
 

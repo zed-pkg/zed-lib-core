@@ -91,6 +91,60 @@ jobs:
           git diff --exit-code conformance/ \
             || (echo "generated version corpus is stale; regenerate and commit" && exit 1)
 
+  lock:
+    name: zed-lock ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: zed-lib
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out merged polyglot zed-interfaces contract
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ github.repository_owner }}/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_POLYGLOT_REF }}
+          path: zed-interfaces
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify immutable interfaces pin
+        shell: bash
+        run: test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_POLYGLOT_REF"
+
+      # zed-lock's minimum supported toolchain; the slice must keep compiling
+      # on it even though the rest of the workspace tracks stable.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.88.0
+          components: rustfmt,clippy
+
+      - name: Validate Cargo, Zed package, and provenance contracts
+        working-directory: zed-lib/src/rust-lock
+        run: python3 scripts/check-package-contract.py
+
+      - name: Exercise package-contract negative cases
+        working-directory: zed-lib/src/rust-lock
+        run: python3 -m unittest -v tests/test_package_contract.py
+
+      - name: Clippy
+        working-directory: zed-lib
+        run: cargo clippy --locked -p zed-lock --all-targets -- -D warnings
+
+      - name: Test
+        working-directory: zed-lib
+        run: cargo test --locked -p zed-lock --all-targets -- --nocapture
+
   dart:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

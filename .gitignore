@@ -5,8 +5,8 @@
 /zed_modules/
 /.zed/pack/
 /.vendor/
-tmp
-temp
+tmp/
+temp/
 
 # Language-slice tooling state
 node_modules/

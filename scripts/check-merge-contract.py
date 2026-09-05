@@ -105,6 +105,7 @@ def assert_package() -> None:
     required_targets = {
         "repository",
         "rust",
+        "rust-lock",
         "conformance",
         "dart",
         "typescript",
@@ -116,6 +117,22 @@ def assert_package() -> None:
         directory = ROOT / spec["dir"]
         if not directory.is_dir():
             fail(f"target {target} directory is missing: {directory}")
+
+    lock_target = manifest["targets"]["rust-lock"]
+    if lock_target != {
+        "dir": "src/rust-lock",
+        "name": "zed-lock",
+        "adapter": "rust",
+    }:
+        fail("folded zed-lock target boundary differs")
+    lock_manifest = tomllib.loads((ROOT / "src/rust-lock/.zpkg.toml").read_text(encoding="utf-8"))
+    if lock_manifest.get("targets"):
+        fail("folded zed-lock manifest must not declare nested targets")
+    lock_package = lock_manifest.get("package", {})
+    if f"{lock_package.get('org')}/{lock_package.get('name')}" != "zed-pkg/zed-lock":
+        fail("folded zed-lock package identity differs")
+    if lock_manifest.get("publish", {}).get("tag_format") != "lock/v{version}":
+        fail("folded zed-lock release tag namespace differs")
 
     if {"rust-orm", "sql-schema"} & targets:
         fail("ORM and schema packages must not inherit root target metadata")
