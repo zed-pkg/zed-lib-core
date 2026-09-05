@@ -1,16 +1,17 @@
 # TypeSpec, JSON Schema, and Protobuf persistence cross-checks
 
 This document records both the current transition tooling and the target
-dual-source contract. In the target, TypeSpec is the authored P0 canonical AST
-and an independently authored JSON Schema tree is the P1 secondary-primary
-source. P1 is not generated from TypeSpec and has release-veto power. The JSON
-Schema emitted from P0 is stored separately as diagnostic evidence and compared
-with P1.
+peer-source contract. In the target, TypeSpec and JSON Schema/OpenAPI are
+co-equal, independently authored sources. Neither is canonical over, generated
+from, or a fallback for the other; each has release-veto power when normalized
+semantics disagree. Optional cross-translations are diagnostic witnesses only
+and cannot feed production SQL, Protobuf, OpenAPI, clients, ORM code,
+migrations, or releases.
 
 The current tool still fans the locked persistence JSON shadow into generated
 TypeSpec, JSON Schema, and Protobuf. That direction is useful legacy evidence;
-it is not the completed P0/P1 architecture and must not be mislabeled as such.
-The immutable DDL/migration lineage remains the deployed P2 baseline until the
+it is not the completed peer-source architecture and must not be mislabeled as
+such. The immutable DDL/migration lineage remains the deployed baseline until the
 authored sources and all parity/migration gates pass. Public DTOs remain owned
 by `zed-pkg/zed-interfaces`.
 
@@ -18,17 +19,17 @@ by `zed-pkg/zed-interfaces`.
 
 ```text
 target:
-  authored TypeSpec P0 -----> SQL/ORM/wire candidate A
-          |                  +-> emitted JSON Schema (diagnostic)
-          +------------------+-> Protobuf 3
+  authored TypeSpec peer -----> SQL/ORM candidate A
+          +--------------------> Protobuf 3 / gRPC / wire clients
 
-  independent JSON P1 -----> SQL/ORM/wire candidate B
+  authored JSON Schema/OpenAPI peer -> SQL/ORM candidate B
+          +--------------------------> interfaces/validators/HTTP clients
 
   candidate A/B + common PostgreSQL extension
           -> disposable PostgreSQL A/B -> Diesel/SeaORM/catalog parity
 
 current transition:
-  deployed P2 DDL -> locked JSON shadow -> generated TypeSpec/JSON/Protobuf
+  deployed DDL -> locked JSON shadow -> generated TypeSpec/JSON/Protobuf
 ```
 
 `schema/persistence.schema.json` is currently an imported shadow whose table,
@@ -36,11 +37,11 @@ column, type, nullability, interface revision, SeaORM source blobs, and
 production SQL blob are checked elsewhere.
 `tools/typespec-protobuf-parity.mjs` currently generates TypeSpec from that
 shadow, invokes the pinned official JSON Schema and Protobuf emitters, and
-independently parses both outputs. Before P1 promotion, this tree needs an
-independence/provenance audit and a protected authored workflow; before P0
-promotion, TypeSpec must move from generated evidence to the authored canonical
-AST. Generated P0 JSON Schema must then live at a distinct path so it cannot
-overwrite P1.
+independently parses both outputs. Before peer promotion, the JSON Schema tree
+needs an independence/provenance audit and a protected authored workflow, while
+TypeSpec must move from generated evidence to a separately authored source.
+Legacy cross-generated output remains isolated below generated paths and cannot
+become an input to either production lane.
 
 ## Explicit wire transformations
 
@@ -106,9 +107,10 @@ wire identities as a side effect.
 
 The current TypeSpec/Protobuf check is tied to the same source commit as the ORM
 and schema Zed packages. A green check proves deterministic legacy
-cross-projection at that commit; it does not prove independent P0/P1 agreement.
+cross-projection at that commit; it does not prove independent peer-source agreement.
 
-The target gate additionally requires independently reviewed P0 and P1 inputs,
+The target gate additionally requires independently reviewed TypeSpec and JSON
+Schema/OpenAPI inputs,
 normalized source/catalog/Diesel/SeaORM/behavior/wire parity, stable Protobuf
 identity, and a reviewed expected-divergence registry. Neither emitter output
 nor ORM code replaces the `declarative-migrations` plan against a fresh live
