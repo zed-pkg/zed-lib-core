@@ -14,9 +14,9 @@ path = "lib.rs"
 
 [dependencies]
 # Pin the independently published interface authority so zed-lib is a real
-# Cargo git dependency. A sibling-only path made downstream consumers such as
-# zed-clients and zed-cli compile only inside specially arranged checkouts.
-zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "7d31f80dd8a310f218931165a3ad636a2f32b932" }
+# Cargo git dependency. This exact reviewed commit also contains the signing,
+# mirror, and binary-artifact contracts consumed by zed-clients and zed-cli.
+zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "3c54298fc7a8c1b2f9c1d74f588c6118b38f197e" }
 thiserror = "2.0.19"
 
 [dev-dependencies]
