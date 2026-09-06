@@ -25,7 +25,9 @@ permissions:
   contents: read
 
 env:
-  ZED_INTERFACES_REF: 02e23b4862c670f197eb818733736b8f62375aae
+  # Keep the isolated checkout aligned with the git revision recorded in
+  # Cargo.lock; --locked must never rewrite the dependency graph in CI.
+  ZED_INTERFACES_REF: 7d31f80dd8a310f218931165a3ad636a2f32b932
 
 jobs:
   boundary:
