@@ -24,4 +24,4 @@ pub mod namespace_plan;
 pub mod resolve;
 
 pub use namespace_plan::plan_registry_namespaces;
-pub use resolve::{ResolveError, latest_stable, resolve_version};
+pub use resolve::{ResolveError, latest_stable, requirement_matches, resolve_version};

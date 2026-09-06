@@ -13,10 +13,10 @@ repository = "https://github.com/zed-pkg/zed-lib-core"
 path = "lib.rs"
 
 [dependencies]
-# Sibling checkout, matching the rest of the org (zed-web-server.rs, the Rust
-# client in zed-clients). Becomes a version requirement once zed-interfaces
-# publishes 0.1.0 to the registry.
-zed-interfaces = { path = "../../../zed-interfaces/src/rust" }
+# Pin the independently published interface authority so zed-lib is a real
+# Cargo git dependency. This exact reviewed commit also contains the signing,
+# mirror, and binary-artifact contracts consumed by zed-clients and zed-cli.
+zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "3c54298fc7a8c1b2f9c1d74f588c6118b38f197e" }
 thiserror = "2.0.19"
 
 [dev-dependencies]
