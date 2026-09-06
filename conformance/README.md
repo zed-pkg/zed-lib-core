@@ -4,10 +4,10 @@ Language-neutral cases that **every** zed-lib implementation must satisfy. The
 Rust slice runs them from `src/rust/tests/conformance.rs`; the Dart and
 TypeScript slices will run the same files.
 
-The corpus is validated in CI against the JSON Schema 2020-12 contracts in
-`conformance/schema/`. A case that is syntactically plausible but outside the
-shared wire contract must fail schema validation before any implementation is
-allowed to interpret it.
+The hand-written and generated fuzz corpora are validated in CI against the
+JSON Schema 2020-12 contracts in `conformance/schema/`. A case that is
+syntactically plausible but outside the shared wire contract must fail schema
+validation before any implementation is allowed to interpret it.
 
 A corpus, rather than per-language tests, is what keeps three implementations
 honest: "the CLI resolved 1.4.0 but the web UI offered 2.0.0" becomes a failing

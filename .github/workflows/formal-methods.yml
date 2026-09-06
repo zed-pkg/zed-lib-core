@@ -143,8 +143,14 @@ jobs:
             -s conformance/schema/version-resolution.schema.json \
             -d conformance/cases/version-resolution.json
           npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
+            -s conformance/schema/version-resolution.schema.json \
+            -d conformance/cases/fuzz-version-resolution.json
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
             -s conformance/schema/latest-stable.schema.json \
             -d conformance/cases/latest-stable.json
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
+            -s conformance/schema/latest-stable.schema.json \
+            -d conformance/cases/fuzz-latest-stable.json
 
       - name: Validate the dependency-resolution formal manifest
         run: |
