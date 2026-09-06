@@ -34,7 +34,7 @@ jobs:
       - name: Prove exact-SHA Cargo git consumption and interface type identity
         env:
           LIB_SHA: ${{ github.sha }}
-          INTERFACES_SHA: 7d31f80dd8a310f218931165a3ad636a2f32b932
+          INTERFACES_SHA: 3c54298fc7a8c1b2f9c1d74f588c6118b38f197e
         run: |
           set -euo pipefail
           consumer="$RUNNER_TEMP/zed-lib-git-consumer"
