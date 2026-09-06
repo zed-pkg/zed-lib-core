@@ -1,3 +1,4 @@
+# Temporary lock materializer; removed before pull-request review.
 name: materialize Rust git-consumer lock
 
 on:
@@ -66,6 +67,11 @@ jobs:
                   }))
                   .expect("shared interface fixture");
               assert_eq!(zed_lib::resolve_version(&metadata, "^1.0").unwrap(), "1.2.0");
+              assert!(zed_lib::requirement_matches(
+                  zed_interfaces::version::VersionScheme::Semver,
+                  "^1.0",
+                  "1.2.0"
+              ));
           }
           EOF
           cargo run --manifest-path "$consumer/Cargo.toml"
