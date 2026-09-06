@@ -1,0 +1,17 @@
+format = "ores.core-source-lock/v1"
+status = "pinned-candidate"
+interfaces_repository = "zed-pkg/zed-interfaces"
+typespec_path = "validation/typespec/validation.tsp"
+typespec_commit = "02e23b4862c670f197eb818733736b8f62375aae"
+typespec_sha256 = "db35089409f061110de674c7d29623b2cde53e9e85eff60f9778bbe2bcc039f2"
+json_schema_path = "validation/public-contracts.v1.json"
+json_schema_commit = "02e23b4862c670f197eb818733736b8f62375aae"
+json_schema_sha256 = "bc413f8d3953358987b0d57f5a527d50627087c5a0b7bb23941a3dc333e6462b"
+comparator_repository = "ORESoftware/api-docs"
+comparator_version = "c75c3924847a42d8d2854eb78c85f330ea726bef"
+semantic_receipt = "generated/final/parity-receipt.v2.json"
+
+# The independent authorities are pinned to one reviewed repository revision,
+# but neither source is generated from the other. Release finalization remains
+# blocked until all interface, persistence, SQL-catalog, and ORM evidence pairs
+# are complete and equivalent.

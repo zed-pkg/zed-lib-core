@@ -2,6 +2,11 @@
 # the Dart and TypeScript implementations beside it — the same layout as
 # zed-interfaces, and for the same reason: `.zpkg.toml` publishes each language
 # slice as its own package, and a target may not own `dir = "."`.
+#
+# `src/rust-orm` remains a temporary workspace member only to preserve the
+# certified predecessor build and Cargo.lock while its behavior is migrated to
+# private zed-pkg/zed-orm-core. The new boundary guard blocks release while this
+# path exists, and the root Zed publication excludes it.
 [workspace]
 resolver = "3"
 members = [

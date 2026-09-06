@@ -22,6 +22,10 @@
 
 pub mod namespace_plan;
 pub mod resolve;
+#[cfg(feature = "public-config")]
+pub mod runtime_config;
 
 pub use namespace_plan::plan_registry_namespaces;
 pub use resolve::{ResolveError, latest_stable, resolve_version};
+#[cfg(feature = "public-config")]
+pub use runtime_config::PublicRuntimeConfig;

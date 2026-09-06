@@ -2,9 +2,9 @@
 org = "zed-pkg"
 name = "zed-lib-core"
 version = "0.1.0"
-description = "Canonical zed-pkg core: SeaORM registry entities, migrations, the role-aware query boundary, the polyglot resolution slices, and the kernel-backed local lock crate"
+description = "Canonical zed-pkg core: shared client, server, edge, and isomorphic behavior; SeaORM registry entities and migrations; polyglot resolution slices; and the kernel-backed local lock crate"
 license = "MIT"
-keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot", "locking"]
+keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot", "locking", "validation"]
 
 [package.repository]
 vcs = "git"
@@ -20,6 +20,7 @@ smoke_test = "test -f \"$ZED_PKG_TEST_TARGET/conformance/cases/version-resolutio
 exclude = [
   ".env",
   ".env.*",
+  "env/dec/**",
   ".direnv/**",
   ".vendor/.zed/**",
   ".zed/**",
@@ -28,6 +29,10 @@ exclude = [
   "**/target/**",
   "**/node_modules/**",
   "**/.dart_tool/**",
+  # Executable ORM ownership is migrating to the private zed-orm-core family;
+  # keep it out of the root publication while the temporary workspace member
+  # preserves the audited build during that migration.
+  "src/rust-orm/**",
   # The ORM and schema are standalone nested packages. Keep their package
   # metadata out of the whole-repository artifact.
   "src/rust-orm/.zpkg.toml",
@@ -55,10 +60,6 @@ exclude = [
 [install]
 dir = ".vendor/.zed"
 
-# Whole-repository slice: every implementation plus the shared corpus they are
-# all verified against.
-# Publishes under the canonical package name; the model rejects a divergent
-# `name` on the whole-repository slice (DEN-2960).
 [targets.repository]
 dir = "."
 
@@ -86,9 +87,6 @@ dir = "conformance"
 name = "zed-lib-conformance"
 adapter = "none"
 
-# Front-end implementations of the same behavior. Not thin bindings — each is a
-# native implementation held to `conformance/cases/*.json`, so a browser or
-# Flutter client resolves a requirement exactly the way zed-cli does.
 [targets.dart]
 dir = "src/dart"
 adapter = "dart"
@@ -109,4 +107,6 @@ package = "@zed-pkg/zed-lib"
 tag_format = "ts/v{version}"
 
 [scripts]
-test = "cargo test --all-targets --locked"
+test = "cargo test --locked -p zed-lib --all-targets --all-features && cargo test --locked -p zed-lib --all-targets --no-default-features"
+boundary = "rustc --edition=2021 -D warnings tools/core-contract-guard.rs -o /tmp/core-contract-guard && /tmp/core-contract-guard --kind lib-core"
+release-gate = "rustc --edition=2021 -D warnings tools/core-contract-guard.rs -o /tmp/core-contract-guard && /tmp/core-contract-guard --kind lib-core --require-evidence"
