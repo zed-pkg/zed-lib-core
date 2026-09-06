@@ -92,6 +92,102 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  dependency-resolution-safety:
+    name: fmctl + Quint dependency-resolution safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NO_COLOR: '1'
+      RUST_BACKTRACE: '1'
+    steps:
+      - name: Checkout zed-lib-core
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout the pinned fmctl incubator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: opto-sync/opto-sync-clients
+          ref: c2146ef9f054d24e1488c216547852aa148285cf
+          path: .formal-tools/opto-sync-clients
+          persist-credentials: false
+
+      - name: Install the fmctl Rust toolchain
+        uses: dtolnay/rust-toolchain@2eae45db285e407f22119950686d47e1101e071b
+
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install Java for TLC
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build the pinned fmctl runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/fmctl-source"
+          cp -R .formal-tools/opto-sync-clients/tools/fmctl/. "$RUNNER_TEMP/fmctl-source/"
+          cargo build \
+            --locked \
+            --release \
+            --manifest-path "$RUNNER_TEMP/fmctl-source/Cargo.toml"
+          echo "FMCTL=$RUNNER_TEMP/fmctl-source/target/release/fmctl" >> "$GITHUB_ENV"
+
+      - name: Validate the version-resolution schemas and corpus
+        run: |
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
+            -s conformance/schema/version-resolution.schema.json \
+            -d conformance/cases/version-resolution.json
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
+            -s conformance/schema/latest-stable.schema.json \
+            -d conformance/cases/latest-stable.json
+
+      - name: Validate the dependency-resolution formal manifest
+        run: |
+          mkdir -p .formal-artifacts/dependency-resolution
+          "$FMCTL" \
+            --manifest formal/dependency_resolution.fm.toml \
+            --format json validate \
+            | tee .formal-artifacts/dependency-resolution/validate.json
+
+      - name: Record and validate the dependency-resolution toolchain
+        run: |
+          "$FMCTL" \
+            --manifest formal/dependency_resolution.fm.toml \
+            --format json doctor \
+            | tee .formal-artifacts/dependency-resolution/doctor.json
+
+      - name: Type-check the bounded dependency-resolution model
+        run: |
+          "$FMCTL" --manifest formal/dependency_resolution.fm.toml check
+
+      - name: Reach every dependency-resolution witness
+        run: |
+          "$FMCTL" --manifest formal/dependency_resolution.fm.toml simulate
+
+      - name: Exhaust the finite dependency-resolution state graph
+        run: |
+          "$FMCTL" --manifest formal/dependency_resolution.fm.toml verify
+
+      - name: Upload model-checker evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: zed-lib-core-dependency-resolution-formal-methods
+          path: |
+            .formal-artifacts/dependency-resolution/
+            formal/dependency_resolution.fm.toml
+            formal/dependency_resolution.qnt
+            conformance/schema/version-resolution.schema.json
+            conformance/schema/latest-stable.schema.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
   rust-lock-waiter-lifecycle:
     name: fmctl + Quint zed-lock waiter lifecycle
     runs-on: ubuntu-24.04
