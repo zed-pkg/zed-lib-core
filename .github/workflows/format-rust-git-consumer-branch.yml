@@ -1,0 +1,34 @@
+# Temporary branch-only formatter; removed after it commits rustfmt output.
+name: format Rust git-consumer branch
+
+on:
+  push:
+    branches: [fix/rust-git-consumer-boundary]
+    paths:
+      - ".github/workflows/format-rust-git-consumer-branch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  format-and-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+          components: rustfmt
+      - run: cargo fmt --all
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/rust/resolve.rs
+          git diff --cached --check
+          git commit -m "style(rust): apply rustfmt to shared resolution"
+          git push origin HEAD:fix/rust-git-consumer-boundary
