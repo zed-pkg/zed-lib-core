@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  INTERFACES_SHA: 7d31f80dd8a310f218931165a3ad636a2f32b932
+  INTERFACES_SHA: 3c54298fc7a8c1b2f9c1d74f588c6118b38f197e
   LIB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
