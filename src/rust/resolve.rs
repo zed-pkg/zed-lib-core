@@ -94,6 +94,26 @@ fn looks_like_malformed_dotted_numeric_requirement(input: &str) -> bool {
     all_numeric && segment_count > 3
 }
 
+/// Test one published version against one requirement using the package's
+/// declared scheme.
+///
+/// This small predicate is intentionally shared by graph solvers and clients.
+/// Keeping it here prevents the CLI from growing a second, subtly different
+/// interpretation of opaque, semver, and calver requirements.
+#[must_use]
+pub fn requirement_matches(
+    scheme: VersionScheme,
+    requirement: &str,
+    published: &str,
+) -> bool {
+    match scheme {
+        VersionScheme::Opaque => requirement == published,
+        VersionScheme::Semver | VersionScheme::Calver => {
+            Requirement::parse(requirement).matches(published)
+        }
+    }
+}
+
 /// Resolve `requirement` against what the registry says a package published.
 ///
 /// Returns the version in its **original spelling** — the store address and
@@ -213,6 +233,27 @@ mod tests {
             &["1.0.0", "1.4.0", "1.5.0-rc.1", "2.0.0"],
         );
         assert_eq!(resolve_version(&meta, "^1.2").unwrap(), "1.4.0");
+    }
+
+    #[test]
+    fn the_single_version_predicate_is_scheme_aware() {
+        assert!(requirement_matches(VersionScheme::Semver, "^1.2", "1.9.0"));
+        assert!(!requirement_matches(VersionScheme::Semver, "^1.2", "2.0.0"));
+        assert!(requirement_matches(
+            VersionScheme::Calver,
+            ">=2026.7",
+            "2026.07.24"
+        ));
+        assert!(requirement_matches(
+            VersionScheme::Opaque,
+            "release-candidate-1",
+            "release-candidate-1"
+        ));
+        assert!(!requirement_matches(
+            VersionScheme::Opaque,
+            "^1.0",
+            "1.9.0"
+        ));
     }
 
     #[test]
