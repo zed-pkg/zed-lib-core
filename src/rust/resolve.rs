@@ -101,11 +101,7 @@ fn looks_like_malformed_dotted_numeric_requirement(input: &str) -> bool {
 /// Keeping it here prevents the CLI from growing a second, subtly different
 /// interpretation of opaque, semver, and calver requirements.
 #[must_use]
-pub fn requirement_matches(
-    scheme: VersionScheme,
-    requirement: &str,
-    published: &str,
-) -> bool {
+pub fn requirement_matches(scheme: VersionScheme, requirement: &str, published: &str) -> bool {
     match scheme {
         VersionScheme::Opaque => requirement == published,
         VersionScheme::Semver | VersionScheme::Calver => {
@@ -249,11 +245,7 @@ mod tests {
             "release-candidate-1",
             "release-candidate-1"
         ));
-        assert!(!requirement_matches(
-            VersionScheme::Opaque,
-            "^1.0",
-            "1.9.0"
-        ));
+        assert!(!requirement_matches(VersionScheme::Opaque, "^1.0", "1.9.0"));
     }
 
     #[test]
