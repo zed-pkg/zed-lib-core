@@ -8,7 +8,7 @@ on:
       - ".github/workflows/materialize-rust-git-consumer-lock.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: materialize-rust-git-consumer-lock-${{ github.ref }}
@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 1
-          persist-credentials: false
+          persist-credentials: true
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
           toolchain: stable
@@ -69,10 +69,15 @@ jobs:
           }
           EOF
           cargo run --manifest-path "$consumer/Cargo.toml"
-      - name: Retain generated lockfile
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: zed-lib-git-consumer-lock-${{ github.run_id }}
-          path: Cargo.lock
-          if-no-files-found: error
-          retention-days: 7
+      - name: Commit the resolver-generated lockfile to this branch
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock is already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "chore(lock): resolve zed-lib interface source"
+          git push origin HEAD:fix/rust-git-consumer-boundary
