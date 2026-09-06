@@ -1,0 +1,78 @@
+name: materialize Rust git-consumer lock
+
+on:
+  push:
+    branches: [fix/rust-git-consumer-boundary]
+    paths:
+      - "src/rust/Cargo.toml"
+      - ".github/workflows/materialize-rust-git-consumer-lock.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: materialize-rust-git-consumer-lock-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-and-prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+      - name: Regenerate the workspace lock and test zed-lib
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          cargo test --locked -p zed-lib
+      - name: Prove exact-SHA Cargo git consumption and interface type identity
+        env:
+          LIB_SHA: ${{ github.sha }}
+          INTERFACES_SHA: 7d31f80dd8a310f218931165a3ad636a2f32b932
+        run: |
+          set -euo pipefail
+          consumer="$RUNNER_TEMP/zed-lib-git-consumer"
+          mkdir -p "$consumer/src"
+          cat >"$consumer/Cargo.toml" <<EOF
+          [package]
+          name = "zed-lib-git-consumer"
+          version = "0.0.0"
+          edition = "2024"
+
+          [dependencies]
+          serde_json = "1"
+          zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "$INTERFACES_SHA" }
+          zed-lib = { git = "https://github.com/zed-pkg/zed-lib-core.git", rev = "$LIB_SHA" }
+          EOF
+          cat >"$consumer/src/main.rs" <<'EOF'
+          fn main() {
+              let metadata: zed_interfaces::registry::PackageMetadata =
+                  serde_json::from_value(serde_json::json!({
+                      "org": "acme",
+                      "name": "kit",
+                      "vcs": "git",
+                      "repo_url": "https://github.com/acme/kit",
+                      "description": null,
+                      "latest": "1.2.0",
+                      "versions": ["1.0.0", "1.2.0"],
+                      "version_scheme": "semver",
+                      "tags": []
+                  }))
+                  .expect("shared interface fixture");
+              assert_eq!(zed_lib::resolve_version(&metadata, "^1.0").unwrap(), "1.2.0");
+          }
+          EOF
+          cargo run --manifest-path "$consumer/Cargo.toml"
+      - name: Retain generated lockfile
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: zed-lib-git-consumer-lock-${{ github.run_id }}
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
