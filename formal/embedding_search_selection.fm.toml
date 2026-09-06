@@ -1,0 +1,41 @@
+# Bounded model for the canonical JSONB embedding-search selector.
+#
+# The Rust query ranks content rows per (entity, model) by updated_at and id,
+# then applies visibility. The model covers that ordering and visibility
+# boundary without pretending to prove PostgreSQL's execution engine.
+schema_version = 1
+project = "zed-lib-core"
+model = "embedding-search-selection"
+language = "quint"
+spec = "formal/embedding_search_selection.qnt"
+main = "embedding_search_selection"
+init = "init"
+step = "step"
+invariants = ["selection_safety"]
+witnesses = [
+  "duplicate_content_row_reached",
+  "timestamp_tie_break_reached",
+  "second_model_partition_reached",
+  "visibility_filter_reached",
+  "idempotent_replay_reached",
+]
+
+[toolchain]
+quint = "0.32.0"
+java = ">=17"
+node = "22"
+npx = "npx"
+
+[execution]
+timeout_seconds = 600
+max_output_bytes = 8388608
+artifacts_dir = ".formal-artifacts/embedding-search-selection"
+
+[simulation]
+backend = "typescript"
+max_samples = 10000
+max_steps = 16
+
+[verification]
+backend = "tlc"
+exhaustive_finite_model = true

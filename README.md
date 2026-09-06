@@ -1,9 +1,10 @@
 # zed-lib-core
 
 Canonical core library for the **zed-pkg** registry. This repository is the
-semantic merge of two predecessors — `zed-pkg/zed-lib` (resolution, polyglot
-behavior, and registry entities) and `zed-pkg/zed-orm-core` (the opaque
-role-aware query boundary) — with both histories preserved.
+semantic merge of three predecessors — `zed-pkg/zed-lib` (resolution, polyglot
+behavior, and registry entities), `zed-pkg/zed-orm-core` (the opaque
+role-aware query boundary), and `zed-pkg/zed-lock` (kernel-backed local
+locking) — with every history preserved.
 
 `zed-lib-core` is itself a zed package: see `.zpkg.toml`. Consumer migration and
 exact source commits are recorded in [`PREDECESSOR_MIGRATION.md`](PREDECESSOR_MIGRATION.md).
@@ -15,6 +16,7 @@ exact source commits are recorded in [`PREDECESSOR_MIGRATION.md`](PREDECESSOR_MI
 | `src/rust-orm` | `zed-orm-core` | Current SeaORM entities and opaque named operations; target Diesel-primary/SeaORM-secondary runtime |
 | `src/rust-orm/sql` | `zed-schema` | Current immutable DDL baseline and forward migrations; target reviewed dual-source desired release for declarative-migrations |
 | `src/rust` | `zed-lib` | Version resolution and policy over the shared contract types |
+| `src/rust-lock` | `zed-lock` | Kernel-backed, event-driven local file locking (folded in from `zed-pkg/zed-lock`) |
 | `src/ts` | `@zed-pkg/zed-lib` | The same resolution behavior, natively in TypeScript |
 | `src/dart` | `zed_lib` | The same resolution behavior, natively in Dart |
 | `conformance` | `zed-lib-conformance` | The shared corpus all three are held to |
@@ -28,13 +30,14 @@ authorities.
 Three rules define the crate:
 
 1. **The schema belongs to this product package.** The target sources are an
-   authored TypeSpec P0 canonical AST, an independently authored JSON Schema P1
-   secondary-primary veto, and a common PostgreSQL extension bundle. The
-   current DDL and forward-only migrations in `src/rust-orm/sql` remain the
-   immutable deployed baseline until the dual-source parity and migration
-   gates pass. Its nested Zed manifest exposes the narrow desired-release
-   boundary to declarative-migrations. `shared-defs.lock.json` records
-   historical import provenance only; it is not a dependency or change path.
+   authored TypeSpec peer and a separately authored JSON Schema/OpenAPI peer,
+   plus one common PostgreSQL extension bundle. Neither source is generated
+   from or canonical over the other. The current DDL and forward-only
+   migrations in `src/rust-orm/sql` remain the immutable deployed baseline
+   until the peer-source parity and migration gates pass. Its nested Zed
+   manifest exposes the narrow desired-release boundary to
+   declarative-migrations. `shared-defs.lock.json` records historical import
+   provenance only; it is not a dependency or change path.
 2. **Raw sessions do not escape.** Consumers get an opaque `ReadContext` or
    `WriteContext` and call named operations in `read`, `registry`, `write`, and
    the feature-gated `invitations` module. The current SeaORM connections and
@@ -43,9 +46,11 @@ Three rules define the crate:
    retained as a secondary DB-first parity surface.
 3. **Writes are opt-in.** Default builds cannot compile a write symbol
    (`compile_fail` doctests prove it). API servers enable `read-write`; only the
-   discrete DPM migration job enables `migrate`. The feature split expresses
-   intent — the authoritative control is the database principal, because Cargo
-   features are additive across a dependency graph.
+   org-owned `zed-infra` migration Job invokes DPM and receives a DDL identity.
+   The current ORM `migrate` feature is transitional and must not be consumed by
+   application services; the target ORM package exposes no migration runner.
+   The feature split expresses intent—the authoritative control is the database
+   principal, because Cargo features are additive across a dependency graph.
 
 ### Named operation groups
 
@@ -94,9 +99,12 @@ interpolating table names.
 ### Identity
 
 Supabase Auth is the identity provider. `shared-auth-server.rs` verifies the
-Supabase JWT, owns the principal, and issues the session cookie — customer
-principals on the `customer-auth` RDS instance, operator/admin principals on
-`admin-auth`. **No session state lives in the registry.**
+Supabase JWT, owns the principal, and issues the session cookie. Customer and
+operator/admin realms retain distinct issuers, schemas/database identities,
+keys, provider projects, cookies, clients, and service credentials. Under the
+DEN-3146 near-term exception they may be physically co-resident in the shared
+`oresoftware` Supabase auth database only with explicit realm isolation and
+mutual-rejection evidence. **No session state lives in the registry.**
 
 A principal maps to exactly one registry user through
 `zed_users.shared_auth_subject` + `zed_users.auth_realm`. Those instances are

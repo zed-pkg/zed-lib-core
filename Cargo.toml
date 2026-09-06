@@ -9,5 +9,11 @@
 # path exists, and the root Zed publication excludes it.
 [workspace]
 resolver = "3"
-members = ["src/rust", "src/rust-orm"]
-default-members = ["src/rust", "src/rust-orm"]
+members = [
+  "src/rust",
+  "src/rust-orm",
+  "src/rust-lock",
+  "validation/rust",
+  "validation/rust-server",
+]
+default-members = ["src/rust", "src/rust-orm", "src/rust-lock"]
