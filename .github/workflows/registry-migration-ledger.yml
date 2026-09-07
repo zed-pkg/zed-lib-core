@@ -1,0 +1,34 @@
+name: registry-migration-ledger
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: registry-migration-ledger-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rust-migrator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: zed-lib
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: 7d31f80dd8a310f218931165a3ad636a2f32b932
+          path: zed-interfaces
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+      - name: Compile the real opt-in migrator and run its tests
+        working-directory: zed-lib
+        run: cargo test --locked -p zed-orm-core --features migrate --lib
+      - name: Check the opt-in migration code
+        working-directory: zed-lib
+        run: cargo clippy --locked -p zed-orm-core --features migrate --lib -- -D warnings
