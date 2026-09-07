@@ -356,7 +356,10 @@ mod tests {
         );
         assert_eq!(
             plan,
-            vec![MigrationStep::DependencyGraph, MigrationStep::PromotionPolicy]
+            vec![
+                MigrationStep::DependencyGraph,
+                MigrationStep::PromotionPolicy
+            ]
         );
     }
 
