@@ -1,0 +1,68 @@
+name: Production public contract runtime conformance
+on:
+  pull_request:
+    paths: ['validation/**', '.github/workflows/public-contract-runtime.yml']
+  push:
+    branches: [main]
+    paths: ['validation/**', '.github/workflows/public-contract-runtime.yml']
+permissions:
+  contents: read
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [typescript, rust]
+    env:
+      RUSTUP_TOOLCHAIN: '1.89.0'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify reviewed runtime revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: 1641ecb2281d763e6df9a5620a64d10e91177037
+          path: .deps/zed-interfaces
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: ORESoftware/typespec-json-schema-validator
+          ref: c745036456dd80408b83217118b8563edb8f6abd
+          path: .deps/zed-interfaces/.deps/typespec-json-schema-validator
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Install locked peer-authority compiler
+        run: npm ci --prefix .deps/zed-interfaces/.deps/typespec-json-schema-validator
+      - name: Admit production authorities before testing runtime implementations
+        run: node .deps/zed-interfaces/validation/compiler/public-parity.mjs
+      - name: Bootstrap TypeScript lock for review
+        if: matrix.runtime == 'typescript'
+        run: |
+          npm install --prefix validation/typescript
+          cat validation/typescript/package-lock.json
+      - name: Build and test actual TypeScript validators
+        if: matrix.runtime == 'typescript'
+        run: |
+          npm test --prefix validation/typescript
+          node --test validation/compiler-conformance/runtime.test.mjs
+      - name: Install pinned Rust toolchain
+        if: matrix.runtime == 'rust'
+        run: rustup toolchain install 1.89.0 --profile minimal --component rustfmt,clippy
+      - name: Bootstrap Rust lock for review
+        if: matrix.runtime == 'rust'
+        run: |
+          cargo generate-lockfile --manifest-path validation/rust/Cargo.toml
+          cat validation/rust/Cargo.lock
+      - name: Test actual Rust validators and serialization
+        if: matrix.runtime == 'rust'
+        run: cargo test --locked --manifest-path validation/rust/Cargo.toml
