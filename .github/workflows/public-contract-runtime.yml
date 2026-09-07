@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: zed-pkg/zed-interfaces
-          ref: 1641ecb2281d763e6df9a5620a64d10e91177037
+          ref: 58495c9aaf438b043a5e8bc154d27e9409eabc2d
           path: .deps/zed-interfaces
           persist-credentials: false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -41,15 +41,26 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.16.0'
+      - name: Verify immutable production dependency checkouts
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          const pins = JSON.parse(readFileSync('validation/compiler-conformance/pins.json', 'utf8'));
+          for (const [key, path] of [['interfaces', '.deps/zed-interfaces'], ['validator', '.deps/zed-interfaces/.deps/typespec-json-schema-validator']]) {
+            assert.match(pins[key], /^[a-f0-9]{40}$/);
+            assert.equal(execFileSync('git', ['-C', path, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), pins[key]);
+            execFileSync('git', ['-C', path, 'diff', '--exit-code', 'HEAD']);
+          }
+          NODE
       - name: Install locked peer-authority compiler
         run: npm ci --prefix .deps/zed-interfaces/.deps/typespec-json-schema-validator
       - name: Admit production authorities before testing runtime implementations
         run: node .deps/zed-interfaces/validation/compiler/public-parity.mjs
-      - name: Bootstrap TypeScript lock for review
+      - name: Install exact TypeScript runtime dependencies
         if: matrix.runtime == 'typescript'
-        run: |
-          npm install --prefix validation/typescript
-          cat validation/typescript/package-lock.json
+        run: npm ci --prefix validation/typescript
       - name: Build and test actual TypeScript validators
         if: matrix.runtime == 'typescript'
         run: |
@@ -58,11 +69,10 @@ jobs:
       - name: Install pinned Rust toolchain
         if: matrix.runtime == 'rust'
         run: rustup toolchain install 1.89.0 --profile minimal --component rustfmt,clippy
-      - name: Bootstrap Rust lock for review
+      - name: Test actual Rust validators and serialization using the workspace lock
         if: matrix.runtime == 'rust'
         run: |
-          cargo generate-lockfile --manifest-path validation/rust/Cargo.toml
-          cat validation/rust/Cargo.lock
-      - name: Test actual Rust validators and serialization
-        if: matrix.runtime == 'rust'
-        run: cargo test --locked --manifest-path validation/rust/Cargo.toml
+          cargo test --locked -p zed-validation -p zed-validation-server
+          cargo run --locked -p zed-validation-server --example production_corpus
+      - name: Verify dependency lock immutability
+        run: git diff --exit-code -- Cargo.lock validation/typescript/package-lock.json

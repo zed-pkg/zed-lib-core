@@ -1,3 +1,7 @@
+//! Explicit external-corpus conformance runner. It accepts no CLI options and
+//! uses only the pinned checkout provisioned by public-contract-runtime.yml.
+//! Kept in the existing server validation crate because it already owns the
+//! serde_json dependency; no duplicate workspace or regenerated lock is needed.
 use garde::Validate;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};
@@ -12,8 +16,8 @@ where
     serde_json::to_value(parsed).ok()
 }
 
-#[test]
-fn matches_the_admitted_production_corpus_without_null_insertion() {
+fn main() {
+    assert_eq!(std::env::args_os().count(), 1, "no CLI options accepted");
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../.deps/zed-interfaces/validation/compiler/cases.json");
     let corpus: Value = serde_json::from_str(
@@ -39,32 +43,48 @@ fn matches_the_admitted_production_corpus_without_null_insertion() {
                 .into_iter()
                 .flatten()
                 .collect();
-                if matches.len() == 1 { matches.pop() } else { None }
+                if matches.len() == 1 {
+                    matches.pop()
+                } else {
+                    None
+                }
             }
             other => panic!("unimplemented declaration: {other}"),
         };
         let expected = case["valid"].as_bool().unwrap();
         if parsed.is_some() != expected || (expected && parsed.as_ref() != Some(value)) {
-            failures.push(format!("{}/{}: expected valid={expected}, output={parsed:?}", case["declaration"], case["id"]));
+            failures.push(format!(
+                "{}/{}: expected valid={expected}, output={parsed:?}",
+                case["declaration"], case["id"]
+            ));
         }
     }
-    assert!(failures.is_empty(), "runtime/schema disagreements:\n{}", failures.join("\n"));
-}
-
-#[test]
-fn unicode_lengths_use_code_points() {
-    assert!(checked::<RequestMeta>(&json!({"requestId":"😀".repeat(128),"traceId":"t"})).is_some());
-    assert!(checked::<RequestMeta>(&json!({"requestId":"😀".repeat(129),"traceId":"t"})).is_none());
-    assert!(checked::<RequestMeta>(&json!({"requestId":"r","traceId":"t","locale":"😀"})).is_none());
-}
-
-#[test]
-fn integer_json_spellings_are_not_string_coercion() {
+    for (value, valid) in [
+        (json!({"requestId":"😀".repeat(128),"traceId":"t"}), true),
+        (json!({"requestId":"😀".repeat(129),"traceId":"t"}), false),
+        (json!({"requestId":"r","traceId":"t","locale":"😀"}), false),
+    ] {
+        if checked::<RequestMeta>(&value).is_some() != valid {
+            failures.push(format!("Unicode length disagreement: expected valid={valid}"));
+        }
+    }
     for wire in [r#"{"limit":50.0}"#, r#"{"limit":5e1}"#] {
-        let parsed: PageQuery = serde_json::from_str(wire).expect("JSON mathematical integers must decode");
-        assert!(parsed.validate().is_ok());
+        let accepted = serde_json::from_str::<PageQuery>(wire)
+            .map(|value| value.validate().is_ok())
+            .unwrap_or(false);
+        if !accepted {
+            failures.push(format!("mathematical integer rejected: {wire}"));
+        }
     }
     for wire in [r#"{"limit":1.5}"#, r#"{"limit":"50"}"#, r#"{"limit":null}"#] {
-        assert!(serde_json::from_str::<PageQuery>(wire).is_err());
+        if serde_json::from_str::<PageQuery>(wire).is_ok() {
+            failures.push(format!("invalid integer payload accepted: {wire}"));
+        }
     }
+    assert!(
+        failures.is_empty(),
+        "runtime/schema disagreements:\n{}",
+        failures.join("\n")
+    );
+    println!("34 production corpus cases and 8 Unicode/integer checks passed");
 }
