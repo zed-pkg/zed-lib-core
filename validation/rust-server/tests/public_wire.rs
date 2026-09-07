@@ -87,7 +87,10 @@ fn missing_and_invalid_numeric_values_fail() {
         json!({"limit":0}),
         json!({"limit":101}),
     ] {
-        assert!(checked::<PageQuery>(value.clone()).is_err(), "accepted {value}");
+        assert!(
+            checked::<PageQuery>(value.clone()).is_err(),
+            "accepted {value}"
+        );
     }
 }
 

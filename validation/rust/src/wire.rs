@@ -56,7 +56,9 @@ where
             {
                 Ok(value as u16)
             } else {
-                Err(E::custom("expected a finite integral JSON number within u16"))
+                Err(E::custom(
+                    "expected a finite integral JSON number within u16",
+                ))
             }
         }
     }

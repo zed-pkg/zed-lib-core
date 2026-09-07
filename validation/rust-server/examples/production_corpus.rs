@@ -65,7 +65,9 @@ fn main() {
         (json!({"requestId":"r","traceId":"t","locale":"😀"}), false),
     ] {
         if checked::<RequestMeta>(&value).is_some() != valid {
-            failures.push(format!("Unicode length disagreement: expected valid={valid}"));
+            failures.push(format!(
+                "Unicode length disagreement: expected valid={valid}"
+            ));
         }
     }
     for wire in [r#"{"limit":50.0}"#, r#"{"limit":5e1}"#] {
