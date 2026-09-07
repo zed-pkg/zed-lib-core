@@ -39,6 +39,11 @@ const DEPENDENCY_GRAPH_SQL: &str = include_str!("sql/2026-08-11-dependency-graph
 const VISIBILITY_IMMUTABILITY_SQL: &str =
     include_str!("sql/2026-08-11-public-visibility-is-permanent.sql");
 
+const PROMOTION_POLICY_SQL: &str = include_str!("sql/2026-09-07-promotion-policy-facts.sql");
+
+/// Immutable identity for the decision-clock and policy-facts upgrade.
+const PROMOTION_POLICY_VERSION: &str = "registry-promotion-policy-facts@2026-09-07-v1";
+
 /// Historical ledger key emitted by the first registry migration release.
 ///
 /// The original source-provenance constant accidentally named an unpublished
@@ -56,14 +61,19 @@ pub fn visibility_immutability_version() -> String {
     format!("registry-visibility-immutability@{VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX}")
 }
 
+/// Ledger identity for the forward-only promotion-policy upgrade.
+pub fn promotion_policy_version() -> String {
+    PROMOTION_POLICY_VERSION.to_owned()
+}
+
 /// Target version retained for compatibility with existing migration callers.
 ///
 /// The runner owns an ordered ledger rather than one mutable schema version.
 /// This value is the final step in that order; use
-/// [`dependency_graph_version`] and [`visibility_immutability_version`] when an
-/// individual migration identity is required.
+/// [`dependency_graph_version`], [`visibility_immutability_version`], and
+/// [`promotion_policy_version`] when an individual identity is required.
 pub fn registry_version() -> String {
-    visibility_immutability_version()
+    promotion_policy_version()
 }
 
 /// Arbitrary but stable key for the advisory lock guarding migration.
@@ -76,15 +86,17 @@ enum MigrationStep {
     HistoricalBase,
     DependencyGraph,
     VisibilityImmutability,
+    PromotionPolicy,
 }
 
 impl MigrationStep {
     /// Deployment order is part of the contract. Never substitute a changing
     /// package revision for the historical base identity.
-    const ORDERED: [Self; 3] = [
+    const ORDERED: [Self; 4] = [
         Self::HistoricalBase,
         Self::DependencyGraph,
         Self::VisibilityImmutability,
+        Self::PromotionPolicy,
     ];
 
     fn version(self) -> String {
@@ -92,6 +104,7 @@ impl MigrationStep {
             Self::HistoricalBase => BASE_REGISTRY_VERSION.to_owned(),
             Self::DependencyGraph => dependency_graph_version(),
             Self::VisibilityImmutability => visibility_immutability_version(),
+            Self::PromotionPolicy => promotion_policy_version(),
         }
     }
 
@@ -100,6 +113,7 @@ impl MigrationStep {
             Self::HistoricalBase => REGISTRY_SQL,
             Self::DependencyGraph => DEPENDENCY_GRAPH_SQL,
             Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,
+            Self::PromotionPolicy => PROMOTION_POLICY_SQL,
         }
     }
 }
@@ -268,8 +282,10 @@ mod tests {
     #[test]
     fn every_forward_migration_has_an_independent_ledger_identity() {
         assert!(dependency_graph_version().ends_with(DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
-        assert!(registry_version().ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
-        assert_eq!(registry_version(), visibility_immutability_version());
+        let visibility_version = visibility_immutability_version();
+        assert!(visibility_version.ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
+        assert_eq!(registry_version(), promotion_policy_version());
+        assert_ne!(registry_version(), visibility_immutability_version());
         assert_ne!(
             dependency_graph_version(),
             visibility_immutability_version()
@@ -293,7 +309,8 @@ mod tests {
             plan,
             vec![
                 MigrationStep::DependencyGraph,
-                MigrationStep::VisibilityImmutability
+                MigrationStep::VisibilityImmutability,
+                MigrationStep::PromotionPolicy
             ]
         );
         assert!(!plan.contains(&MigrationStep::HistoricalBase));
@@ -306,7 +323,8 @@ mod tests {
             plan,
             vec![
                 MigrationStep::DependencyGraph,
-                MigrationStep::VisibilityImmutability
+                MigrationStep::VisibilityImmutability,
+                MigrationStep::PromotionPolicy
             ]
         );
         assert!(!plan.contains(&MigrationStep::HistoricalBase));
@@ -319,7 +337,8 @@ mod tests {
             plan,
             vec![
                 MigrationStep::DependencyGraph,
-                MigrationStep::VisibilityImmutability
+                MigrationStep::VisibilityImmutability,
+                MigrationStep::PromotionPolicy
             ]
         );
         assert!(!plan.contains(&MigrationStep::HistoricalBase));
@@ -335,7 +354,42 @@ mod tests {
                 visibility_immutability_version(),
             ],
         );
-        assert_eq!(plan, vec![MigrationStep::DependencyGraph]);
+        assert_eq!(
+            plan,
+            vec![
+                MigrationStep::DependencyGraph,
+                MigrationStep::PromotionPolicy
+            ]
+        );
+    }
+
+    #[test]
+    fn an_up_to_date_historical_database_receives_only_the_policy_upgrade() {
+        let plan = migration_plan(
+            true,
+            true,
+            &[
+                BASE_REGISTRY_VERSION.to_owned(),
+                dependency_graph_version(),
+                visibility_immutability_version(),
+            ],
+        );
+        assert_eq!(plan, vec![MigrationStep::PromotionPolicy]);
+    }
+
+    #[test]
+    fn policy_upgrade_is_last_and_keeps_security_definer_disabled() {
+        assert_eq!(
+            MigrationStep::ORDERED.last(),
+            Some(&MigrationStep::PromotionPolicy)
+        );
+        assert!(PROMOTION_POLICY_SQL.contains("decision_at := clock_timestamp()"));
+        assert!(PROMOTION_POLICY_SQL.contains("greatest(old.download_count, new.download_count)"));
+        assert!(!PROMOTION_POLICY_SQL.contains("security definer"));
+        assert_eq!(
+            PROMOTION_POLICY_VERSION,
+            "registry-promotion-policy-facts@2026-09-07-v1"
+        );
     }
 
     #[test]
