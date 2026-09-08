@@ -44,6 +44,9 @@ const PROMOTION_POLICY_SQL: &str = include_str!("sql/2026-09-07-promotion-policy
 /// Immutable identity for the decision-clock and policy-facts upgrade.
 const PROMOTION_POLICY_VERSION: &str = "registry-promotion-policy-facts@2026-09-07-v1";
 
+const REGISTRY_INTEGRITY_SQL: &str = include_str!("sql/2026-09-07-registry-integrity.sql");
+const REGISTRY_INTEGRITY_VERSION: &str = "registry-integrity@2026-09-07-v1";
+
 /// Historical ledger key emitted by the first registry migration release.
 ///
 /// The original source-provenance constant accidentally named an unpublished
@@ -66,14 +69,18 @@ pub fn promotion_policy_version() -> String {
     PROMOTION_POLICY_VERSION.to_owned()
 }
 
+/// Ledger identity for validated ownership bindings and SPDX completeness.
+pub fn registry_integrity_version() -> String {
+    REGISTRY_INTEGRITY_VERSION.to_owned()
+}
+
 /// Target version retained for compatibility with existing migration callers.
 ///
 /// The runner owns an ordered ledger rather than one mutable schema version.
-/// This value is the final step in that order; use
-/// [`dependency_graph_version`], [`visibility_immutability_version`], and
-/// [`promotion_policy_version`] when an individual identity is required.
+/// This value is the final step in that order; individual identity accessors
+/// remain stable when a new final step is added.
 pub fn registry_version() -> String {
-    promotion_policy_version()
+    registry_integrity_version()
 }
 
 /// Arbitrary but stable key for the advisory lock guarding migration.
@@ -87,16 +94,18 @@ enum MigrationStep {
     DependencyGraph,
     VisibilityImmutability,
     PromotionPolicy,
+    RegistryIntegrity,
 }
 
 impl MigrationStep {
     /// Deployment order is part of the contract. Never substitute a changing
     /// package revision for the historical base identity.
-    const ORDERED: [Self; 4] = [
+    const ORDERED: [Self; 5] = [
         Self::HistoricalBase,
         Self::DependencyGraph,
         Self::VisibilityImmutability,
         Self::PromotionPolicy,
+        Self::RegistryIntegrity,
     ];
 
     fn version(self) -> String {
@@ -105,6 +114,7 @@ impl MigrationStep {
             Self::DependencyGraph => dependency_graph_version(),
             Self::VisibilityImmutability => visibility_immutability_version(),
             Self::PromotionPolicy => promotion_policy_version(),
+            Self::RegistryIntegrity => registry_integrity_version(),
         }
     }
 
@@ -114,6 +124,7 @@ impl MigrationStep {
             Self::DependencyGraph => DEPENDENCY_GRAPH_SQL,
             Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,
             Self::PromotionPolicy => PROMOTION_POLICY_SQL,
+            Self::RegistryIntegrity => REGISTRY_INTEGRITY_SQL,
         }
     }
 }
@@ -284,7 +295,8 @@ mod tests {
         assert!(dependency_graph_version().ends_with(DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
         let visibility_version = visibility_immutability_version();
         assert!(visibility_version.ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
-        assert_eq!(registry_version(), promotion_policy_version());
+        assert_eq!(registry_version(), registry_integrity_version());
+        assert_ne!(registry_version(), promotion_policy_version());
         assert_ne!(registry_version(), visibility_immutability_version());
         assert_ne!(
             dependency_graph_version(),
@@ -310,7 +322,8 @@ mod tests {
             vec![
                 MigrationStep::DependencyGraph,
                 MigrationStep::VisibilityImmutability,
-                MigrationStep::PromotionPolicy
+                MigrationStep::PromotionPolicy,
+                MigrationStep::RegistryIntegrity
             ]
         );
         assert!(!plan.contains(&MigrationStep::HistoricalBase));
@@ -324,7 +337,8 @@ mod tests {
             vec![
                 MigrationStep::DependencyGraph,
                 MigrationStep::VisibilityImmutability,
-                MigrationStep::PromotionPolicy
+                MigrationStep::PromotionPolicy,
+                MigrationStep::RegistryIntegrity
             ]
         );
         assert!(!plan.contains(&MigrationStep::HistoricalBase));
@@ -338,7 +352,8 @@ mod tests {
             vec![
                 MigrationStep::DependencyGraph,
                 MigrationStep::VisibilityImmutability,
-                MigrationStep::PromotionPolicy
+                MigrationStep::PromotionPolicy,
+                MigrationStep::RegistryIntegrity
             ]
         );
         assert!(!plan.contains(&MigrationStep::HistoricalBase));
@@ -358,13 +373,14 @@ mod tests {
             plan,
             vec![
                 MigrationStep::DependencyGraph,
-                MigrationStep::PromotionPolicy
+                MigrationStep::PromotionPolicy,
+                MigrationStep::RegistryIntegrity
             ]
         );
     }
 
     #[test]
-    fn an_up_to_date_historical_database_receives_only_the_policy_upgrade() {
+    fn a_database_before_policy_receives_both_integrity_upgrades() {
         let plan = migration_plan(
             true,
             true,
@@ -374,14 +390,36 @@ mod tests {
                 visibility_immutability_version(),
             ],
         );
-        assert_eq!(plan, vec![MigrationStep::PromotionPolicy]);
+        assert_eq!(
+            plan,
+            vec![
+                MigrationStep::PromotionPolicy,
+                MigrationStep::RegistryIntegrity
+            ]
+        );
     }
 
     #[test]
-    fn policy_upgrade_is_last_and_keeps_security_definer_disabled() {
+    fn a_database_with_policy_receives_only_registry_integrity() {
+        let ledger = MigrationStep::ORDERED[..4]
+            .iter()
+            .map(|step| step.version())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            migration_plan(true, true, &ledger),
+            vec![MigrationStep::RegistryIntegrity]
+        );
+        assert_eq!(registry_integrity_version(), "registry-integrity@2026-09-07-v1");
+        assert!(REGISTRY_INTEGRITY_SQL.contains("validate constraint"));
+        assert!(!REGISTRY_INTEGRITY_SQL.contains("security definer"));
+    }
+
+    #[test]
+    fn policy_upgrade_precedes_integrity_and_keeps_security_definer_disabled() {
+        assert_eq!(MigrationStep::ORDERED[3], MigrationStep::PromotionPolicy);
         assert_eq!(
             MigrationStep::ORDERED.last(),
-            Some(&MigrationStep::PromotionPolicy)
+            Some(&MigrationStep::RegistryIntegrity)
         );
         assert!(PROMOTION_POLICY_SQL.contains("decision_at := clock_timestamp()"));
         assert!(PROMOTION_POLICY_SQL.contains("greatest(old.download_count, new.download_count)"));
