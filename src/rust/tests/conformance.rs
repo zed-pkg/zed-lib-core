@@ -252,6 +252,8 @@ fn the_generated_corpus_is_present_and_deterministic() {
         "latest-stable.json",
         "fuzz-version-resolution.json",
         "fuzz-latest-stable.json",
+        "formal-version-resolution.json",
+        "formal-latest-stable.json",
         "registry-namespace-plans.json",
     ] {
         assert!(
