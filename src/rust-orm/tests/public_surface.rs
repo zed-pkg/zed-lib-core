@@ -154,16 +154,18 @@ fn product_schema_is_local_and_historical_import_provenance_is_exact() {
 }
 
 #[test]
-fn migration_ledger_keeps_base_graph_visibility_and_policy_distinct() {
+fn migration_ledger_keeps_historical_steps_and_integrity_distinct() {
     let migrations = read("migrations.rs");
     assert!(migrations.contains("registry@c8bdc06d74746acc6439f9527ebd02697fdf028b"));
     assert!(migrations.contains("Self::HistoricalBase"));
     assert!(migrations.contains("Self::DependencyGraph"));
     assert!(migrations.contains("Self::VisibilityImmutability"));
     assert!(migrations.contains("Self::PromotionPolicy"));
+    assert!(migrations.contains("Self::RegistryIntegrity"));
     assert!(migrations.contains("sql/2026-08-11-dependency-graph-artifacts.sql"));
     assert!(migrations.contains("sql/2026-08-11-public-visibility-is-permanent.sql"));
     assert!(migrations.contains("sql/2026-09-07-promotion-policy-facts.sql"));
+    assert!(migrations.contains("sql/2026-09-07-registry-integrity.sql"));
 }
 
 #[cfg(feature = "migrate")]
@@ -172,13 +174,18 @@ fn individual_migration_versions_are_public_and_distinct() {
     let graph = zed_orm_core::migrations::dependency_graph_version();
     let visibility = zed_orm_core::migrations::visibility_immutability_version();
     let policy = zed_orm_core::migrations::promotion_policy_version();
+    let integrity = zed_orm_core::migrations::registry_integrity_version();
     assert!(graph.ends_with(zed_orm_core::DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
     assert!(visibility.ends_with(zed_orm_core::VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
     assert_eq!(policy, "registry-promotion-policy-facts@2026-09-07-v1");
+    assert_eq!(integrity, "registry-integrity@2026-09-07-v1");
     assert_ne!(graph, visibility);
     assert_ne!(graph, policy);
     assert_ne!(visibility, policy);
-    assert_eq!(zed_orm_core::migrations::registry_version(), policy);
+    assert_ne!(graph, integrity);
+    assert_ne!(visibility, integrity);
+    assert_ne!(policy, integrity);
+    assert_eq!(zed_orm_core::migrations::registry_version(), integrity);
 }
 
 #[test]

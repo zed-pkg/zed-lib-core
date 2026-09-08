@@ -1,0 +1,82 @@
+name: registry-integrity
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: registry-integrity-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  postgres:
+    name: Registry integrity / PostgreSQL ${{ matrix.postgres }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['17', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: integrity_test
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: registry_integrity_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U integrity_test -d registry_integrity_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: integrity_test
+      PGPASSWORD: disposable-ci-only
+      PGDATABASE: registry_integrity_test
+      PGOPTIONS: '-c lock_timeout=5s -c statement_timeout=30s'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Apply historical schema and already-released forward migrations
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -1 -f src/rust-orm/sql/registry.sql
+          psql -X -v ON_ERROR_STOP=1 -1 -f src/rust-orm/sql/2026-08-11-dependency-graph-artifacts.sql
+          psql -X -v ON_ERROR_STOP=1 -1 -f src/rust-orm/sql/2026-08-11-public-visibility-is-permanent.sql
+          psql -X -v ON_ERROR_STOP=1 -1 -f src/rust-orm/sql/2026-09-07-promotion-policy-facts.sql
+      - name: Reproduce all twelve historical integrity failures
+        run: psql -X -v hardened=false -f tests/registry-integrity/assertions.sql
+      - name: Reject dirty upgrades atomically instead of silently repairing data
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spdx in true false; do
+            log="$RUNNER_TEMP/dirty-$spdx.log"
+            if psql -X -1 -v spdx="$spdx" -f tests/registry-integrity/dirty-upgrade.sql > "$log" 2>&1; then
+              echo 'Dirty upgrade unexpectedly succeeded' >&2
+              exit 1
+            fi
+            cat "$log"
+            if [[ "$spdx" == true ]]; then
+              grep -Fq 'zed_package_licenses_spdx_required_chk' "$log"
+            else
+              grep -Fq 'zed_packages_project_org_integrity_fk' "$log"
+            fi
+            test "$(psql -X -qAt -c "select count(*) from pg_catalog.pg_class where relname in ('zed_projects_id_org_integrity_uq', 'zed_versions_id_package_integrity_uq')")" = 0
+            test "$(psql -X -qAt -c "select count(*) from public.zed_orgs where slug like 'integrity-%'")" = 0
+          done
+      - name: Apply and repeat the validated forward upgrade
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -1 -f src/rust-orm/sql/2026-09-07-registry-integrity.sql
+          psql -X -v ON_ERROR_STOP=1 -1 -f src/rust-orm/sql/2026-09-07-registry-integrity.sql
+      - name: Reject invalid writes and preserve valid nullable and deletion behavior
+        run: |
+          psql -X -v hardened=true -f tests/registry-integrity/assertions.sql
+          psql -X -f tests/registry-policy/expired-transaction.sql
+          psql -X -f tests/registry-policy/assertions.sql
+      - name: Require all five new guards to be validated
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(psql -X -qAt -c "select count(*) from pg_catalog.pg_constraint where convalidated and connamespace = 'public'::regnamespace and conname in ('zed_packages_project_org_integrity_fk', 'zed_licenses_version_package_integrity_fk', 'zed_uploads_version_package_integrity_fk', 'zed_downloads_version_package_integrity_fk', 'zed_package_licenses_spdx_required_chk')")" = 5
