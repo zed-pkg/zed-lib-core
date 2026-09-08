@@ -1,0 +1,70 @@
+name: registry-promotion-policy
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: registry-policy-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  postgres:
+    name: Promotion policy / PostgreSQL ${{ matrix.postgres }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['17', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: policy_test
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: registry_policy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U policy_test -d registry_policy_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: policy_test
+      PGPASSWORD: disposable-ci-only
+      PGDATABASE: registry_policy_test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Apply the real historical schema and migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f src/rust-orm/sql/registry.sql
+          psql -X -v ON_ERROR_STOP=1 -f src/rust-orm/sql/2026-08-11-dependency-graph-artifacts.sql
+          psql -X -v ON_ERROR_STOP=1 -f src/rust-orm/sql/2026-08-11-public-visibility-is-permanent.sql
+      - name: Prove the historical transaction-clock regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          if psql -X -f tests/registry-policy/expired-transaction.sql > "$RUNNER_TEMP/policy-red.log" 2>&1; then
+            echo 'Expected the historical policy to reject this regression test.' >&2
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/policy-red.log"
+          grep -Fq 'REGRESSION: expired transaction was accepted' "$RUNNER_TEMP/policy-red.log"
+      - name: Apply the forward upgrade and prove retry safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f src/rust-orm/sql/2026-09-07-promotion-policy-facts.sql
+          psql -X -v ON_ERROR_STOP=1 -f src/rust-orm/sql/2026-09-07-promotion-policy-facts.sql
+      - name: Verify elapsed-time and policy-fact invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -f tests/registry-policy/expired-transaction.sql
+          psql -X -f tests/registry-policy/assertions.sql

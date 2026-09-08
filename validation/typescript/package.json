@@ -7,6 +7,6 @@
   "files": ["dist"],
   "exports": {".": {"types": "./dist/public.d.ts", "import": "./dist/public.js"}},
   "scripts": {"build": "tsc -p tsconfig.json", "test": "npm run build && node --test test/public.test.mjs"},
-  "dependencies": {"zod": "^4.0.0"},
-  "devDependencies": {"typescript": "^5.9.0"}
+  "dependencies": {"zod": "4.5.4"},
+  "devDependencies": {"typescript": "5.9.3"}
 }

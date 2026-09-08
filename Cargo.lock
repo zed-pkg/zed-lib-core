@@ -128,6 +128,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bs58"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2550,7 +2559,9 @@ dependencies = [
 [[package]]
 name = "zed-interfaces"
 version = "0.1.0"
+source = "git+https://github.com/zed-pkg/zed-interfaces.git?rev=3c54298fc7a8c1b2f9c1d74f588c6118b38f197e#3c54298fc7a8c1b2f9c1d74f588c6118b38f197e"
 dependencies = [
+ "bs58",
  "hex",
  "schemars",
  "semver",
@@ -2583,7 +2594,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "zed-interfaces 0.1.0",
+ "zed-interfaces 0.1.0 (git+https://github.com/zed-pkg/zed-interfaces.git?rev=3c54298fc7a8c1b2f9c1d74f588c6118b38f197e)",
 ]
 
 [[package]]

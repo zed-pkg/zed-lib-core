@@ -1,0 +1,78 @@
+name: Production public contract runtime conformance
+on:
+  pull_request:
+    paths: ['validation/**', '.github/workflows/public-contract-runtime.yml']
+  push:
+    branches: [main]
+    paths: ['validation/**', '.github/workflows/public-contract-runtime.yml']
+permissions:
+  contents: read
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [typescript, rust]
+    env:
+      RUSTUP_TOOLCHAIN: '1.89.0'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify reviewed runtime revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: 58495c9aaf438b043a5e8bc154d27e9409eabc2d
+          path: .deps/zed-interfaces
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: ORESoftware/typespec-json-schema-validator
+          ref: c745036456dd80408b83217118b8563edb8f6abd
+          path: .deps/zed-interfaces/.deps/typespec-json-schema-validator
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Verify immutable production dependency checkouts
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          const pins = JSON.parse(readFileSync('validation/compiler-conformance/pins.json', 'utf8'));
+          for (const [key, path] of [['interfaces', '.deps/zed-interfaces'], ['validator', '.deps/zed-interfaces/.deps/typespec-json-schema-validator']]) {
+            assert.match(pins[key], /^[a-f0-9]{40}$/);
+            assert.equal(execFileSync('git', ['-C', path, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), pins[key]);
+            execFileSync('git', ['-C', path, 'diff', '--exit-code', 'HEAD']);
+          }
+          NODE
+      - name: Install locked peer-authority compiler
+        run: npm ci --prefix .deps/zed-interfaces/.deps/typespec-json-schema-validator
+      - name: Admit production authorities before testing runtime implementations
+        run: node .deps/zed-interfaces/validation/compiler/public-parity.mjs
+      - name: Install exact TypeScript runtime dependencies
+        if: matrix.runtime == 'typescript'
+        run: npm ci --prefix validation/typescript
+      - name: Build and test actual TypeScript validators
+        if: matrix.runtime == 'typescript'
+        run: |
+          npm test --prefix validation/typescript
+          node --test validation/compiler-conformance/runtime.test.mjs
+      - name: Install pinned Rust toolchain
+        if: matrix.runtime == 'rust'
+        run: rustup toolchain install 1.89.0 --profile minimal --component rustfmt,clippy
+      - name: Test actual Rust validators and serialization using the workspace lock
+        if: matrix.runtime == 'rust'
+        run: |
+          cargo test --locked -p zed-validation -p zed-validation-server
+          cargo run --locked -p zed-validation-server --example production_corpus
+      - name: Verify dependency lock immutability
+        run: git diff --exit-code -- Cargo.lock validation/typescript/package-lock.json
