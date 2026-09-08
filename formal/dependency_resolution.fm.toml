@@ -18,6 +18,10 @@ witnesses = [
   "missing_dependency_fails_closed_reached",
   "cycle_fails_closed_reached",
   "deterministic_replay_reached",
+  "normalized_tie_reached",
+  "prerelease_range_rejected_reached",
+  "stale_latest_reached",
+  "absent_latest_reached",
 ]
 
 [toolchain]
@@ -34,7 +38,7 @@ artifacts_dir = ".formal-artifacts/dependency-resolution"
 [simulation]
 backend = "typescript"
 max_samples = 10000
-max_steps = 24
+max_steps = 40
 
 [verification]
 backend = "tlc"

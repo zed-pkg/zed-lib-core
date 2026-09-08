@@ -41,24 +41,49 @@ exhaustive TLC check of the finite graph. Generated evidence is written below
 `dependency_resolution.qnt`, configured by
 `dependency_resolution.fm.toml`, is the bounded safety model for the shared
 Rust/TypeScript/Dart resolver. It abstracts the parser's string algebra into
-finite published candidate identities and requirement shapes, then checks the
-properties that must hold across all three implementations:
+finite candidate ranks and membership predicates. Selection visits candidates
+one at a time; an independent quantified invariant checks the greatest eligible
+candidate in the visited prefix, including the last-equal spelling rule. There
+is no expected-answer table in the selection transition system.
 
-1. every modeled outcome is one of the stable success/error kinds;
-2. a successful selection is present in the published candidate set;
-3. opaque packages never resolve through range algebra;
-4. malformed, empty, and unsatisfied requirements remain distinct; and
-5. missing transitive dependencies and cycles fail closed without emitting a
-   partial lock.
+The 17 concrete fixtures cover semver, calver, opaque exact/range requests,
+normalized spelling ties in both orders, explicit prerelease ranges, malformed
+requirements, empty candidate sets, unsatisfied ranges, and absent/withdrawn or
+prerelease latest hints. Outcomes preserve the published spelling and the three
+distinct errors, including `no_versions` precedence over malformed input.
+Every fixture runs twice through the same transitions in `trace_step`.
+Range selection is stable-only, even for an explicit `=1.5.0-rc.1` comparator;
+exact-tag selection is verbatim. Membership and stability are separate model
+predicates so this project-specific policy is not mistaken for Cargo's generic
+prerelease matching behavior.
 
-The model is deliberately a safety boundary, not a replacement for production
-semver parsing. The schema-validated corpus remains the executable cross-language
-oracle, and the larger deterministic corpus remains differential testing.
+`generate_formal_corpus` projects the completed ITF states into 34 schema-validated
+cases. It does not import a production resolver. Rust, TypeScript, and Dart load
+those exact files and invoke their real `resolve_version` / `latest_stable`
+equivalents. CI regenerates the trace and corpus and requires byte-for-byte
+agreement with the committed fixtures. The existing 600-case Rust-oracle fuzz
+corpus remains a separate differential test. See [generation instructions](../conformance/README.md).
+
+This is a finite refinement check, not a proof of arbitrary semver parsing or
+all possible package graphs. The three two-node graph scenarios retain DEN-99's
+abstract stage/commit contract: missing dependencies and a rejected cycle clear
+staged state without publishing a partial lock. They are **not** replayed against
+the scalar resolver, which has no graph API. Concrete graph resolution lives in
+zed-cli (including its separately defined exact-cycle policy), while registry
+publication models remain in zed-api-server.rs under DEN-99. Extending graph
+refinement must use those production owners and their actual cycle semantics.
+
+Canonical ownership: this shared-resolver model and corpus belong to
+[DEN-3855](https://linear.app/denman/issue/DEN-3855) and
+[zed-lib-core #44](https://github.com/zed-pkg/zed-lib-core/issues/44), not a second
+API-server resolver implementation. The lock waiter-lifecycle model separately
+lives at `src/rust-lock/formal/`; zed-lock is incorporated into this repository.
 
 Run it locally with:
 
 ```sh
 fmctl --manifest formal/dependency_resolution.fm.toml validate
+fmctl --manifest formal/dependency_resolution.fm.toml doctor
 fmctl --manifest formal/dependency_resolution.fm.toml check
 fmctl --manifest formal/dependency_resolution.fm.toml simulate
 fmctl --manifest formal/dependency_resolution.fm.toml verify

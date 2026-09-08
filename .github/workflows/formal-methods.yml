@@ -151,6 +151,12 @@ jobs:
           npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
             -s conformance/schema/latest-stable.schema.json \
             -d conformance/cases/fuzz-latest-stable.json
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
+            -s conformance/schema/version-resolution.schema.json \
+            -d conformance/cases/formal-version-resolution.json
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
+            -s conformance/schema/latest-stable.schema.json \
+            -d conformance/cases/formal-latest-stable.json
 
       - name: Validate the dependency-resolution formal manifest
         run: |
@@ -171,6 +177,21 @@ jobs:
         run: |
           "$FMCTL" --manifest formal/dependency_resolution.fm.toml check
 
+      # This driver uses the same transitions as the exhaustive model. Its
+      # completed outcomes become fixtures replayed by Rust, TypeScript and
+      # Dart in ci.yml; no production resolver supplies the expected answers.
+      - name: Regenerate the model-derived production replay corpus
+        run: |
+          npx --yes @informalsystems/quint@0.32.0 run formal/dependency_resolution.qnt \
+            --backend typescript --step trace_step --invariant resolution_safety \
+            --seed 3855 --max-samples 1 --max-steps 180 \
+            --out-itf .formal-artifacts/dependency-resolution/trace.itf.json --verbosity 0
+          cargo test --locked -p zed-lib --example generate_formal_corpus
+          cargo run --locked -p zed-lib --example generate_formal_corpus
+          git diff --exit-code -- \
+            conformance/cases/formal-version-resolution.json \
+            conformance/cases/formal-latest-stable.json
+
       - name: Reach every dependency-resolution witness
         run: |
           "$FMCTL" --manifest formal/dependency_resolution.fm.toml simulate
@@ -190,6 +211,8 @@ jobs:
             formal/dependency_resolution.qnt
             conformance/schema/version-resolution.schema.json
             conformance/schema/latest-stable.schema.json
+            conformance/cases/formal-version-resolution.json
+            conformance/cases/formal-latest-stable.json
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14

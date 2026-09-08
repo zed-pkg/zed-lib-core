@@ -167,4 +167,7 @@ for (const file of files) {
 // A loader bug that silently matched nothing would look like a clean run.
 test("the generated corpus was loaded too", () => {
   assert.ok(total > 100, `ran only ${total} cases`);
+  for (const required of ["formal-version-resolution.json", "formal-latest-stable.json"]) {
+    assert.ok(files.includes(required), `missing model-derived corpus ${required}`);
+  }
 });

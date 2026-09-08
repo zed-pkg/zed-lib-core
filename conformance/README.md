@@ -2,9 +2,9 @@
 
 Language-neutral cases that **every** zed-lib implementation must satisfy. The
 Rust slice runs them from `src/rust/tests/conformance.rs`; the Dart and
-TypeScript slices will run the same files.
+TypeScript slices run the same files in their conformance tests.
 
-The hand-written and generated fuzz corpora are validated in CI against the
+The hand-written, model-derived, and generated fuzz corpora are validated in CI against the
 JSON Schema 2020-12 contracts in `conformance/schema/`. A case that is
 syntactically plausible but outside the shared wire contract must fail schema
 validation before any implementation is allowed to interpret it.
@@ -44,6 +44,33 @@ null, never an error). `latest` is **data** in these cases, including when it is
 null — that is what "the registry recorded nothing" looks like, and a runner
 that substitutes the newest version there is quietly answering a different
 question. Resolution cases never read `latest`, so they may fall back.
+
+## `cases/formal-*.json` — model-derived, do not edit
+
+These 34 cases are projected from completed Quint states: 17 input fixtures,
+each executed twice through the actual model transitions. The Rust projector
+does **not** call any resolver to compute expected values. All three production
+implementations independently replay those results, including error kinds and
+exact published spelling. Removing either corpus file fails the loaders.
+
+From the repository root, with the pinned toolchain available:
+
+```sh
+mkdir -p .formal-artifacts/dependency-resolution
+npx --yes @informalsystems/quint@0.32.0 run formal/dependency_resolution.qnt \
+  --backend typescript --step trace_step --invariant resolution_safety \
+  --seed 3855 --max-samples 1 --max-steps 180 \
+  --out-itf .formal-artifacts/dependency-resolution/trace.itf.json --verbosity 0
+cargo test --locked -p zed-lib --example generate_formal_corpus
+cargo run --locked -p zed-lib --example generate_formal_corpus
+```
+
+Generation rejects incomplete, failed, conflicting, or nondeterministic traces.
+ITF timestamps and intermediate states are not included in committed output.
+CI repeats generation and requires no diff. The separate exhaustive TLC job
+checks the full finite state space, not just this deterministic replay path.
+See [the formal boundary](../formal/README.md#dependency-resolution-boundary)
+for parser assumptions and the distinction between scalar and graph resolution.
 
 ## `cases/fuzz-*.json` — generated, do not edit
 

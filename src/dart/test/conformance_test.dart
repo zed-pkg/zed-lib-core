@@ -148,5 +148,12 @@ void main() {
   // A loader bug that silently matched nothing would look like a clean run.
   test('the generated corpus was loaded too', () {
     expect(total, greaterThan(100), reason: 'ran only $total cases');
+    for (final required in [
+      'formal-version-resolution.json',
+      'formal-latest-stable.json',
+    ]) {
+      expect(files.any((file) => file.path.endsWith('/$required')), isTrue,
+          reason: 'missing model-derived corpus $required');
+    }
   });
 }
