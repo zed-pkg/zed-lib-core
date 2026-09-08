@@ -409,7 +409,10 @@ mod tests {
             migration_plan(true, true, &ledger),
             vec![MigrationStep::RegistryIntegrity]
         );
-        assert_eq!(registry_integrity_version(), "registry-integrity@2026-09-07-v1");
+        assert_eq!(
+            registry_integrity_version(),
+            "registry-integrity@2026-09-07-v1"
+        );
         assert!(REGISTRY_INTEGRITY_SQL.contains("validate constraint"));
         assert!(!REGISTRY_INTEGRITY_SQL.contains("security definer"));
     }
