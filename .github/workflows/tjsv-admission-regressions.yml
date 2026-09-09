@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   admission:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: zed-pkg/zed-interfaces
-          ref: 602285a9bac5ef0a845e958e3920613be7198680
+          ref: 4b8a0a2a466acb82abc286879695b2e5ac21fef8
           path: tmp/tjsv-authorities
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -35,7 +35,7 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          test "$(git -C tmp/tjsv-authorities rev-parse HEAD)" = 602285a9bac5ef0a845e958e3920613be7198680
+          test "$(git -C tmp/tjsv-authorities rev-parse HEAD)" = 4b8a0a2a466acb82abc286879695b2e5ac21fef8
           test "$(git -C tmp/tjsv-validator rev-parse HEAD)" = 2281843126ab644607b11cf8281d84f382d68dfc
           git -C tmp/tjsv-authorities diff --exit-code HEAD
           git -C tmp/tjsv-validator diff --exit-code HEAD
@@ -87,6 +87,6 @@ jobs:
           path: tmp/tjsv-admission/
           if-no-files-found: error
           retention-days: 14
-# DEN-3828 / upstream issue #20. Real public declaration admission at pinned,
-# current interface and validator revisions, not proof of this library's runtime
-# or SQL/ORM conformance. No copied authorities; all native checks remain.
+# DEN-3908 / upstream issue #20. Real public declaration admission at the exact
+# merged authority and reviewed validator revisions, not proof of this library's
+# runtime or SQL/ORM conformance. No copied authorities; all native checks remain.
