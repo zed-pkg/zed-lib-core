@@ -21,13 +21,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: zed-pkg/zed-interfaces
-          ref: 65363ad0849b00cb63025bfe23d05a2ef6e8d1e2
+          ref: 3d018498f381e8cc699776e945247136864271d6
           path: tmp/tjsv-authorities
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ORESoftware/typespec-json-schema-validator
-          ref: b5bd51946b53c00b1daeb2723c0b5d54eaeafab7
+          ref: 4473504c4c9d2831d825919f70c03994d8ce01d2
           path: tmp/tjsv-validator
           persist-credentials: false
       - name: Verify consumer and producer source revisions
@@ -35,13 +35,15 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          test "$(git -C tmp/tjsv-authorities rev-parse HEAD)" = 65363ad0849b00cb63025bfe23d05a2ef6e8d1e2
-          test "$(git -C tmp/tjsv-validator rev-parse HEAD)" = b5bd51946b53c00b1daeb2723c0b5d54eaeafab7
+          test "$(git -C tmp/tjsv-authorities rev-parse HEAD)" = 3d018498f381e8cc699776e945247136864271d6
+          test "$(git -C tmp/tjsv-validator rev-parse HEAD)" = 4473504c4c9d2831d825919f70c03994d8ce01d2
+          git -C tmp/tjsv-authorities diff --exit-code HEAD
+          git -C tmp/tjsv-validator diff --exit-code HEAD
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22.16.0
       - name: Install the tested validator toolchain
-        run: npm ci --prefix tmp/tjsv-validator --omit=dev
+        run: npm ci --prefix tmp/tjsv-validator
       - name: Materialize canonical independently recorded public cases
         run: |
           node --input-type=module <<'NODE'
@@ -64,8 +66,8 @@ jobs:
             --report=tmp/tjsv-admission/report.json \
             --contract-ir=tmp/tjsv-admission/contract-ir.json \
             --seal-object-schemas=false --format-assertion=true --probes=true --max-probes=64 --quiet
-      - name: Require positive admission and seven canonical refusals
-        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@b5bd51946b53c00b1daeb2723c0b5d54eaeafab7
+      - name: Require positive admission and canonical refusal regressions
+        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@4473504c4c9d2831d825919f70c03994d8ce01d2
         with:
           contract_ir: tmp/tjsv-admission/contract-ir.json
           report: tmp/tjsv-admission/report.json
@@ -74,8 +76,10 @@ jobs:
           generated_schema: tmp/tjsv-admission/generated/typespec.generated.schema.json
           expected_declarations: '["Zed.Validation.RequestMeta","Zed.Validation.PageQuery","Zed.Validation.ProblemDetails","Zed.Validation.PublicValidationContract"]'
           verification: tmp/tjsv-admission/verification.json
-      - name: Preserve interface authority sources
-        run: git -C tmp/tjsv-authorities diff --exit-code -- validation/
+      - name: Preserve interface authority sources and validator checkout
+        run: |
+          git -C tmp/tjsv-authorities diff --exit-code -- validation/
+          git -C tmp/tjsv-validator diff --exit-code HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: ${{ always() }}
         with:
@@ -83,6 +87,6 @@ jobs:
           path: tmp/tjsv-admission/
           if-no-files-found: error
           retention-days: 14
-# DEN-3828 / upstream issue #20. Real public declaration admission at a pinned
-# interface revision, not proof of this library's runtime or SQL/ORM conformance.
-# No copied authorities or new runtime dependency; all native checks remain.
+# DEN-3828 / upstream issue #20. Real public declaration admission at pinned,
+# current interface and validator revisions, not proof of this library's runtime
+# or SQL/ORM conformance. No copied authorities; all native checks remain.
