@@ -1,0 +1,92 @@
+name: TJSV canonical public consumer regressions
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tjsv-regressions-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: 602285a9bac5ef0a845e958e3920613be7198680
+          path: tmp/tjsv-authorities
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ORESoftware/typespec-json-schema-validator
+          ref: 2281843126ab644607b11cf8281d84f382d68dfc
+          path: tmp/tjsv-validator
+          persist-credentials: false
+      - name: Verify consumer and producer source revisions
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(git -C tmp/tjsv-authorities rev-parse HEAD)" = 602285a9bac5ef0a845e958e3920613be7198680
+          test "$(git -C tmp/tjsv-validator rev-parse HEAD)" = 2281843126ab644607b11cf8281d84f382d68dfc
+          git -C tmp/tjsv-authorities diff --exit-code HEAD
+          git -C tmp/tjsv-validator diff --exit-code HEAD
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.16.0
+      - name: Install the tested validator toolchain
+        run: npm ci --prefix tmp/tjsv-validator
+      - name: Materialize canonical independently recorded public cases
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, mkdir, writeFile } from 'node:fs/promises';
+          import { validateCorpus } from './tmp/tjsv-authorities/validation/compiler/public-parity.mjs';
+          const corpus = validateCorpus(JSON.parse(await readFile('tmp/tjsv-authorities/validation/compiler/cases.json', 'utf8')));
+          for (const item of corpus.cases) {
+            const dir = `tmp/tjsv-admission/instances/${item.declaration}/${item.valid ? 'valid' : 'invalid'}`;
+            await mkdir(dir, { recursive: true });
+            await writeFile(`${dir}/${item.id}.json`, JSON.stringify(item.value), { flag: 'wx' });
+          }
+          NODE
+      - name: Require fresh canonical public parity without weakening closure or format policy
+        run: |
+          node tmp/tjsv-validator/bin/typespec-json-schema-validator.mjs check \
+            --typespec=tmp/tjsv-authorities/validation/typespec/validation.tsp \
+            --schema=tmp/tjsv-authorities/validation/public-contracts.v1.json \
+            --instances=tmp/tjsv-admission/instances \
+            --output-dir=tmp/tjsv-admission/generated \
+            --report=tmp/tjsv-admission/report.json \
+            --contract-ir=tmp/tjsv-admission/contract-ir.json \
+            --seal-object-schemas=false --format-assertion=true --probes=true --max-probes=64 --quiet
+      - name: Require positive admission and canonical refusal regressions
+        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@2281843126ab644607b11cf8281d84f382d68dfc
+        with:
+          contract_ir: tmp/tjsv-admission/contract-ir.json
+          report: tmp/tjsv-admission/report.json
+          typespec: tmp/tjsv-authorities/validation/typespec/validation.tsp
+          schema: tmp/tjsv-authorities/validation/public-contracts.v1.json
+          generated_schema: tmp/tjsv-admission/generated/typespec.generated.schema.json
+          expected_declarations: '["Zed.Validation.RequestMeta","Zed.Validation.PageQuery","Zed.Validation.ProblemDetails","Zed.Validation.PublicValidationContract"]'
+          verification: tmp/tjsv-admission/verification.json
+      - name: Preserve interface authority sources and validator checkout
+        run: |
+          git -C tmp/tjsv-authorities diff --exit-code -- validation/
+          git -C tmp/tjsv-validator diff --exit-code HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: tjsv-public-consumer-${{ github.event.pull_request.head.sha || github.sha }}
+          path: tmp/tjsv-admission/
+          if-no-files-found: error
+          retention-days: 14
+# DEN-3828 / upstream issue #20. Real public declaration admission at pinned,
+# current interface and validator revisions, not proof of this library's runtime
+# or SQL/ORM conformance. No copied authorities; all native checks remain.
