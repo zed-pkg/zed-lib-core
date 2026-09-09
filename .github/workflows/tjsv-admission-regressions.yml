@@ -21,13 +21,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: zed-pkg/zed-interfaces
-          ref: 3d018498f381e8cc699776e945247136864271d6
+          ref: 602285a9bac5ef0a845e958e3920613be7198680
           path: tmp/tjsv-authorities
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ORESoftware/typespec-json-schema-validator
-          ref: 4473504c4c9d2831d825919f70c03994d8ce01d2
+          ref: 2281843126ab644607b11cf8281d84f382d68dfc
           path: tmp/tjsv-validator
           persist-credentials: false
       - name: Verify consumer and producer source revisions
@@ -35,8 +35,8 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          test "$(git -C tmp/tjsv-authorities rev-parse HEAD)" = 3d018498f381e8cc699776e945247136864271d6
-          test "$(git -C tmp/tjsv-validator rev-parse HEAD)" = 4473504c4c9d2831d825919f70c03994d8ce01d2
+          test "$(git -C tmp/tjsv-authorities rev-parse HEAD)" = 602285a9bac5ef0a845e958e3920613be7198680
+          test "$(git -C tmp/tjsv-validator rev-parse HEAD)" = 2281843126ab644607b11cf8281d84f382d68dfc
           git -C tmp/tjsv-authorities diff --exit-code HEAD
           git -C tmp/tjsv-validator diff --exit-code HEAD
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -67,7 +67,7 @@ jobs:
             --contract-ir=tmp/tjsv-admission/contract-ir.json \
             --seal-object-schemas=false --format-assertion=true --probes=true --max-probes=64 --quiet
       - name: Require positive admission and canonical refusal regressions
-        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@4473504c4c9d2831d825919f70c03994d8ce01d2
+        uses: ORESoftware/typespec-json-schema-validator/actions/test-consumer-admission@2281843126ab644607b11cf8281d84f382d68dfc
         with:
           contract_ir: tmp/tjsv-admission/contract-ir.json
           report: tmp/tjsv-admission/report.json
