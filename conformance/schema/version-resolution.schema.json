@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zed-pkg.github.io/zed-lib-core/conformance/version-resolution.schema.json",
+  "title": "zed-lib version-resolution conformance corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "description", "cases"],
+  "properties": {
+    "schema": {
+      "const": "zed-lib/conformance/version-resolution/v1"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "scheme", "versions", "requirement", "expect"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scheme": {
+          "enum": ["semver", "calver", "opaque"]
+        },
+        "versions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requirement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["version"],
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["error"],
+              "properties": {
+                "error": {
+                  "enum": ["no_versions", "invalid_requirement", "unsatisfied"]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

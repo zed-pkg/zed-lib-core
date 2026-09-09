@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "expect": {
+        "version": "2.0.0"
+      },
+      "latest": "1.5.0-rc.1",
+      "name": "formal/9/latest-ignores-prerelease/first",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "1.4.0",
+        "1.5.0-rc.1",
+        "2.0.0"
+      ]
+    },
+    {
+      "expect": {
+        "version": "2.0.0"
+      },
+      "latest": "1.5.0-rc.1",
+      "name": "formal/9/latest-ignores-prerelease/replay",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "1.4.0",
+        "1.5.0-rc.1",
+        "2.0.0"
+      ]
+    },
+    {
+      "expect": {
+        "version": null
+      },
+      "latest": "withdrawn",
+      "name": "formal/10/latest-withdrawn-opaque/first",
+      "scheme": "opaque",
+      "versions": [
+        "legacy-api",
+        "nightly"
+      ]
+    },
+    {
+      "expect": {
+        "version": null
+      },
+      "latest": "withdrawn",
+      "name": "formal/10/latest-withdrawn-opaque/replay",
+      "scheme": "opaque",
+      "versions": [
+        "legacy-api",
+        "nightly"
+      ]
+    },
+    {
+      "expect": {
+        "version": "2026.10.01"
+      },
+      "latest": null,
+      "name": "formal/11/latest-calver-without-hint/first",
+      "scheme": "calver",
+      "versions": [
+        "2026.06.01",
+        "2026.07.24",
+        "2026.10.01"
+      ]
+    },
+    {
+      "expect": {
+        "version": "2026.10.01"
+      },
+      "latest": null,
+      "name": "formal/11/latest-calver-without-hint/replay",
+      "scheme": "calver",
+      "versions": [
+        "2026.06.01",
+        "2026.07.24",
+        "2026.10.01"
+      ]
+    },
+    {
+      "expect": {
+        "version": "v1.0.0"
+      },
+      "latest": null,
+      "name": "formal/12/latest-last-normalized-tie/first",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "v1.0.0"
+      ]
+    },
+    {
+      "expect": {
+        "version": "v1.0.0"
+      },
+      "latest": null,
+      "name": "formal/12/latest-last-normalized-tie/replay",
+      "scheme": "semver",
+      "versions": [
+        "1.0.0",
+        "v1.0.0"
+      ]
+    },
+    {
+      "expect": {
+        "version": null
+      },
+      "latest": null,
+      "name": "formal/14/latest-opaque-without-hint/first",
+      "scheme": "opaque",
+      "versions": [
+        "legacy-api",
+        "nightly"
+      ]
+    },
+    {
+      "expect": {
+        "version": null
+      },
+      "latest": null,
+      "name": "formal/14/latest-opaque-without-hint/replay",
+      "scheme": "opaque",
+      "versions": [
+        "legacy-api",
+        "nightly"
+      ]
+    },
+    {
+      "expect": {
+        "version": null
+      },
+      "latest": null,
+      "name": "formal/15/latest-empty/first",
+      "scheme": "semver",
+      "versions": []
+    },
+    {
+      "expect": {
+        "version": null
+      },
+      "latest": null,
+      "name": "formal/15/latest-empty/replay",
+      "scheme": "semver",
+      "versions": []
+    }
+  ],
+  "description": "GENERATED from formal/dependency_resolution.qnt by the pinned Quint trace driver and generate_formal_corpus. Expected answers come from model transitions, not a production resolver. Do not edit by hand.",
+  "schema": "zed-lib/conformance/latest-stable/v1"
+}
