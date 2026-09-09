@@ -22,7 +22,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  INTERFACES_SHA: 3c54298fc7a8c1b2f9c1d74f588c6118b38f197e
+  # DEN-3495 peer TypeSpec + authored JSON Schema receipt authority, merged
+  # after the exact ORESoftware/typespec-json-schema-validator gate passed.
+  INTERFACES_SHA: d11322f06ca6930ddcc34a745b4ef01e0b2bddc1
   LIB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
