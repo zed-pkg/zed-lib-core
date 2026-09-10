@@ -16,7 +16,14 @@ CHECKER = REPOSITORY / "scripts/check-package-contract.py"
 class PackageContractTests(unittest.TestCase):
     def fixture(self) -> pathlib.Path:
         temporary = pathlib.Path(self.addCleanupTempDir())
-        for name in ("Cargo.toml", ".zpkg.toml", "PROVENANCE.md", "lib.rs", "path_security.rs"):
+        for name in (
+            "Cargo.toml",
+            ".zpkg.toml",
+            "zed-env.toml",
+            "PROVENANCE.md",
+            "lib.rs",
+            "path_security.rs",
+        ):
             shutil.copy2(REPOSITORY / name, temporary / name)
         return temporary
 
@@ -70,6 +77,44 @@ class PackageContractTests(unittest.TestCase):
         result = self.run_checker(fixture)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("lock/v{version}", result.stderr)
+
+    def test_package_scripts_are_test_only(self) -> None:
+        fixture = self.fixture()
+        manifest = fixture / ".zpkg.toml"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8").replace(
+                'test = "cargo test --locked --all-targets"',
+                'test = "cargo test --locked --all-targets"\nlint = "cargo clippy --all-targets"',
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_checker(fixture)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("exactly the package-level 'test' hook", result.stderr)
+
+    def test_package_cargo_commands_must_be_locked(self) -> None:
+        fixture = self.fixture()
+        manifest = fixture / ".zpkg.toml"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8").replace(
+                "cargo test --locked", "cargo test"
+            ),
+            encoding="utf-8",
+        )
+        result = self.run_checker(fixture)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--locked", result.stderr)
+
+    def test_schema_two_task_plan_is_enforced(self) -> None:
+        fixture = self.fixture()
+        plan = fixture / "zed-env.toml"
+        plan.write_text(
+            plan.read_text(encoding="utf-8").replace("schema = 2", "schema = 1"),
+            encoding="utf-8",
+        )
+        result = self.run_checker(fixture)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("schema = 2", result.stderr)
 
     def test_empty_zed_lock_placeholder_is_rejected(self) -> None:
         fixture = self.fixture()
