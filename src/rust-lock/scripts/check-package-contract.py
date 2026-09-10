@@ -26,9 +26,16 @@ def main() -> int:
     errors: list[str] = []
     cargo_path = ROOT / "Cargo.toml"
     zpkg_path = ROOT / ".zpkg.toml"
+    zed_env_path = ROOT / "zed-env.toml"
     provenance_path = ROOT / "PROVENANCE.md"
 
-    for path in (cargo_path, zpkg_path, provenance_path, ROOT / "lib.rs"):
+    for path in (
+        cargo_path,
+        zpkg_path,
+        zed_env_path,
+        provenance_path,
+        ROOT / "lib.rs",
+    ):
         if not path.is_file():
             try:
                 display = path.relative_to(ROOT)
@@ -41,6 +48,7 @@ def main() -> int:
 
     cargo = load_toml(cargo_path)
     zpkg = load_toml(zpkg_path)
+    zed_env = load_toml(zed_env_path)
     cargo_package = cargo.get("package", {})
     zpkg_package = zpkg.get("package", {})
 
@@ -91,6 +99,11 @@ def main() -> int:
             "Zed publish.tag_format must be 'lock/v{version}' so the nested package's "
             "tags cannot collide with the repository package or the orm slice"
         )
+    smoke_test = publish.get("smoke_test")
+    if not isinstance(smoke_test, str) or "cargo test --locked --manifest-path" not in smoke_test:
+        errors.append(
+            "Zed publish.smoke_test must run Cargo with --locked against the nested Cargo.toml"
+        )
 
     # A nested slice is published by the repository package's `targets.rust-lock`
     # entry; declaring its own targets (or a crates.io native route) would make
@@ -104,6 +117,35 @@ def main() -> int:
     install = zpkg.get("install", {})
     if install.get("adapter") != "rust":
         errors.append("Zed install.adapter must be 'rust'")
+
+    scripts = zpkg.get("scripts", {})
+    if not isinstance(scripts, dict) or set(scripts) != {"test"}:
+        errors.append("Zed [scripts] must contain exactly the package-level 'test' hook")
+    elif scripts.get("test") != "cargo test --locked --all-targets":
+        errors.append("Zed scripts.test must run the zed-lock suite with Cargo --locked")
+
+    if zed_env.get("schema") != 2:
+        errors.append("zed-env.toml must declare schema = 2")
+    tasks = zed_env.get("tasks", {})
+    expected_tasks = {
+        "package-contract": ["python3 scripts/check-package-contract.py"],
+        "format": ["cargo fmt --all --check"],
+        "lint": ["cargo clippy --locked --all-targets -- -D warnings"],
+        "test": ["cargo test --locked --all-targets"],
+    }
+    if not isinstance(tasks, dict):
+        errors.append("zed-env.toml [tasks] must be a table")
+    else:
+        if set(tasks) != set(expected_tasks):
+            errors.append(
+                "zed-env.toml tasks must be exactly package-contract, format, lint, and test"
+            )
+        for name, expected_run in expected_tasks.items():
+            task = tasks.get(name)
+            if not isinstance(task, dict) or task.get("run") != expected_run:
+                errors.append(
+                    f"zed-env.toml tasks.{name}.run must be {expected_run!r}"
+                )
 
     placeholder_lock = ROOT / ".zpkg.lock"
     if placeholder_lock.exists():
@@ -144,7 +186,7 @@ def report(errors: list[str]) -> int:
             print(f"error: {error}", file=sys.stderr)
         return 1
     print(
-        "zed-lock Cargo, Zed package, and extraction provenance contracts are consistent"
+        "zed-lock Cargo, Zed package, schema-2 task, and extraction provenance contracts are consistent"
     )
     return 0
 
