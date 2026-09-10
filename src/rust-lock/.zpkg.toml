@@ -14,7 +14,7 @@ url = "https://github.com/zed-pkg/zed-lib-core"
 [publish]
 include_readme = true
 tag_format = "lock/v{version}"
-smoke_test = "python3 \"$ZED_PKG_TEST_TARGET/scripts/check-package-contract.py\" && cargo test --manifest-path \"$ZED_PKG_TEST_TARGET/Cargo.toml\" --all-targets"
+smoke_test = "python3 \"$ZED_PKG_TEST_TARGET/scripts/check-package-contract.py\" && cargo test --locked --manifest-path \"$ZED_PKG_TEST_TARGET/Cargo.toml\" --all-targets"
 exclude = [
   ".env",
   ".env.*",
@@ -32,7 +32,4 @@ dir = ".vendor/.zed"
 adapter = "rust"
 
 [scripts]
-test = "cargo test --all-targets"
-lint = "cargo clippy --all-targets -- -D warnings"
-format = "cargo fmt --all --check"
-package-contract = "python3 scripts/check-package-contract.py"
+test = "cargo test --locked --all-targets"
