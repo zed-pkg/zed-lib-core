@@ -1,0 +1,17 @@
+schema = 2
+
+[tasks.package-contract]
+description = "Validate nested Cargo/Zed package and extraction provenance contracts."
+run = ["python3 scripts/check-package-contract.py"]
+
+[tasks.format]
+description = "Check Rust formatting for the zed-lock slice."
+run = ["cargo fmt --all --check"]
+
+[tasks.lint]
+description = "Run locked Clippy over every zed-lock target."
+run = ["cargo clippy --locked --all-targets -- -D warnings"]
+
+[tasks.test]
+description = "Run the locked zed-lock test suite."
+run = ["cargo test --locked --all-targets"]
