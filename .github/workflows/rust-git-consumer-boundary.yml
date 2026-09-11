@@ -22,9 +22,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # DEN-3495 peer TypeSpec + authored JSON Schema receipt authority, merged
-  # after the exact ORESoftware/typespec-json-schema-validator gate passed.
-  INTERFACES_SHA: d11322f06ca6930ddcc34a745b4ef01e0b2bddc1
+  # Current merged interface authority after the R2-first locator fix. The
+  # commit retains the peer TypeSpec + authored Draft 2020-12 TJSV admissions
+  # and is the exact native interface revision consumed by this lib candidate.
+  INTERFACES_SHA: 0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c
   LIB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
