@@ -14,12 +14,11 @@ path = "lib.rs"
 
 [dependencies]
 # Pin the independently published interface authority so zed-lib is a real
-# Cargo git dependency. This reviewed commit includes the signing, mirror,
-# binary-artifact, and DEN-3495 Git CLI install receipt contracts consumed by
-# zed-clients and zed-cli. The Git install receipt's independent TypeSpec and
-# authored Draft 2020-12 JSON Schema authorities are admitted by the pinned
-# ORESoftware/typespec-json-schema-validator gate in zed-interfaces.
-zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "d11322f06ca6930ddcc34a745b4ef01e0b2bddc1" }
+# Cargo git dependency. This reviewed commit includes the R2-first locator
+# ordering on top of the signing, mirror, binary-artifact, DEN-3495 Git CLI
+# receipt, and TJSV-admitted private persistence contracts consumed by the
+# native clients and CLI.
+zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c" }
 thiserror = "2.0.19"
 
 [dev-dependencies]
