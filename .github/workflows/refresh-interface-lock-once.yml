@@ -25,12 +25,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo update -p zed-interfaces --precise 0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c
+          old_id='git+https://github.com/zed-pkg/zed-interfaces.git?rev=d11322f06ca6930ddcc34a745b4ef01e0b2bddc1#zed-interfaces@0.1.0'
+          cargo update -p "$old_id" --precise 0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c
           changed="$(git diff --name-only)"
           test "$changed" = "Cargo.lock" || {
             printf 'unexpected generated files:\n%s\n' "$changed" >&2
             exit 1
           }
+          grep -Fq 'rev=0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c' Cargo.lock
+          ! grep -Fq 'rev=d11322f06ca6930ddcc34a745b4ef01e0b2bddc1' Cargo.lock
+          grep -Fq 'rev=7d31f80dd8a310f218931165a3ad636a2f32b932' Cargo.lock
           cargo test --locked -p zed-lib
       - name: Commit resolver output
         shell: bash
