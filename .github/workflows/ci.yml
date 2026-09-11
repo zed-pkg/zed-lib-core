@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_INTERFACES_POLYGLOT_REF: 7d31f80dd8a310f218931165a3ad636a2f32b932
+  ZED_INTERFACES_POLYGLOT_REF: 0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c
 
 jobs:
   rust:
