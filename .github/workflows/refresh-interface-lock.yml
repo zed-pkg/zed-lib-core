@@ -1,0 +1,57 @@
+name: Refresh interface lock candidate
+
+on:
+  push:
+    branches:
+      - chore/repin-interfaces-0c2ffa-20260911
+    paths:
+      - "src/rust/Cargo.toml"
+      - ".github/workflows/refresh-interface-lock.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: chore/repin-interfaces-0c2ffa-20260911
+          fetch-depth: 1
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+      - name: Refresh only the native zed-lib interface source
+        shell: bash
+        run: |
+          set -euo pipefail
+          old='d11322f06ca6930ddcc34a745b4ef01e0b2bddc1'
+          new='0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c'
+          cargo update \
+            -p "git+https://github.com/zed-pkg/zed-interfaces.git?rev=${old}#zed-interfaces@0.1.0" \
+            --precise "$new"
+          changed="$(git diff --name-only)"
+          test "$changed" = "Cargo.lock" || {
+            printf 'unexpected generated files:\n%s\n' "$changed" >&2
+            exit 1
+          }
+          grep -F "rev=${new}#${new}" Cargo.lock
+          grep -F 'rev=7d31f80dd8a310f218931165a3ad636a2f32b932#7d31f80dd8a310f218931165a3ad636a2f32b932' Cargo.lock
+          if grep -F "rev=${old}#${old}" Cargo.lock; then
+            echo 'stale native zed-lib interface source remains in Cargo.lock' >&2
+            exit 1
+          fi
+          cargo test --locked -p zed-lib
+      - name: Commit Cargo-generated lock only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: refresh Cargo lock for interfaces repin'
+          git push origin HEAD:chore/repin-interfaces-0c2ffa-20260911
