@@ -419,6 +419,34 @@ mod tests {
     }
 
     #[test]
+    fn canonical_artifact_key_is_content_addressed_not_a_guessable_alias() {
+        let sha = "a".repeat(64);
+        let canonical = format!("artifacts/{sha}.tar.gz");
+        let mut ok = input();
+        ok.artifact_key = canonical.clone();
+        assert!(validate(&ok).is_ok());
+        // Guessable CDN copies (`github/…`, `packages/…`) are extra R2
+        // objects. The version row keeps the content-addressed key so a
+        // republish with the same bytes stays identity-stable.
+        let aliases = [
+            "github/zed-pkg/zed-lib-core/v0.1.0/zed-lib-core-0.1.0.tar.gz",
+            "packages/zed-pkg/zed-lib-core/0.1.0/zed-lib-core-0.1.0.tar.gz",
+        ];
+        for alias in aliases {
+            assert_ne!(alias, canonical);
+            assert!(!alias.starts_with("artifacts/"));
+            let mut extra = input();
+            extra.artifact_key = alias.to_owned();
+            assert!(
+                validate(&extra).is_ok(),
+                "alias keys are valid extra objects, not a replacement schema"
+            );
+        }
+        assert!(canonical.starts_with("artifacts/"));
+        assert!(canonical.ends_with(".tar.gz"));
+    }
+
+    #[test]
     fn immutable_fact_comparison_detects_drift() {
         let input = input();
         let now = chrono::Utc::now().fixed_offset();
