@@ -17,7 +17,7 @@ Git does **not** persist the write bit (only the executable bit). A fresh clone 
 writable until you re-freeze:
 
 ```sh
-find generated -type f ! -name 'README.md' ! -name 'readme.md' -exec chmod a-w {} +
+python3 scripts/check-generated-contract.py --freeze --require-readonly
 ```
 
 To regenerate, change the **primary source** (`.cli-flags.toml`, route map, OpenAPI,
