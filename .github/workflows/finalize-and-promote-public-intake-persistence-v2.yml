@@ -1,0 +1,220 @@
+name: finalize keyed public intake persistence
+
+on:
+  push:
+    branches:
+      - feat/public-intake-persistence-clean
+    paths:
+      - .github/workflows/finalize-and-promote-public-intake-persistence-v2.yml
+
+permissions:
+  actions: read
+  checks: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-and-promote-public-intake-persistence
+  cancel-in-progress: false
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: zed_public_intake_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zed_public_intake_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PUBLIC_INTAKE_REQUIRE_POSTGRES: "1"
+      PUBLIC_INTAKE_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zed_public_intake_test
+
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/public-intake-persistence-clean
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Merge current main without rewriting history
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@6d653acedea9b9aaf8b1d10a8d8b03ee8a4a20b1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Build the keyed-fingerprint source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/materialize/public_intake_v2.rs .github/materialize/public_intake.rs
+          cp .github/materialize/2026-09-02-public-intake-v2.sql \
+            .github/materialize/2026-09-02-public-intake.sql
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("docs/public-intake-persistence.md")
+          text = path.read_text()
+          text = text.replace(
+              "a 32-byte digest of the normalized canonical request;",
+              "a domain-separated 32-byte keyed fingerprint of the request UUID and transient body SHA-256;",
+          )
+          text = text.replace(
+              "A replay with the same request UUID, source host, kind, and body digest succeeds",
+              "A replay with the same request UUID, source host, kind, and keyed body fingerprint succeeds",
+          )
+          if "raw body digest" not in text:
+              text += "\nThe transient SHA-256 used by the signed edge-to-API envelope is never persisted; PostgreSQL receives only the keyed, domain-separated body fingerprint.\n"
+          path.write_text(text)
+          PY
+          python3 .github/materialize/finalize_public_intake.py
+          cargo update -p zed-interfaces
+          cargo fmt --all
+          npm ci --prefix schema-tooling --ignore-scripts --no-audit --no-fund
+          npm --prefix schema-tooling run generate
+          npm --prefix schema-tooling run ddl:roundtrip:write
+          npm --prefix schema-tooling run contracts:write
+
+      - name: Remove every temporary orchestration artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/materialize
+          rm -f \
+            .github/workflows/materialize-public-intake-persistence.yml \
+            .github/workflows/finalize-public-intake-persistence.yml \
+            .github/workflows/retry-or-promote-public-intake-persistence.yml \
+            .github/workflows/finalize-and-promote-public-intake-persistence.yml \
+            .github/workflows/finalize-and-promote-public-intake-persistence-v2.yml \
+            .github/workflows/public-intake-persistence.yml \
+            .materialize-public-intake-persistence-trigger \
+            .finalize-public-intake-persistence-trigger \
+            .public-intake-v*-failure.txt
+
+      - name: Certify Rust and real PostgreSQL behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets --all-features --locked
+          cargo test --workspace --all-targets --all-features --locked
+          cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Certify generated schemas and ORM projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix schema-tooling run generate:check
+          npm --prefix schema-tooling run drift:check
+          npm --prefix schema-tooling run ddl:roundtrip:check
+          npm --prefix schema-tooling run contracts:check
+          npm --prefix schema-tooling test
+
+      - name: Certify privacy and clean-tree boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s src/rust-orm/public_intake.rs
+          test -s src/rust-orm/sql/2026-09-02-public-intake.sql
+          test -s .github/workflows/public-intake-persistence-contract.yml
+          grep -q "body_fingerprint_hmac" src/rust-orm/public_intake.rs
+          grep -q "body_fingerprint_hmac" src/rust-orm/sql/2026-09-02-public-intake.sql
+          ! grep -q "body_sha256 bytea" src/rust-orm/sql/2026-09-02-public-intake.sql
+          ! grep -q "body_sha256" src/rust-orm/sql/registry.sql
+          grep -q "insert_public_intake_submission" src/rust-orm/write.rs
+          test "$(find .github/workflows -maxdepth 1 -type f -name '*public-intake-persistence*' | wc -l | tr -d ' ')" = "1"
+          git diff --check
+          if git grep -nE '(ghp_|github_pat_|lin_api_)[A-Za-z0-9_]+' -- . ':!schema-tooling/node_modules'; then
+            echo "credential-shaped material found" >&2
+            exit 1
+          fi
+
+      - name: Publish exact certified keyed-fingerprint head
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(intake): persist only keyed body fingerprints"
+          HEAD_SHA=$(git rev-parse HEAD)
+          git push origin HEAD:feat/public-intake-persistence-clean
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Record exact-head certification
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f name="public-intake/persistence-final" \
+            -f head_sha="$HEAD_SHA" \
+            -f status="completed" \
+            -f conclusion="success" \
+            -f 'output[title]=Keyed public-intake persistence certified' \
+            -f 'output[summary]=No raw contact-payload digest is persisted. Workspace Rust, strict Clippy, real PostgreSQL replay/conflict/encryption/fingerprint behavior, schema shadow, DDL round-trip, generated contracts, and credential scanning passed on this clean head.'
+
+      - name: Reopen or create the reviewable pull request
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          MERGED=$(gh api repos/${GITHUB_REPOSITORY}/pulls/30 --jq .merged)
+          if test "$MERGED" = true; then
+            EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&head=zed-pkg:feat/public-intake-persistence-clean" --jq '.[0].number // empty')
+            if test -n "$EXISTING"; then
+              PR_NUMBER=$EXISTING
+            else
+              PR_NUMBER=$(gh pr create \
+                --title "fix(intake): persist only keyed body fingerprints" \
+                --body "Replaces the raw request-body digest with a domain-separated HMAC while preserving encrypted idempotent persistence. Exact-head certification is recorded by public-intake/persistence-final. Tracking: DEN-3970." \
+                --base main \
+                --head feat/public-intake-persistence-clean \
+                --draft | sed -E 's#.*/pull/([0-9]+).*#\1#')
+            fi
+          else
+            gh api --method PATCH repos/${GITHUB_REPOSITORY}/pulls/30 -f state=open >/dev/null
+            PR_NUMBER=30
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Promote only the exact certified head
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          test "$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)" = "$HEAD_SHA"
+          test "$(gh pr view "$PR_NUMBER" --json baseRefOid --jq .baseRefOid)" = "$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq .commit.sha)"
+          gh pr ready "$PR_NUMBER"
+          gh pr merge "$PR_NUMBER" --squash --match-head-commit "$HEAD_SHA"

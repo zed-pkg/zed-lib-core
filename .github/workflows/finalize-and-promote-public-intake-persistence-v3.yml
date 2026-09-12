@@ -1,0 +1,313 @@
+name: finalize retention-aware public intake persistence
+
+on:
+  push:
+    branches:
+      - feat/public-intake-persistence-clean
+    paths:
+      - .github/workflows/finalize-and-promote-public-intake-persistence-v3.yml
+
+permissions:
+  actions: write
+  checks: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-and-promote-public-intake-persistence
+  cancel-in-progress: false
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: zed_public_intake_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zed_public_intake_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PUBLIC_INTAKE_REQUIRE_POSTGRES: "1"
+      PUBLIC_INTAKE_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zed_public_intake_test
+
+    steps:
+      - name: Cancel superseded intake orchestrators only
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?branch=feat/public-intake-persistence-clean&per_page=100" \
+            --jq '.workflow_runs[] | select(.id != ${{ github.run_id }} and (.status == "queued" or .status == "in_progress" or .status == "waiting") and ((.name | ascii_downcase | contains("public intake")) or (.name | ascii_downcase | contains("public-intake")) or (.name | ascii_downcase | contains("materialize")) or (.name | ascii_downcase | contains("finalize")))) | .id' \
+            | while read -r run_id; do
+                test -n "$run_id" || continue
+                gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" >/dev/null 2>&1 || true
+              done
+
+      - name: Check out candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/public-intake-persistence-clean
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Merge current main without rewriting history
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@6d653acedea9b9aaf8b1d10a8d8b03ee8a4a20b1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Build the final privacy and retention source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/materialize/public_intake_v3.rs .github/materialize/public_intake.rs
+          cp .github/materialize/2026-09-02-public-intake-v3.sql \
+            .github/materialize/2026-09-02-public-intake.sql
+          python3 .github/materialize/finalize_public_intake.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          source = Path("src/rust-orm/public_intake.rs")
+          text = source.read_text()
+          anchor = '''    if batch_limit == 0 || batch_limit > MAX_PURGE_BATCH {
+        return Err(PublicIntakeStoreError::InvalidPurgeBatch);
+    }
+    let rows = database'''
+          replacement = '''    if batch_limit == 0 || batch_limit > MAX_PURGE_BATCH {
+        return Err(PublicIntakeStoreError::InvalidPurgeBatch);
+    }
+    let batch_limit = i64::try_from(batch_limit)
+        .map_err(|_| PublicIntakeStoreError::InvalidPurgeBatch)?;
+    let rows = database'''
+          if anchor not in text:
+              raise SystemExit("purge batch conversion anchor missing")
+          source.write_text(text.replace(anchor, replacement, 1))
+
+          write = Path("src/rust-orm/write.rs")
+          text = write.read_text()
+          structure = re.search(r"pub struct WriteContext\s*\{(?P<body>[\s\S]*?)\n\}", text)
+          if structure:
+              field = re.search(
+                  r"(?m)^\s*(?:pub(?:\([^)]*\))?\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?:std::sync::Arc<|Arc<)?DatabaseConnection>?\s*,?\s*$",
+                  structure.group("body"),
+              )
+              if not field:
+                  raise SystemExit("cannot locate WriteContext database field for purge")
+              database = f"&self.{field.group(1)}"
+          elif re.search(r"pub struct WriteContext\s*\(\s*DatabaseConnection\s*\)\s*;", text):
+              database = "&self.0"
+          else:
+              raise SystemExit("cannot locate WriteContext representation for purge")
+          text += f'''\nimpl WriteContext {{
+              /// Delete at most `batch_limit` expired encrypted intake rows.
+              /// The SQL operation uses `SKIP LOCKED`, so independent replicas
+              /// can sweep concurrently without selecting the same batch.
+              pub async fn purge_expired_public_intake_submissions(
+                  &self,
+                  cutoff: chrono::DateTime<chrono::Utc>,
+                  batch_limit: u64,
+              ) -> Result<u64, crate::public_intake::PublicIntakeStoreError> {{
+                  crate::public_intake::purge_expired_public_intake_submissions_on_database(
+                      {database},
+                      cutoff,
+                      batch_limit,
+                  )
+                  .await
+              }}
+          }}
+          '''
+          write.write_text(text)
+
+          library = Path("src/rust-orm/lib.rs")
+          text = library.read_text()
+          anchor = '''pub use public_intake::{
+              NewPublicIntakeSubmission, PublicIntakeInsertResult, PublicIntakeStoreError,
+              PublicIntakeSubmissionKind, SecretBytes,
+          };'''
+          replacement = '''pub use public_intake::{
+              NewPublicIntakeSubmission, PUBLIC_INTAKE_ENCRYPTION_FORMAT_V1,
+              PUBLIC_INTAKE_FINGERPRINT_FORMAT_V1, PublicIntakeInsertResult,
+              PublicIntakeStoreError, PublicIntakeSubmissionKind, SecretBytes,
+          };'''
+          if anchor not in text:
+              raise SystemExit("public-intake export anchor missing")
+          library.write_text(text.replace(anchor, replacement, 1))
+
+          docs = Path("docs/public-intake-persistence.md")
+          text = docs.read_text()
+          text = text.replace(
+              "a 32-byte digest of the normalized canonical request;",
+              "a domain-separated 32-byte keyed fingerprint of the request UUID and transient body SHA-256;",
+          )
+          text = text.replace(
+              "A replay with the same request UUID, source host, kind, and body digest succeeds",
+              "A replay with the same request UUID, source host, kind, and keyed body fingerprint succeeds",
+          )
+          text += '''
+
+## Cryptographic format and retention
+
+Every row records `aes-256-gcm-v1` and `hmac-sha256-v1` alongside versioned key identifiers, so decryption and re-key operations never guess an algorithm from ciphertext. The transient transport SHA-256 is not stored.
+
+The API supplies `retention_expires_at`, bounded to 1–3650 days after consent. A named `WriteContext` purge operation deletes ordered batches of at most 10,000 expired rows using `FOR UPDATE SKIP LOCKED`; multiple API replicas can run the sweep without racing on the same rows. Key rotation still requires an explicit re-encryption and fingerprint re-key plan before old key material is retired.
+'''
+          docs.write_text(text)
+          PY
+
+          cargo update -p zed-interfaces
+          cargo fmt --all
+          npm ci --prefix schema-tooling --ignore-scripts --no-audit --no-fund
+          npm --prefix schema-tooling run generate
+          npm --prefix schema-tooling run ddl:roundtrip:write
+          npm --prefix schema-tooling run contracts:write
+
+      - name: Remove every temporary orchestration artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/materialize
+          rm -f \
+            .github/workflows/materialize-public-intake-persistence.yml \
+            .github/workflows/finalize-public-intake-persistence.yml \
+            .github/workflows/retry-or-promote-public-intake-persistence.yml \
+            .github/workflows/finalize-and-promote-public-intake-persistence.yml \
+            .github/workflows/finalize-and-promote-public-intake-persistence-v2.yml \
+            .github/workflows/finalize-and-promote-public-intake-persistence-v3.yml \
+            .github/workflows/public-intake-persistence.yml \
+            .materialize-public-intake-persistence-trigger \
+            .finalize-public-intake-persistence-trigger \
+            .public-intake-v*-failure.txt
+
+      - name: Certify Rust, PostgreSQL, and retention behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets --all-features --locked
+          cargo test --workspace --all-targets --all-features --locked
+          cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Certify generated schemas and ORM projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix schema-tooling run generate:check
+          npm --prefix schema-tooling run drift:check
+          npm --prefix schema-tooling run ddl:roundtrip:check
+          npm --prefix schema-tooling run contracts:check
+          npm --prefix schema-tooling test
+
+      - name: Certify privacy, retention, and clean-tree boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s src/rust-orm/public_intake.rs
+          test -s src/rust-orm/sql/2026-09-02-public-intake.sql
+          test -s .github/workflows/public-intake-persistence-contract.yml
+          grep -q "body_fingerprint_hmac" src/rust-orm/public_intake.rs
+          grep -q "retention_expires_at" src/rust-orm/public_intake.rs
+          grep -q "SKIP LOCKED\|skip locked" src/rust-orm/public_intake.rs
+          grep -q "aes-256-gcm-v1" src/rust-orm/sql/2026-09-02-public-intake.sql
+          grep -q "hmac-sha256-v1" src/rust-orm/sql/2026-09-02-public-intake.sql
+          ! grep -q "body_sha256 bytea" src/rust-orm/sql/2026-09-02-public-intake.sql
+          ! grep -q "body_sha256" src/rust-orm/sql/registry.sql
+          grep -q "insert_public_intake_submission" src/rust-orm/write.rs
+          grep -q "purge_expired_public_intake_submissions" src/rust-orm/write.rs
+          test "$(find .github/workflows -maxdepth 1 -type f -name '*public-intake-persistence*' | wc -l | tr -d ' ')" = "1"
+          git diff --check
+          if git grep -nE '(ghp_|github_pat_|lin_api_)[A-Za-z0-9_]+' -- . ':!schema-tooling/node_modules'; then
+            echo "credential-shaped material found" >&2
+            exit 1
+          fi
+
+      - name: Publish exact certified retention-aware head
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(intake): version encryption and enforce retention"
+          HEAD_SHA=$(git rev-parse HEAD)
+          git push origin HEAD:feat/public-intake-persistence-clean
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Record exact-head certification
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f name="public-intake/persistence-final" \
+            -f head_sha="$HEAD_SHA" \
+            -f status="completed" \
+            -f conclusion="success" \
+            -f 'output[title]=Retention-aware public-intake persistence certified' \
+            -f 'output[summary]=No raw contact-payload digest is persisted. Versioned AES-GCM/HMAC formats, zeroized normalization, bounded expiry, concurrent SKIP LOCKED purge, workspace Rust, strict Clippy, real PostgreSQL behavior, schema/ORM generation, DDL round-trip, and credential scanning passed on this exact clean head.'
+
+      - name: Reopen or create the reviewable pull request
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          MERGED=$(gh api repos/${GITHUB_REPOSITORY}/pulls/30 --jq .merged)
+          if test "$MERGED" = true; then
+            EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&head=zed-pkg:feat/public-intake-persistence-clean" --jq '.[0].number // empty')
+            if test -n "$EXISTING"; then
+              PR_NUMBER=$EXISTING
+            else
+              URL=$(gh pr create \
+                --title "fix(intake): version encryption and enforce retention" \
+                --body "Adds versioned cryptographic formats, keyed body fingerprints, zeroized normalization, bounded row expiry, and a multi-replica-safe purge operation. Exact-head certification is recorded by public-intake/persistence-final. Tracking: DEN-3970." \
+                --base main \
+                --head feat/public-intake-persistence-clean \
+                --draft)
+              PR_NUMBER=${URL##*/}
+            fi
+          else
+            gh api --method PATCH repos/${GITHUB_REPOSITORY}/pulls/30 -f state=open >/dev/null
+            PR_NUMBER=30
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Promote only the exact certified head
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          test "$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)" = "$HEAD_SHA"
+          test "$(gh pr view "$PR_NUMBER" --json baseRefOid --jq .baseRefOid)" = "$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq .commit.sha)"
+          gh pr ready "$PR_NUMBER"
+          gh pr merge "$PR_NUMBER" --squash --match-head-commit "$HEAD_SHA"

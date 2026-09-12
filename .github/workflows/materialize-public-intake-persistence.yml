@@ -1,0 +1,319 @@
+name: materialize public intake persistence
+
+on:
+  push:
+    branches:
+      - feat/public-intake-persistence-clean
+    paths:
+      - .materialize-public-intake-persistence-trigger
+      - .github/workflows/materialize-public-intake-persistence.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-public-intake-persistence-clean
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/public-intake-persistence-clean
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@6d653acedea9b9aaf8b1d10a8d8b03ee8a4a20b1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Wire source, regenerate projections, and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          INTERFACES_REV = "71db90c83b9113d91c3b5b862d0e4c497d4a646a"
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one {label} anchor, found {count}")
+              return text.replace(old, new, 1)
+
+          public_intake = Path("src/rust-orm/public_intake.rs")
+          text = public_intake.read_text()
+          text = replace_once(
+              text,
+              "use zed_interfaces::{PublicIntakeSourceHostV1, PUBLIC_INTAKE_SCHEMA_V1};",
+              "use zed_interfaces::PublicIntakeSourceHostV1;",
+              "public-intake import",
+          )
+          text = replace_once(
+              text,
+              "fn database_errors_are redacted()",
+              "fn database_errors_are_redacted()",
+              "redacted database test name",
+          )
+          text = replace_once(
+              text,
+              'assert_eq!(PUBLIC_INTAKE_SCHEMA_V1, "zed.public-intake.v1");',
+              'assert_eq!(\n            zed_interfaces::PUBLIC_INTAKE_SCHEMA_V1,\n            "zed.public-intake.v1"\n        );',
+              "schema marker assertion",
+          )
+          public_intake.write_text(text)
+
+          cargo = Path("src/rust-orm/Cargo.toml")
+          text = cargo.read_text()
+          text = replace_once(
+              text,
+              'zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "7d31f80c255c139bd61118f408b435bff24ab668" }',
+              f'zed-interfaces = {{ git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "{INTERFACES_REV}" }}',
+              "zed-interfaces dependency",
+          )
+          cargo.write_text(text)
+
+          public_surface = Path("src/rust-orm/tests/public_surface.rs")
+          text = public_surface.read_text()
+          text = replace_once(
+              text,
+              'pub const ZED_INTERFACES_GIT_REV: &str = "7d31f80c255c139bd61118f408b435bff24ab668";',
+              f'pub const ZED_INTERFACES_GIT_REV: &str = "{INTERFACES_REV}";',
+              "public-surface dependency assertion",
+          )
+          public_surface.write_text(text)
+
+          library = Path("src/rust-orm/lib.rs")
+          text = library.read_text()
+          text = replace_once(
+              text,
+              '#[cfg(feature = "read-write")]\npub mod write;\n',
+              '#[cfg(feature = "read-write")]\npub mod write;\n#[cfg(feature = "read-write")]\npub mod public_intake;\n',
+              "public-intake module",
+          )
+          text = replace_once(
+              text,
+              'pub use migrations::{\n    MigrationOutcome, RegistryMigrationStatus, registry_version, run_registry_migrations,\n};\n',
+              'pub use migrations::{\n    MigrationOutcome, RegistryMigrationStatus, public_intake_version, registry_version,\n    run_registry_migrations,\n};\n#[cfg(feature = "read-write")]\npub use public_intake::{\n    NewPublicIntakeSubmission, PublicIntakeInsertResult, PublicIntakeStoreError,\n    PublicIntakeSubmissionKind, SecretBytes, insert_public_intake_submission,\n};\n',
+              "public-intake exports",
+          )
+          text = replace_once(
+              text,
+              '    DEPENDENCY_GRAPH_MIGRATION_PATH, ORG_SCHEMA, REGISTRY_DDL_BLOB_SHA, REGISTRY_DDL_PATH,\n',
+              '    DEPENDENCY_GRAPH_MIGRATION_PATH, ORG_SCHEMA, PUBLIC_INTAKE_MIGRATION_BLOB_SHA,\n    PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX, PUBLIC_INTAKE_MIGRATION_PATH,\n    REGISTRY_DDL_BLOB_SHA, REGISTRY_DDL_PATH,\n',
+              "public-intake schema exports",
+          )
+          library.write_text(text)
+
+          migration_sql_path = Path("src/rust-orm/sql/2026-09-02-public-intake.sql")
+          migration_sql = migration_sql_path.read_text().strip()
+          registry = Path("src/rust-orm/sql/registry.sql")
+          registry_text = registry.read_text()
+          table_marker = "create table if not exists zed_public_intake_submissions"
+          if table_marker not in registry_text.lower():
+              registry_text = registry_text.rstrip() + "\n\n" + migration_sql + "\n"
+              registry.write_text(registry_text)
+          if registry.read_text().lower().count(table_marker) != 1:
+              raise SystemExit("public-intake desired-state table must occur exactly once")
+
+          migration_blob = subprocess.check_output(
+              ["git", "hash-object", str(migration_sql_path)], text=True
+          ).strip()
+          registry_blob = subprocess.check_output(
+              ["git", "hash-object", str(registry)], text=True
+          ).strip()
+
+          schema = Path("src/rust-orm/schema.rs")
+          text = schema.read_text()
+          old_registry_blob = 'pub const REGISTRY_DDL_BLOB_SHA: &str = "c0869ca29c10e1c77bd9d9b8236fc61eac826ab9";'
+          text = replace_once(
+              text,
+              old_registry_blob,
+              f'pub const REGISTRY_DDL_BLOB_SHA: &str = "{registry_blob}";',
+              "registry desired-state blob",
+          )
+          constants = f'''/// Package-local forward migration for encrypted public commercial intake.
+          pub const PUBLIC_INTAKE_MIGRATION_PATH: &str =
+              "src/rust-orm/sql/2026-09-02-public-intake.sql";
+
+          /// Immutable Git blob identity of the public-intake forward migration.
+          pub const PUBLIC_INTAKE_MIGRATION_BLOB_SHA: &str = "{migration_blob}";
+
+          /// Ledger suffix for the first public-intake migration.
+          pub const PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX: &str =
+              PUBLIC_INTAKE_MIGRATION_BLOB_SHA;
+
+          '''
+          text = replace_once(
+              text,
+              "// Compatibility aliases retained for existing Rust consumers.",
+              constants + "// Compatibility aliases retained for existing Rust consumers.",
+              "public-intake schema constants",
+          )
+          schema.write_text(text)
+
+          migrations = Path("src/rust-orm/migrations.rs")
+          text = migrations.read_text()
+          text = replace_once(
+              text,
+              "    SHARED_DEFS_REGISTRY_SEGMENT, VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX,\n",
+              "    PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX, SHARED_DEFS_REGISTRY_SEGMENT,\n    VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX,\n",
+              "public-intake migration import",
+          )
+          text = replace_once(
+              text,
+              'const VISIBILITY_IMMUTABILITY_SQL: &str =\n    include_str!("sql/2026-08-11-public-visibility-is-permanent.sql");\n',
+              'const VISIBILITY_IMMUTABILITY_SQL: &str =\n    include_str!("sql/2026-08-11-public-visibility-is-permanent.sql");\nconst PUBLIC_INTAKE_SQL: &str = include_str!("sql/2026-09-02-public-intake.sql");\n',
+              "public-intake SQL include",
+          )
+          text = replace_once(
+              text,
+              "/// Return the current registry migration identity.\n",
+              '''/// Return the package-owned public-intake migration identity.
+          pub fn public_intake_version() -> String {
+              format!("registry-public-intake@{PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX}")
+          }
+
+          /// Return the current registry migration identity.
+          ''',
+              "public-intake version function",
+          )
+          text = replace_once(
+              text,
+              "    visibility_immutability_version()\n",
+              "    public_intake_version()\n",
+              "current registry version",
+          )
+          text = replace_once(
+              text,
+              "    VisibilityImmutability,\n",
+              "    VisibilityImmutability,\n    PublicIntake,\n",
+              "public-intake migration enum",
+          )
+          text = replace_once(
+              text,
+              "    const ORDERED: [Self; 3] = [\n        Self::HistoricalBase,\n        Self::DependencyGraph,\n        Self::VisibilityImmutability,\n    ];\n",
+              "    const ORDERED: [Self; 4] = [\n        Self::HistoricalBase,\n        Self::DependencyGraph,\n        Self::VisibilityImmutability,\n        Self::PublicIntake,\n    ];\n",
+              "ordered migrations",
+          )
+          text = replace_once(
+              text,
+              "            Self::VisibilityImmutability => visibility_immutability_version(),\n",
+              "            Self::VisibilityImmutability => visibility_immutability_version(),\n            Self::PublicIntake => public_intake_version(),\n",
+              "migration version dispatch",
+          )
+          text = replace_once(
+              text,
+              "            Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,\n",
+              "            Self::VisibilityImmutability => VISIBILITY_IMMUTABILITY_SQL,\n            Self::PublicIntake => PUBLIC_INTAKE_SQL,\n",
+              "migration SQL dispatch",
+          )
+          text = replace_once(
+              text,
+              '''        assert_eq!(
+              RegistryMigration::ORDERED,
+              [
+                  RegistryMigration::HistoricalBase,
+                  RegistryMigration::DependencyGraph,
+                  RegistryMigration::VisibilityImmutability,
+              ]
+          );''',
+              '''        assert_eq!(
+              RegistryMigration::ORDERED,
+              [
+                  RegistryMigration::HistoricalBase,
+                  RegistryMigration::DependencyGraph,
+                  RegistryMigration::VisibilityImmutability,
+                  RegistryMigration::PublicIntake,
+              ]
+          );''',
+              "ordered migration test",
+          )
+          text = replace_once(
+              text,
+              '''        let visibility = visibility_immutability_version();
+              assert!(graph.ends_with(DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
+              assert!(visibility.ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
+              assert_ne!(graph, visibility);
+              assert_eq!(registry_version(), visibility);''',
+              '''        let visibility = visibility_immutability_version();
+              let intake = public_intake_version();
+              assert!(graph.ends_with(DEPENDENCY_GRAPH_MIGRATION_IDENTITY_SUFFIX));
+              assert!(visibility.ends_with(VISIBILITY_IMMUTABILITY_MIGRATION_IDENTITY_SUFFIX));
+              assert!(intake.ends_with(PUBLIC_INTAKE_MIGRATION_IDENTITY_SUFFIX));
+              assert_ne!(graph, visibility);
+              assert_ne!(visibility, intake);
+              assert_ne!(graph, intake);
+              assert_eq!(registry_version(), intake);''',
+              "migration identity test",
+          )
+          text = replace_once(
+              text,
+              '''        let versions = [
+              historical_registry_version(),
+              dependency_graph_version(),
+              visibility_immutability_version(),
+          ];''',
+              '''        let versions = [
+              historical_registry_version(),
+              dependency_graph_version(),
+              visibility_immutability_version(),
+              public_intake_version(),
+          ];''',
+              "migration reconciliation test",
+          )
+          migrations.write_text(text)
+          PY
+
+          cargo update -p zed-interfaces
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets --all-features
+          cargo test --workspace --all-targets --all-features
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+          npm ci --prefix schema-tooling --ignore-scripts --no-audit --no-fund
+          npm --prefix schema-tooling run generate
+          npm --prefix schema-tooling run ddl:roundtrip:write
+          npm --prefix schema-tooling run contracts:write
+          npm --prefix schema-tooling run generate:check
+          npm --prefix schema-tooling run drift:check
+          npm --prefix schema-tooling run ddl:roundtrip:check
+          npm --prefix schema-tooling run contracts:check
+          npm --prefix schema-tooling test
+
+          git diff --check
+          if git grep -nE '(ghp_|github_pat_|lin_api_)[A-Za-z0-9_]+' -- . ':!schema-tooling/node_modules'; then
+            echo "credential-shaped material found" >&2
+            exit 1
+          fi
+
+      - name: Remove materializer and publish verified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/materialize-public-intake-persistence.yml \
+            .materialize-public-intake-persistence-trigger
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(intake): materialize encrypted persistence boundary"
+          git push origin HEAD:feat/public-intake-persistence-clean

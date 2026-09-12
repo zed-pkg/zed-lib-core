@@ -1,0 +1,104 @@
+name: public intake persistence contract
+
+on:
+  pull_request:
+    paths:
+      - "src/rust-orm/public_intake.rs"
+      - "src/rust-orm/write.rs"
+      - "src/rust-orm/migrations.rs"
+      - "src/rust-orm/schema.rs"
+      - "src/rust-orm/sql/2026-09-02-public-intake.sql"
+      - "src/rust-orm/sql/registry.sql"
+      - "src/rust-orm/Cargo.toml"
+      - "Cargo.lock"
+      - "generated/**"
+      - ".github/workflows/public-intake-persistence-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/rust-orm/public_intake.rs"
+      - "src/rust-orm/write.rs"
+      - "src/rust-orm/migrations.rs"
+      - "src/rust-orm/schema.rs"
+      - "src/rust-orm/sql/2026-09-02-public-intake.sql"
+      - "src/rust-orm/sql/registry.sql"
+      - "src/rust-orm/Cargo.toml"
+      - "Cargo.lock"
+      - "generated/**"
+      - ".github/workflows/public-intake-persistence-contract.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-intake-persistence-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-intake-persistence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: zed_public_intake_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zed_public_intake_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PUBLIC_INTAKE_REQUIRE_POSTGRES: "1"
+      PUBLIC_INTAKE_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/zed_public_intake_test
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@6d653acedea9b9aaf8b1d10a8d8b03ee8a4a20b1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify Rust, real PostgreSQL, and diagnostics
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo test --workspace --all-targets --all-features --locked
+          cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Verify generated schema and ORM projections
+        run: |
+          set -euo pipefail
+          npm ci --prefix schema-tooling --ignore-scripts --no-audit --no-fund
+          npm --prefix schema-tooling run generate:check
+          npm --prefix schema-tooling run drift:check
+          npm --prefix schema-tooling run ddl:roundtrip:check
+          npm --prefix schema-tooling run contracts:check
+          npm --prefix schema-tooling test
+
+      - name: Verify repository safety boundary
+        run: |
+          set -euo pipefail
+          git diff --check
+          test -s docs/public-intake-persistence.md
+          test -s src/rust-orm/agents.md
+          if git grep -nE '(ghp_|github_pat_|lin_api_)[A-Za-z0-9_]+' -- . ':!schema-tooling/node_modules'; then
+            echo "credential-shaped material found" >&2
+            exit 1
+          fi
