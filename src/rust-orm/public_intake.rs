@@ -394,7 +394,7 @@ mod tests {
     }
 
     #[test]
-    fn database_errors_are redacted() {
+    fn database_errors_are_redacted() {
         let error = PublicIntakeStoreError::from_db("email=private.person@example.com");
         assert_eq!(error.to_string(), "public intake database operation failed");
         assert!(!format!("{error:?}").contains("private.person"));
