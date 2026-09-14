@@ -2,23 +2,20 @@
 name = "zed-lib"
 version = "0.1.0"
 edition = "2024"
-description = "Implementations of the zed-pkg interfaces: resolution and policy over the shared contract types"
+description = "Implementations of the zed-pkg interfaces: resolution, policy, and registry coordination over the shared contract types"
 license = "MIT"
 repository = "https://github.com/zed-pkg/zed-lib-core"
 
-# The Rust slice of a polyglot zed-package; Dart and TypeScript slices land
-# beside it under `src/`. See `docs` in zed-interfaces for why the crate
-# manifest sits inside its own slice rather than at the repository root.
 [lib]
 path = "lib.rs"
 
 [dependencies]
-# Pin the independently published interface authority so zed-lib is a real
-# Cargo git dependency. This reviewed commit includes the R2-first locator
-# ordering on top of the signing, mirror, binary-artifact, DEN-3495 Git CLI
-# receipt, and TJSV-admitted private persistence contracts consumed by the
-# native clients and CLI.
 zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c" }
+# Native Rust projection of the zed-pkg dependency declared at repository root.
+# Default features are deliberately off: zed-lib owns key/catalog semantics and
+# callers inject the chosen fenced authority (Cloudflare DO, Redis, Fiducia) at
+# the service boundary instead of making the library recursively depend on one.
+ores-locks-and-leases = { git = "https://github.com/ORESoftware/ores-locks-and-leases.git", rev = "e752dd983cfc5a5107396d1fb9ac192fa72270b1", default-features = false }
 thiserror = "2.0.19"
 
 [dev-dependencies]
