@@ -70,6 +70,17 @@ jobs:
         working-directory: zed-lib
         run: cargo fmt --all -- --check
 
+      - name: Generate DEN-566 Cargo.lock evidence
+        working-directory: zed-lib
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          cargo metadata --locked --no-deps >/dev/null
+          printf 'LOCKFILE_BASE64='
+          base64 -w0 Cargo.lock
+          printf '\n'
+
       - name: Clippy
         working-directory: zed-lib
         run: cargo clippy --locked --all-targets -- -D warnings
