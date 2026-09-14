@@ -52,6 +52,9 @@ mod tests {
 
     #[test]
     fn singleton_jobs_do_not_collide_with_registry_keys() {
-        assert_ne!(singleton_job("mirror-repair"), registry_publish("mirror-repair"));
+        assert_ne!(
+            singleton_job("mirror-repair"),
+            registry_publish("mirror-repair")
+        );
     }
 }
