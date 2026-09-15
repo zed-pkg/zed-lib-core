@@ -14,11 +14,11 @@ path = "lib.rs"
 
 [dependencies]
 # Pin the independently published interface authority so zed-lib is a real
-# Cargo git dependency. This reviewed commit includes the R2-first locator
-# ordering on top of the signing, mirror, binary-artifact, DEN-3495 Git CLI
-# receipt, and TJSV-admitted private persistence contracts consumed by the
-# native clients and CLI.
-zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c" }
+# Cargo git dependency. This reviewed commit includes the shared GitHub-first
+# post-registry artifact recovery ordering on top of the signing, mirror,
+# binary-artifact, DEN-3495 Git CLI receipt, and TJSV-admitted private
+# persistence contracts consumed by the native clients and CLI.
+zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "bb0f3fe10218e7dcb6a857bcb43deffdaa08b4f6" }
 thiserror = "2.0.19"
 
 [dev-dependencies]
