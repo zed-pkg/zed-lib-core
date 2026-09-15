@@ -2,7 +2,6 @@
 org = "zed-pkg"
 name = "zed-lib-core"
 version = "0.1.0"
-kind = "lib-core"
 description = "Canonical zed-pkg core: SeaORM registry entities, migrations, the role-aware query boundary, the polyglot resolution slices, and the kernel-backed local lock crate"
 license = "MIT"
 keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot", "locking"]
