@@ -2,7 +2,7 @@
 org = "zed-pkg"
 name = "zed-lib-core"
 version = "0.1.0"
-description = "Canonical zed-pkg core: SeaORM registry entities, migrations, the role-aware query boundary, the polyglot resolution slices, and the kernel-backed local lock crate"
+description = "Canonical zed-pkg core: SeaORM registry entities, migrations, the role-aware query boundary, polyglot resolution slices, local kernel locks, and shared fenced distributed leases"
 license = "MIT"
 keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot", "locking"]
 
@@ -12,6 +12,7 @@ url = "https://github.com/zed-pkg/zed-lib-core"
 
 [dependencies]
 "zed-pkg/zed-interfaces" = "^0.1.0"
+"oresoftware/ores-locks-and-leases" = "=0.1.1"
 
 [publish]
 include_readme = true
@@ -55,10 +56,6 @@ exclude = [
 [install]
 dir = ".vendor/.zed"
 
-# Whole-repository slice: every implementation plus the shared corpus they are
-# all verified against.
-# Publishes under the canonical package name; the model rejects a divergent
-# `name` on the whole-repository slice (DEN-2960).
 [targets.repository]
 dir = "."
 
@@ -70,25 +67,20 @@ adapter = "rust"
 registry = "crates-io"
 package = "zed-lib"
 
-# The local lock crate, folded in from zed-pkg/zed-lock. It keeps its crate
-# name so consumers change only where they fetch it from; it never depends on
-# the ORM slice or on the network. Distributed lease + Postgres advisory
-# composition lives in ORESoftware/ores-locks-and-leases, not here.
+# Local process/kernel exclusion stays separate. Cross-host or TTL-bounded
+# coordination must go through oresoftware/ores-locks-and-leases so registry
+# publishing, migrations, and singleton jobs share fencing semantics with the
+# rest of the fleet.
 [targets.rust-lock]
 dir = "src/rust-lock"
 name = "zed-lock"
 adapter = "rust"
 
-# The corpus is consumable on its own: an implementation in a language zed-lib
-# does not ship yet still has something to be correct against.
 [targets.conformance]
 dir = "conformance"
 name = "zed-lib-conformance"
 adapter = "none"
 
-# Front-end implementations of the same behavior. Not thin bindings — each is a
-# native implementation held to `conformance/cases/*.json`, so a browser or
-# Flutter client resolves a requirement exactly the way zed-cli does.
 [targets.dart]
 dir = "src/dart"
 adapter = "dart"
