@@ -20,6 +20,10 @@ jobs:
   r2g:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      ZED_PKG_INTERACTIVE: "false"
+      ZED_INTERFACES_TAG_COMMIT: 5394b2e7b070354ee79a4c6ac79c26d6264970cd
+      ZED_PKG_REGISTRY: file://${{ runner.temp }}/zed-registry
     steps:
       - name: Check out exact reviewed head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,6 +49,22 @@ jobs:
           mkdir -p "$RUNNER_TEMP/zed-bin"
           tar -xzf "$archive" -C "$RUNNER_TEMP/zed-bin"
           echo "$RUNNER_TEMP/zed-bin" >> "$GITHUB_PATH"
+
+      - name: Seed immutable zed-interfaces dependency registry
+        run: |
+          set -euo pipefail
+          dependency="$RUNNER_TEMP/zed-interfaces"
+          registry="$RUNNER_TEMP/zed-registry"
+          rm -rf "$dependency" "$registry"
+          mkdir -p "$registry"
+          git clone --branch v0.1.0 --depth 1 https://github.com/zed-pkg/zed-interfaces.git "$dependency"
+          test "$(git -C "$dependency" rev-parse HEAD)" = "$ZED_INTERFACES_TAG_COMMIT"
+          test "$(git -C "$dependency" describe --tags --exact-match)" = "v0.1.0"
+          (
+            cd "$dependency"
+            zed validate
+            zed publish
+          )
 
       - name: Validate authored package contract
         run: zed validate
