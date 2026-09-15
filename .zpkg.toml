@@ -2,6 +2,7 @@
 org = "zed-pkg"
 name = "zed-lib-core"
 version = "0.1.0"
+kind = "lib-core"
 description = "Canonical zed-pkg core: SeaORM registry entities, migrations, the role-aware query boundary, the polyglot resolution slices, and the kernel-backed local lock crate"
 license = "MIT"
 keywords = ["package-manager", "resolution", "registry", "seaorm", "polyglot", "locking"]
@@ -16,7 +17,7 @@ url = "https://github.com/zed-pkg/zed-lib-core"
 [publish]
 include_readme = true
 tag_format = "v{version}"
-smoke_test = "test -f \"$ZED_PKG_TEST_TARGET/conformance/cases/version-resolution.json\""
+smoke_test = "sh \"$ZED_PKG_TEST_TARGET/scripts/tests/smoke-published-artifact.sh\""
 exclude = [
   ".env",
   ".env.*",
