@@ -12,6 +12,7 @@ on:
       - 'contracts/api-routes.v1.json'
       - 'shared-defs.lock.json'
       - 'scripts/check-merge-contract.py'
+      - 'scripts/check-current-merge-contract.py'
       - 'src/rust-orm/**'
       - 'src/rust-lock/**'
       - 'src/rust/namespace_plan.rs'
@@ -30,6 +31,7 @@ on:
       - 'contracts/api-routes.v1.json'
       - 'shared-defs.lock.json'
       - 'scripts/check-merge-contract.py'
+      - 'scripts/check-current-merge-contract.py'
       - 'src/rust-orm/**'
       - 'src/rust-lock/**'
       - 'src/rust/namespace_plan.rs'
@@ -77,11 +79,11 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Certify source histories, shared schema, Zed package, API routes and R2 boundary
+      - name: Certify source histories, package authorities, shared schema, API routes and R2 boundary
         working-directory: zed-lib
         run: |
-          python3 -m py_compile scripts/check-merge-contract.py
-          python3 scripts/check-merge-contract.py
+          python3 -m py_compile scripts/check-merge-contract.py scripts/check-current-merge-contract.py
+          python3 scripts/check-current-merge-contract.py
       - name: Validate route contract JSON
         working-directory: zed-lib
         run: python3 -m json.tool contracts/api-routes.v1.json >/dev/null
