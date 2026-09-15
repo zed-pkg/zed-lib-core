@@ -1,0 +1,48 @@
+name: shared recovery authority lock one-shot
+
+on:
+  push:
+    branches: [hardening/shared-recovery-authority-20260915]
+
+permissions:
+  contents: write
+
+jobs:
+  align:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: hardening/shared-recovery-authority-20260915
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: '1.98.1'
+          components: rustfmt, clippy
+      - name: Regenerate one-authority Cargo graph and prove workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo update -p zed-interfaces --precise bb0f3fe10218e7dcb6a857bcb43deffdaa08b4f6
+          cargo fmt --all --check
+          cargo test --locked --workspace
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo tree --locked -i zed-interfaces > /tmp/interfaces-tree.txt
+          grep -q 'zed-interfaces' /tmp/interfaces-tree.txt
+          test "$(grep -c 'source = \"git+https://github.com/zed-pkg/zed-interfaces.git?rev=' Cargo.lock)" -eq 1
+          grep -q 'bb0f3fe10218e7dcb6a857bcb43deffdaa08b4f6' Cargo.lock
+          git diff --check
+          test "$(git diff --name-only)" = "Cargo.lock"
+      - name: Commit Cargo-generated lockfile and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git rm .github/workflows/shared-recovery-authority-lock-once.yml
+          staged="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n' '.github/workflows/shared-recovery-authority-lock-once.yml' 'Cargo.lock' | sort)"
+          test "$staged" = "$expected"
+          git commit -m "chore: regenerate shared recovery authority lock"
+          git push origin HEAD:hardening/shared-recovery-authority-20260915
