@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Fail closed when the zed-lock Cargo and Zed package contracts drift.
+"""Fail closed when the zed-lock Cargo and root Zed target contracts drift.
 
-zed-lock is the `src/rust-lock` slice of zed-pkg/zed-lib-core: a workspace
-member and a nested Zed package, published under the `lock/v{version}` tag.
+zed-lock is the `src/rust-lock` slice of zed-pkg/zed-lib-core: a Cargo
+workspace member published through the repository-root Zed manifest. The slice
+must not declare a second `.zpkg.toml`; the root `targets.rust-lock` entry is
+the sole Zed package authority for this folded crate.
 """
 
 from __future__ import annotations
@@ -14,6 +16,10 @@ import tomllib
 
 DEFAULT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 ROOT = pathlib.Path(os.environ.get("ZED_LOCK_PACKAGE_ROOT", DEFAULT_ROOT)).resolve()
+DEFAULT_REPOSITORY_ROOT = ROOT.parents[1]
+REPOSITORY_ROOT = pathlib.Path(
+    os.environ.get("ZED_LOCK_REPOSITORY_ROOT", DEFAULT_REPOSITORY_ROOT)
+).resolve()
 EXPECTED_SOURCE_COMMIT = "fd3b08eb1ac170518cb795e662318ae2714b1176"
 
 
@@ -25,48 +31,49 @@ def load_toml(path: pathlib.Path) -> dict[str, object]:
 def main() -> int:
     errors: list[str] = []
     cargo_path = ROOT / "Cargo.toml"
-    zpkg_path = ROOT / ".zpkg.toml"
+    root_zpkg_path = REPOSITORY_ROOT / ".zpkg.toml"
+    nested_zpkg_path = ROOT / ".zpkg.toml"
     zed_env_path = ROOT / "zed-env.toml"
     provenance_path = ROOT / "PROVENANCE.md"
 
     for path in (
         cargo_path,
-        zpkg_path,
+        root_zpkg_path,
         zed_env_path,
         provenance_path,
         ROOT / "lib.rs",
     ):
         if not path.is_file():
             try:
-                display = path.relative_to(ROOT)
+                display = path.relative_to(REPOSITORY_ROOT)
             except ValueError:
                 display = path
             errors.append(f"missing required package file: {display}")
+
+    if nested_zpkg_path.exists():
+        errors.append(
+            "src/rust-lock/.zpkg.toml must not exist: the repository-root "
+            "targets.rust-lock entry is the sole Zed package authority"
+        )
 
     if errors:
         return report(errors)
 
     cargo = load_toml(cargo_path)
-    zpkg = load_toml(zpkg_path)
+    root_zpkg = load_toml(root_zpkg_path)
     zed_env = load_toml(zed_env_path)
     cargo_package = cargo.get("package", {})
-    zpkg_package = zpkg.get("package", {})
 
-    expected_scalar_fields = {
+    expected_cargo_fields = {
         "name": "zed-lock",
         "version": "0.1.1",
         "license": "MIT",
     }
-    for field, expected in expected_scalar_fields.items():
+    for field, expected in expected_cargo_fields.items():
         cargo_value = cargo_package.get(field)
         if cargo_value != expected:
             errors.append(
                 f"Cargo package.{field} must be {expected!r}, got {cargo_value!r}"
-            )
-        zpkg_value = zpkg_package.get(field)
-        if zpkg_value != expected:
-            errors.append(
-                f"Zed package.{field} must be {expected!r}, got {zpkg_value!r}"
             )
 
     if cargo_package.get("rust-version") != "1.88":
@@ -82,47 +89,28 @@ def main() -> int:
             "beside the manifest like every other zed-lib-core slice"
         )
 
-    if zpkg_package.get("org") != "zed-pkg":
-        errors.append("Zed package.org must be 'zed-pkg'")
-    if zpkg_package.get("language") != "rust":
-        errors.append("Zed package.language must be 'rust'")
-
-    repository = zpkg_package.get("repository", {})
+    root_package = root_zpkg.get("package", {})
+    if root_package.get("org") != "zed-pkg" or root_package.get("name") != "zed-lib-core":
+        errors.append("repository-root Zed package must be zed-pkg/zed-lib-core")
+    if root_package.get("version") != "0.1.0":
+        errors.append("repository-root Zed package version must remain 0.1.0")
+    repository = root_package.get("repository", {})
     if repository.get("vcs") != "git":
-        errors.append("Zed package.repository.vcs must be 'git'")
+        errors.append("repository-root package.repository.vcs must be 'git'")
     if repository.get("url") != "https://github.com/zed-pkg/zed-lib-core":
-        errors.append("Zed package.repository.url must point at zed-pkg/zed-lib-core")
+        errors.append("repository-root package.repository.url must point at zed-pkg/zed-lib-core")
 
-    publish = zpkg.get("publish", {})
-    if publish.get("tag_format") != "lock/v{version}":
+    targets = root_zpkg.get("targets", {})
+    lock_target = targets.get("rust-lock") if isinstance(targets, dict) else None
+    expected_lock_target = {
+        "dir": "src/rust-lock",
+        "name": "zed-lock",
+        "adapter": "rust",
+    }
+    if lock_target != expected_lock_target:
         errors.append(
-            "Zed publish.tag_format must be 'lock/v{version}' so the nested package's "
-            "tags cannot collide with the repository package or the orm slice"
+            f"repository-root targets.rust-lock must be {expected_lock_target!r}, got {lock_target!r}"
         )
-    smoke_test = publish.get("smoke_test")
-    if not isinstance(smoke_test, str) or "cargo test --locked --manifest-path" not in smoke_test:
-        errors.append(
-            "Zed publish.smoke_test must run Cargo with --locked against the nested Cargo.toml"
-        )
-
-    # A nested slice is published by the repository package's `targets.rust-lock`
-    # entry; declaring its own targets (or a crates.io native route) would make
-    # two release authorities for one crate.
-    if "targets" in zpkg:
-        errors.append(
-            "nested Zed package must not declare targets: src/rust-lock is published "
-            "through zed-lib-core's root .zpkg.toml, and cargo publish remains an "
-            "independent crates.io release operation"
-        )
-    install = zpkg.get("install", {})
-    if install.get("adapter") != "rust":
-        errors.append("Zed install.adapter must be 'rust'")
-
-    scripts = zpkg.get("scripts", {})
-    if not isinstance(scripts, dict) or set(scripts) != {"test"}:
-        errors.append("Zed [scripts] must contain exactly the package-level 'test' hook")
-    elif scripts.get("test") != "cargo test --locked --all-targets":
-        errors.append("Zed scripts.test must run the zed-lock suite with Cargo --locked")
 
     if zed_env.get("schema") != 2:
         errors.append("zed-env.toml must declare schema = 2")
@@ -186,7 +174,7 @@ def report(errors: list[str]) -> int:
             print(f"error: {error}", file=sys.stderr)
         return 1
     print(
-        "zed-lock Cargo, Zed package, schema-2 task, and extraction provenance contracts are consistent"
+        "zed-lock Cargo, root Zed target, schema-2 task, and extraction provenance contracts are consistent"
     )
     return 0
 
