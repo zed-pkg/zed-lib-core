@@ -10,12 +10,3 @@ format = "tar.gz"
 vcs_tag = "v0.1.1"
 vcs_commit = "99aaf991797432f26f7cebe0f56cbfebbb3461c4"
 source = "https://registry.zpkg.net"
-
-[[package.mirrors]]
-kind = "github-release"
-url = "https://github.com/zed-pkg/zed-interfaces/releases/download/v0.1.1/zpkg-zed-pkg-zed-interfaces-0.1.1.tar.gz"
-
-[package.mirrors.serves]
-artifacts = true
-metadata = true
-index = true
