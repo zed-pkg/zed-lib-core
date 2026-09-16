@@ -19,7 +19,7 @@ begin
   ) then
     alter table zed_email_notification_outbox
       add constraint zed_email_notification_outbox_lease_state_chk
-      check ((state = 'publishing') = (lease_expires_at is not null))
+      check (lease_expires_at is null or state = 'publishing')
       not valid;
   end if;
 end
