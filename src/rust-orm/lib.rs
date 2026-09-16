@@ -8,12 +8,12 @@
 //! 1. **The schema is package-owned.** Zed registry DDL and forward migrations
 //!    live under `src/rust-orm/sql` in this repository and ship as the
 //!    standalone `zed-pkg/zed-schema` package. [`migrations`] applies those reviewed files;
-//!    generated SeaORM and Drizzle projections remain non-authoritative.
+//!    generated ORM SQL remains non-authoritative.
 //! 2. **Raw sessions do not escape.** Consumers receive an opaque
 //!    [`ReadContext`] or [`WriteContext`] and call named operations in [`read`],
 //!    [`registry`], [`version_reads`], [`write`], and the feature-gated
-//!    [`account`], [`invitations`], and [`publication`] modules. SeaORM entities
-//!    and query builders stay private.
+//!    [`account`], [`invitations`], [`notifications`], and [`publication`] modules.
+//!    SeaORM entities and query builders stay private.
 //! 3. **Writes are opt-in.** Default builds cannot compile a write symbol; API
 //!    servers must enable `read-write`, and only the discrete migration job
 //!    enables `migrate`. The feature split expresses intent — the authoritative
@@ -36,6 +36,7 @@ compile_error!("zed-orm-core requires the read-only feature; read-write includes
 mod connection;
 mod error;
 mod policy;
+pub mod notifications;
 pub mod read;
 pub mod registry;
 pub mod schema;
@@ -57,6 +58,8 @@ pub mod write;
 
 #[cfg(feature = "migrate")]
 pub mod migrations;
+#[cfg(feature = "migrate")]
+pub mod notification_migration;
 
 pub use connection::{
     connect_read_only, connect_read_only_with_policy, ConnectPolicy, ReadContext,
