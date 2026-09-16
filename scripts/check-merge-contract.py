@@ -125,14 +125,16 @@ def assert_package() -> None:
         "adapter": "rust",
     }:
         fail("folded zed-lock target boundary differs")
-    lock_manifest = tomllib.loads((ROOT / "src/rust-lock/.zpkg.toml").read_text(encoding="utf-8"))
-    if lock_manifest.get("targets"):
-        fail("folded zed-lock manifest must not declare nested targets")
-    lock_package = lock_manifest.get("package", {})
-    if f"{lock_package.get('org')}/{lock_package.get('name')}" != "zed-pkg/zed-lock":
-        fail("folded zed-lock package identity differs")
-    if lock_manifest.get("publish", {}).get("tag_format") != "lock/v{version}":
-        fail("folded zed-lock release tag namespace differs")
+    if (ROOT / "src/rust-lock/.zpkg.toml").exists():
+        fail("folded zed-lock must not declare a nested Zed package authority")
+    lock_cargo = tomllib.loads(
+        (ROOT / "src/rust-lock/Cargo.toml").read_text(encoding="utf-8")
+    )
+    lock_package = lock_cargo.get("package", {})
+    if lock_package.get("name") != "zed-lock" or lock_package.get("version") != "0.1.1":
+        fail("folded zed-lock Cargo package identity differs")
+    if lock_package.get("repository") != "https://github.com/zed-pkg/zed-lib-core":
+        fail("folded zed-lock Cargo repository differs")
 
     if {"rust-orm", "sql-schema"} & targets:
         fail("ORM and schema packages must not inherit root target metadata")
