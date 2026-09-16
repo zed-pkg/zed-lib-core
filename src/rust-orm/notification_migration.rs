@@ -9,7 +9,8 @@ use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
 
 use crate::{connection::WriteContext, error::OrmError};
 
-const SQL: &str = include_str!("sql/2026-09-16-package-email-notifications.sql");
+const EMAIL_SQL: &str = include_str!("sql/2026-09-16-package-email-notifications.sql");
+const EVENT_SQL: &str = include_str!("sql/2026-09-16-package-notification-events.sql");
 const VERSION: &str = "package-email-notifications@2026-09-16-v1";
 const MIGRATION_LOCK_KEY: i64 = 913_447_316;
 
@@ -55,7 +56,11 @@ pub async fn migrate_notifications(
 
     if !already_applied {
         transaction
-            .execute_unprepared(SQL)
+            .execute_unprepared(EMAIL_SQL)
+            .await
+            .map_err(OrmError::from_db_err)?;
+        transaction
+            .execute_unprepared(EVENT_SQL)
             .await
             .map_err(OrmError::from_db_err)?;
         transaction
@@ -82,11 +87,13 @@ mod tests {
     #[test]
     fn migration_is_forward_only_and_product_owned() {
         assert_eq!(VERSION, "package-email-notifications@2026-09-16-v1");
-        assert!(SQL.contains("zed_package_favorites"));
-        assert!(SQL.contains("zed_notification_preferences"));
-        assert!(SQL.contains("zed_package_security_advisories"));
-        assert!(SQL.contains("zed_email_notification_outbox"));
-        assert!(!SQL.to_ascii_lowercase().contains("sendgrid_api_key"));
-        assert!(!SQL.to_ascii_lowercase().contains("nats_url"));
+        assert!(EMAIL_SQL.contains("zed_package_favorites"));
+        assert!(EMAIL_SQL.contains("zed_notification_preferences"));
+        assert!(EMAIL_SQL.contains("zed_package_security_advisories"));
+        assert!(EMAIL_SQL.contains("zed_email_notification_outbox"));
+        assert!(EVENT_SQL.contains("zed_package_notification_events"));
+        assert!(!EMAIL_SQL.to_ascii_lowercase().contains("sendgrid_api_key"));
+        assert!(!EVENT_SQL.to_ascii_lowercase().contains("sendgrid_api_key"));
+        assert!(!EMAIL_SQL.to_ascii_lowercase().contains("nats_url"));
     }
 }
