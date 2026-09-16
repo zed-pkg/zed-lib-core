@@ -1,0 +1,57 @@
+name: materialize canonical Zed dependency lock
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.event.pull_request.head.ref == 'ci/immutable-zed-package-release-20260915'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ZED_PKG_INTERACTIVE: 'false'
+      ZED_PKG_SOURCE_FALLBACK: 'true'
+      GITHUB_TOKEN: ${{ github.token }}
+      ZED_CLI_COMMIT: eb5656e974105677982f533c6ae24f2c99abdf2e
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: zed-pkg/zed-cli
+          ref: ${{ env.ZED_CLI_COMMIT }}
+          path: .tmp-zed-cli
+          persist-credentials: false
+      - name: Build fixed Zed resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .tmp-zed-cli rev-parse HEAD)" = "$ZED_CLI_COMMIT"
+          cargo build --locked --manifest-path .tmp-zed-cli/Cargo.toml --bin zed
+          install -m 0755 .tmp-zed-cli/target/debug/zed "$RUNNER_TEMP/zed"
+      - name: Generate canonical lock from immutable release bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/zed" install --install-mode copy --adapter none
+          test -s .zpkg.lock
+          grep -F 'org = "zed-pkg"' .zpkg.lock >/dev/null
+          grep -F 'name = "zed-interfaces"' .zpkg.lock >/dev/null
+          grep -F 'sha256 = "6df0c8ca7df5539276270dc8f50e79229ab797ca0c769ec1b8b935ebe44bdb47"' .zpkg.lock >/dev/null
+          rm -rf zed_modules .tmp-zed-cli
+          git rm .github/workflows/materialize-zpkg-lock.yml
+          git diff --check
+      - name: Commit generated lock and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .zpkg.lock
+          git commit -m 'chore(zpkg): commit canonical dependency lock'
+          git push origin HEAD:ci/immutable-zed-package-release-20260915
