@@ -290,8 +290,10 @@ mod tests {
 
     #[test]
     fn invalid_preference_values_fail_before_database_io() {
-        let mut preferences = NotificationPreferences::default();
-        preferences.digest_frequency = "hourly".into();
+        let mut preferences = NotificationPreferences {
+            digest_frequency: "hourly".into(),
+            ..NotificationPreferences::default()
+        };
         assert!(validate_preferences(&preferences).is_err());
         preferences.digest_frequency = "daily".into();
         preferences.digest_hour = 24;
