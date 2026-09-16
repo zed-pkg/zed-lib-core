@@ -1,4 +1,4 @@
-//! Forward-only migration for Zed package email notification state.
+//! Forward-only migrations for Zed package email notification state.
 //!
 //! Kept separate from the historical registry migration series so the feature
 //! can ship without replaying or mutating the established registry ledger.
@@ -11,7 +11,9 @@ use crate::{connection::WriteContext, error::OrmError};
 
 const EMAIL_SQL: &str = include_str!("sql/2026-09-16-package-email-notifications.sql");
 const EVENT_SQL: &str = include_str!("sql/2026-09-16-package-notification-events.sql");
-const VERSION: &str = "package-email-notifications@2026-09-16-v1";
+const LEASE_SQL: &str = include_str!("sql/2026-09-16-package-email-outbox-leases.sql");
+const BASE_VERSION: &str = "package-email-notifications@2026-09-16-v1";
+const LEASE_VERSION: &str = "package-email-notifications@2026-09-16-v2-outbox-leases";
 const MIGRATION_LOCK_KEY: i64 = 913_447_316;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -21,7 +23,7 @@ pub struct NotificationMigrationReport {
 }
 
 pub const fn notification_migration_version() -> &'static str {
-    VERSION
+    LEASE_VERSION
 }
 
 pub async fn migrate_notifications(
@@ -44,17 +46,11 @@ pub async fn migrate_notifications(
         .await
         .map_err(OrmError::from_db_err)?;
 
-    let already_applied = transaction
-        .query_one(Statement::from_sql_and_values(
-            transaction.get_database_backend(),
-            "SELECT version FROM zed_schema_migrations WHERE version = $1",
-            [VERSION.into()],
-        ))
-        .await
-        .map_err(OrmError::from_db_err)?
-        .is_some();
+    let base_applied = ledger_contains(&transaction, BASE_VERSION).await?;
+    let lease_applied = ledger_contains(&transaction, LEASE_VERSION).await?;
+    let mut applied = false;
 
-    if !already_applied {
+    if !base_applied {
         transaction
             .execute_unprepared(EMAIL_SQL)
             .await
@@ -63,21 +59,54 @@ pub async fn migrate_notifications(
             .execute_unprepared(EVENT_SQL)
             .await
             .map_err(OrmError::from_db_err)?;
+        record_version(&transaction, BASE_VERSION).await?;
+        applied = true;
+    }
+
+    if !lease_applied {
         transaction
-            .execute(Statement::from_sql_and_values(
-                transaction.get_database_backend(),
-                "INSERT INTO zed_schema_migrations(version) VALUES ($1)",
-                [VERSION.into()],
-            ))
+            .execute_unprepared(LEASE_SQL)
             .await
             .map_err(OrmError::from_db_err)?;
+        record_version(&transaction, LEASE_VERSION).await?;
+        applied = true;
     }
 
     transaction.commit().await.map_err(OrmError::from_db_err)?;
     Ok(NotificationMigrationReport {
-        version: VERSION,
-        applied: !already_applied,
+        version: LEASE_VERSION,
+        applied,
     })
+}
+
+async fn ledger_contains<C: ConnectionTrait>(
+    connection: &C,
+    version: &str,
+) -> Result<bool, OrmError> {
+    Ok(connection
+        .query_one(Statement::from_sql_and_values(
+            connection.get_database_backend(),
+            "SELECT version FROM zed_schema_migrations WHERE version = $1",
+            [version.to_owned().into()],
+        ))
+        .await
+        .map_err(OrmError::from_db_err)?
+        .is_some())
+}
+
+async fn record_version<C: ConnectionTrait>(
+    connection: &C,
+    version: &str,
+) -> Result<(), OrmError> {
+    connection
+        .execute(Statement::from_sql_and_values(
+            connection.get_database_backend(),
+            "INSERT INTO zed_schema_migrations(version) VALUES ($1)",
+            [version.to_owned().into()],
+        ))
+        .await
+        .map_err(OrmError::from_db_err)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -85,15 +114,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn migration_is_forward_only_and_product_owned() {
-        assert_eq!(VERSION, "package-email-notifications@2026-09-16-v1");
+    fn migration_series_is_forward_only_and_product_owned() {
+        assert_eq!(BASE_VERSION, "package-email-notifications@2026-09-16-v1");
+        assert_eq!(
+            notification_migration_version(),
+            "package-email-notifications@2026-09-16-v2-outbox-leases"
+        );
         assert!(EMAIL_SQL.contains("zed_package_favorites"));
         assert!(EMAIL_SQL.contains("zed_notification_preferences"));
         assert!(EMAIL_SQL.contains("zed_package_security_advisories"));
         assert!(EMAIL_SQL.contains("zed_email_notification_outbox"));
         assert!(EVENT_SQL.contains("zed_package_notification_events"));
+        assert!(LEASE_SQL.contains("lease_expires_at"));
         assert!(!EMAIL_SQL.to_ascii_lowercase().contains("sendgrid_api_key"));
         assert!(!EVENT_SQL.to_ascii_lowercase().contains("sendgrid_api_key"));
+        assert!(!LEASE_SQL.to_ascii_lowercase().contains("sendgrid_api_key"));
         assert!(!EMAIL_SQL.to_ascii_lowercase().contains("nats_url"));
     }
 }
