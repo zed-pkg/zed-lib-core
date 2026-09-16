@@ -40,8 +40,9 @@ exclude = [
   "src/rust-orm/sql/LICENSE",
   "src/rust-orm/sql/README.md",
   "src/rust-orm/sql/schema-package-smoke.sh",
-  # `zed-lock` is a standalone nested package too (folded from zed-pkg/zed-lock).
-  "src/rust-lock/.zpkg.toml",
+  # `zed-lock` is a root-owned target folded from zed-pkg/zed-lock. Keep the
+  # target-specific release/docs residue out of the whole-repository artifact;
+  # package identity itself is declared only by `targets.rust-lock` below.
   "src/rust-lock/LICENSE",
   "src/rust-lock/README.md",
   "src/rust-lock/CHANGELOG.md",
