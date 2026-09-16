@@ -52,6 +52,8 @@ pub mod account;
 #[cfg(feature = "read-write")]
 pub mod invitations;
 #[cfg(feature = "read-write")]
+pub mod notification_preferences;
+#[cfg(feature = "read-write")]
 pub mod publication;
 #[cfg(feature = "read-write")]
 pub mod write;
