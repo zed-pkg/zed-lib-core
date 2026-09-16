@@ -1,0 +1,43 @@
+name: diagnose latest-compatible Zed lock
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.event.pull_request.head.ref == 'ci/immutable-zed-package-release-20260915'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ZED_PKG_INTERACTIVE: 'false'
+      ZED_PKG_SOURCE_FALLBACK: 'true'
+      GITHUB_TOKEN: ${{ github.token }}
+      ZED_CLI_COMMIT: eb5656e974105677982f533c6ae24f2c99abdf2e
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: zed-pkg/zed-cli
+          ref: ${{ env.ZED_CLI_COMMIT }}
+          path: .tmp-zed-cli
+          persist-credentials: false
+      - name: Build fixed resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --manifest-path .tmp-zed-cli/Cargo.toml --bin zed
+          install -m 0755 .tmp-zed-cli/target/debug/zed "$RUNNER_TEMP/zed"
+      - name: Print canonical lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/zed" install --install-mode copy --adapter none
+          echo '=== ZPKG_LOCK_BEGIN ==='
+          cat .zpkg.lock
+          echo '=== ZPKG_LOCK_END ==='
