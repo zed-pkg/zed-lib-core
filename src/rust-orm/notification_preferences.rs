@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
 
 use crate::{connection::WriteContext, error::OrmError};
 
@@ -151,16 +151,21 @@ pub async fn upsert_notification_preferences(
     preferences: &NotificationPreferences,
 ) -> Result<(), OrmError> {
     validate_preferences(preferences)?;
-    context
+    let transaction = context
         .connection()
+        .begin()
+        .await
+        .map_err(OrmError::from_db_err)?;
+    transaction
         .execute(Statement::from_sql_and_values(
-            context.connection().get_database_backend(),
+            transaction.get_database_backend(),
             r#"
             insert into zed_notification_preferences (
               user_id, email_enabled, favorite_package_email, downloaded_package_email,
               major_release_email, security_email, digest_email, digest_frequency,
               minimum_security_severity, timezone, digest_hour, unsubscribed_at
-            ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,null)
+            ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
+                      case when $2 then null else now() end)
             on conflict (user_id) do update set
               email_enabled = excluded.email_enabled,
               favorite_package_email = excluded.favorite_package_email,
@@ -172,7 +177,10 @@ pub async fn upsert_notification_preferences(
               minimum_security_severity = excluded.minimum_security_severity,
               timezone = excluded.timezone,
               digest_hour = excluded.digest_hour,
-              unsubscribed_at = case when excluded.email_enabled then null else zed_notification_preferences.unsubscribed_at end
+              unsubscribed_at = case
+                when excluded.email_enabled then null
+                else coalesce(zed_notification_preferences.unsubscribed_at, now())
+              end
             "#,
             [
                 user_id.into(),
@@ -190,6 +198,10 @@ pub async fn upsert_notification_preferences(
         ))
         .await
         .map_err(OrmError::from_db_err)?;
+    if !preferences.email_enabled {
+        suppress_pending_outbox(&transaction, user_id).await?;
+    }
+    transaction.commit().await.map_err(OrmError::from_db_err)?;
     Ok(())
 }
 
@@ -199,17 +211,38 @@ pub async fn unsubscribe_product_email(
     context: &WriteContext,
     user_id: Uuid,
 ) -> Result<(), OrmError> {
-    context
+    let transaction = context
         .connection()
+        .begin()
+        .await
+        .map_err(OrmError::from_db_err)?;
+    transaction
         .execute(Statement::from_sql_and_values(
-            context.connection().get_database_backend(),
+            transaction.get_database_backend(),
             r#"
             insert into zed_notification_preferences(user_id, email_enabled, unsubscribed_at)
             values ($1, false, now())
             on conflict (user_id) do update set
               email_enabled = false,
-              unsubscribed_at = now()
+              unsubscribed_at = coalesce(zed_notification_preferences.unsubscribed_at, now())
             "#,
+            [user_id.into()],
+        ))
+        .await
+        .map_err(OrmError::from_db_err)?;
+    suppress_pending_outbox(&transaction, user_id).await?;
+    transaction.commit().await.map_err(OrmError::from_db_err)?;
+    Ok(())
+}
+
+async fn suppress_pending_outbox<C: ConnectionTrait>(
+    connection: &C,
+    user_id: Uuid,
+) -> Result<(), OrmError> {
+    connection
+        .execute(Statement::from_sql_and_values(
+            connection.get_database_backend(),
+            "update zed_email_notification_outbox set state = 'suppressed', completed_at = now(), lease_expires_at = null, last_error_code = 'user_opted_out' where user_id = $1 and state in ('pending','publishing')",
             [user_id.into()],
         ))
         .await
