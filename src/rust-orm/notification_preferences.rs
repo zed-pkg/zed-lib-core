@@ -136,9 +136,7 @@ pub async fn notification_preferences(
         minimum_security_severity: row
             .try_get("", "minimum_security_severity")
             .map_err(OrmError::from_db_err)?,
-        timezone: row
-            .try_get("", "timezone")
-            .map_err(OrmError::from_db_err)?,
+        timezone: row.try_get("", "timezone").map_err(OrmError::from_db_err)?,
         digest_hour: row
             .try_get("", "digest_hour")
             .map_err(OrmError::from_db_err)?,
@@ -251,7 +249,10 @@ async fn suppress_pending_outbox<C: ConnectionTrait>(
 }
 
 fn validate_preferences(preferences: &NotificationPreferences) -> Result<(), OrmError> {
-    if !matches!(preferences.digest_frequency.as_str(), "daily" | "weekly" | "never") {
+    if !matches!(
+        preferences.digest_frequency.as_str(),
+        "daily" | "weekly" | "never"
+    ) {
         return Err(OrmError::policy(
             "digest_frequency must be daily, weekly, or never",
         ));

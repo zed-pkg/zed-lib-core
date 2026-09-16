@@ -158,10 +158,7 @@ fn semver_major(value: &str) -> Option<u64> {
 }
 
 #[must_use]
-pub fn security_meets_threshold(
-    severity: SecuritySeverity,
-    minimum: SecuritySeverity,
-) -> bool {
+pub fn security_meets_threshold(severity: SecuritySeverity, minimum: SecuritySeverity) -> bool {
     severity >= minimum
 }
 
@@ -289,7 +286,8 @@ pub fn render_digest_email(
     } else {
         format!(
             "Zed package digest: {} updates, {} security",
-            items.len(), security_count
+            items.len(),
+            security_count
         )
     };
     let mut text = format!("Zed package digest for {period_start} through {period_end}\n");
@@ -431,9 +429,10 @@ pub async fn load_package_notification_recipients(
             let severity = row
                 .try_get::<String>("", "minimum_security_severity")
                 .map_err(OrmError::from_db_err)?;
-            let minimum_security_severity = SecuritySeverity::parse(&severity).ok_or_else(|| {
-                OrmError::policy("notification recipient has invalid security threshold")
-            })?;
+            let minimum_security_severity =
+                SecuritySeverity::parse(&severity).ok_or_else(|| {
+                    OrmError::policy("notification recipient has invalid security threshold")
+                })?;
             Ok(NotificationRecipient {
                 user_id: row
                     .try_get::<Uuid>("", "user_id")
@@ -465,7 +464,10 @@ pub async fn queue_rendered_email(
     context: &WriteContext,
     input: QueueEmailInput,
 ) -> Result<bool, OrmError> {
-    if !matches!(input.event_type, "major_release" | "security_patch" | "digest") {
+    if !matches!(
+        input.event_type,
+        "major_release" | "security_patch" | "digest"
+    ) {
         return Err(OrmError::policy("unsupported notification event type"));
     }
     let result = context
@@ -543,9 +545,7 @@ pub async fn claim_outbox_batch(
         .map(|row| {
             Ok(OutboxEmail {
                 id: row.try_get("", "id").map_err(OrmError::from_db_err)?,
-                user_id: row
-                    .try_get("", "user_id")
-                    .map_err(OrmError::from_db_err)?,
+                user_id: row.try_get("", "user_id").map_err(OrmError::from_db_err)?,
                 package_id: row
                     .try_get("", "package_id")
                     .map_err(OrmError::from_db_err)?,
@@ -561,9 +561,7 @@ pub async fn claim_outbox_batch(
                 recipient_name: row
                     .try_get("", "recipient_name")
                     .map_err(OrmError::from_db_err)?,
-                subject: row
-                    .try_get("", "subject")
-                    .map_err(OrmError::from_db_err)?,
+                subject: row.try_get("", "subject").map_err(OrmError::from_db_err)?,
                 text_body: row
                     .try_get("", "text_body")
                     .map_err(OrmError::from_db_err)?,
@@ -573,19 +571,14 @@ pub async fn claim_outbox_batch(
                 attempt_count: row
                     .try_get("", "attempt_count")
                     .map_err(OrmError::from_db_err)?,
-                metadata: row
-                    .try_get("", "metadata")
-                    .map_err(OrmError::from_db_err)?,
+                metadata: row.try_get("", "metadata").map_err(OrmError::from_db_err)?,
             })
         })
         .collect()
 }
 
 #[cfg(feature = "read-write")]
-pub async fn mark_outbox_published(
-    context: &WriteContext,
-    id: Uuid,
-) -> Result<(), OrmError> {
+pub async fn mark_outbox_published(context: &WriteContext, id: Uuid) -> Result<(), OrmError> {
     context
         .connection()
         .execute(Statement::from_sql_and_values(
@@ -667,15 +660,13 @@ mod tests {
 
     #[test]
     fn empty_digest_is_not_rendered() {
-        assert!(
-            render_digest_email(
-                "2026-09-01",
-                "2026-09-08",
-                &[],
-                "https://zed.pkg/settings/notifications",
-                "https://zed.pkg/unsubscribe/token",
-            )
-            .is_none()
-        );
+        assert!(render_digest_email(
+            "2026-09-01",
+            "2026-09-08",
+            &[],
+            "https://zed.pkg/settings/notifications",
+            "https://zed.pkg/unsubscribe/token",
+        )
+        .is_none());
     }
 }

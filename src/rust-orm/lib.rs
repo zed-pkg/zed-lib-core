@@ -36,8 +36,8 @@ compile_error!("zed-orm-core requires the read-only feature; read-write includes
 
 mod connection;
 mod error;
-mod policy;
 pub mod notifications;
+mod policy;
 pub mod read;
 pub mod registry;
 pub mod schema;

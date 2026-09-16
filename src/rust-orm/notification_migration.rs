@@ -94,10 +94,7 @@ async fn ledger_contains<C: ConnectionTrait>(
         .is_some())
 }
 
-async fn record_version<C: ConnectionTrait>(
-    connection: &C,
-    version: &str,
-) -> Result<(), OrmError> {
+async fn record_version<C: ConnectionTrait>(connection: &C, version: &str) -> Result<(), OrmError> {
     connection
         .execute(Statement::from_sql_and_values(
             connection.get_database_backend(),

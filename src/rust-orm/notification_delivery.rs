@@ -99,10 +99,14 @@ pub async fn record_notification_event(
     input: &NotificationEventInput,
 ) -> Result<bool, OrmError> {
     if !matches!(input.event_type, "major_release" | "security_patch") {
-        return Err(OrmError::policy("unsupported package notification event type"));
+        return Err(OrmError::policy(
+            "unsupported package notification event type",
+        ));
     }
     if input.event_key.is_empty() || input.event_key.len() > 255 {
-        return Err(OrmError::policy("notification event key must contain 1 to 255 bytes"));
+        return Err(OrmError::policy(
+            "notification event key must contain 1 to 255 bytes",
+        ));
     }
     if (input.event_type == "security_patch") != input.security_advisory_id.is_some() {
         return Err(OrmError::policy(
@@ -181,8 +185,12 @@ fn outbox_from_row(row: sea_orm::QueryResult) -> Result<OutboxEmail, OrmError> {
     Ok(OutboxEmail {
         id: row.try_get("", "id").map_err(OrmError::from_db_err)?,
         user_id: row.try_get("", "user_id").map_err(OrmError::from_db_err)?,
-        package_id: row.try_get("", "package_id").map_err(OrmError::from_db_err)?,
-        event_type: row.try_get("", "event_type").map_err(OrmError::from_db_err)?,
+        package_id: row
+            .try_get("", "package_id")
+            .map_err(OrmError::from_db_err)?,
+        event_type: row
+            .try_get("", "event_type")
+            .map_err(OrmError::from_db_err)?,
         idempotency_key: row
             .try_get("", "idempotency_key")
             .map_err(OrmError::from_db_err)?,
@@ -193,8 +201,12 @@ fn outbox_from_row(row: sea_orm::QueryResult) -> Result<OutboxEmail, OrmError> {
             .try_get("", "recipient_name")
             .map_err(OrmError::from_db_err)?,
         subject: row.try_get("", "subject").map_err(OrmError::from_db_err)?,
-        text_body: row.try_get("", "text_body").map_err(OrmError::from_db_err)?,
-        html_body: row.try_get("", "html_body").map_err(OrmError::from_db_err)?,
+        text_body: row
+            .try_get("", "text_body")
+            .map_err(OrmError::from_db_err)?,
+        html_body: row
+            .try_get("", "html_body")
+            .map_err(OrmError::from_db_err)?,
         attempt_count: row
             .try_get("", "attempt_count")
             .map_err(OrmError::from_db_err)?,
