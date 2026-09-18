@@ -11,12 +11,12 @@ vcs = "git"
 url = "https://github.com/zed-pkg/zed-lib-core"
 
 [dependencies]
-"zed-pkg/zed-interfaces" = "^0.1.0"
+"zed-pkg/zed-interfaces" = "^0.1.1"
 
 [publish]
 include_readme = true
 tag_format = "v{version}"
-smoke_test = "test -f \"$ZED_PKG_TEST_TARGET/conformance/cases/version-resolution.json\""
+smoke_test = "sh \"$ZED_PKG_TEST_TARGET/scripts/tests/smoke-published-artifact.sh\""
 exclude = [
   ".env",
   ".env.*",
@@ -70,14 +70,11 @@ adapter = "rust"
 registry = "crates-io"
 package = "zed-lib"
 
-# The local lock crate, folded in from zed-pkg/zed-lock. It keeps its crate
-# name so consumers change only where they fetch it from; it never depends on
-# the ORM slice or on the network. Distributed lease + Postgres advisory
-# composition lives in ORESoftware/ores-locks-and-leases, not here.
-[targets.rust-lock]
-dir = "src/rust-lock"
-name = "zed-lock"
-adapter = "rust"
+# `src/rust-lock` is intentionally not a root target. It owns an independent
+# nested `.zpkg.toml` for the standalone `zed-pkg/zed-lock` package, and Zed
+# rejects a root target that points at another package authority. The root
+# repository artifact still carries the implementation source while excluding
+# the nested package metadata above; publish `zed-lock` from `src/rust-lock`.
 
 # The corpus is consumable on its own: an implementation in a language zed-lib
 # does not ship yet still has something to be correct against.

@@ -2559,9 +2559,8 @@ dependencies = [
 [[package]]
 name = "zed-interfaces"
 version = "0.1.0"
-source = "git+https://github.com/zed-pkg/zed-interfaces.git?rev=0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c#0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c"
+source = "git+https://github.com/zed-pkg/zed-interfaces.git?rev=7d31f80dd8a310f218931165a3ad636a2f32b932#7d31f80dd8a310f218931165a3ad636a2f32b932"
 dependencies = [
- "bs58",
  "hex",
  "schemars",
  "semver",
@@ -2574,9 +2573,10 @@ dependencies = [
 
 [[package]]
 name = "zed-interfaces"
-version = "0.1.0"
-source = "git+https://github.com/zed-pkg/zed-interfaces.git?rev=7d31f80dd8a310f218931165a3ad636a2f32b932#7d31f80dd8a310f218931165a3ad636a2f32b932"
+version = "0.1.1"
+source = "git+https://github.com/zed-pkg/zed-interfaces.git?rev=aa0f87be13cdf003600b42a6088202898fcbae8d#aa0f87be13cdf003600b42a6088202898fcbae8d"
 dependencies = [
+ "bs58",
  "hex",
  "schemars",
  "semver",
@@ -2594,7 +2594,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "zed-interfaces 0.1.0 (git+https://github.com/zed-pkg/zed-interfaces.git?rev=0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c)",
+ "zed-interfaces 0.1.1",
 ]
 
 [[package]]
@@ -2617,7 +2617,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "uuid",
- "zed-interfaces 0.1.0 (git+https://github.com/zed-pkg/zed-interfaces.git?rev=7d31f80dd8a310f218931165a3ad636a2f32b932)",
+ "zed-interfaces 0.1.0",
 ]
 
 [[package]]
