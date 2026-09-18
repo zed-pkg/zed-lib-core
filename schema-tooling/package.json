@@ -10,7 +10,9 @@
     "ddl:roundtrip:write": "node ../tools/ddl-first-orm-roundtrip.mjs --write",
     "contracts:check": "node ../tools/typespec-protobuf-parity.mjs --check",
     "contracts:write": "node ../tools/typespec-protobuf-parity.mjs --write",
-    "test": "node --test ../tests/schema-shadow.test.mjs ../tests/ddl-first-orm-roundtrip.test.mjs ../tests/typespec-protobuf-parity.test.mjs"
+    "test": "node --test ../tests/schema-shadow.test.mjs ../tests/ddl-first-orm-roundtrip.test.mjs ../tests/typespec-protobuf-parity.test.mjs",
+    "lint:ores": "if [ -f ../.ores-lint/lint.sh ]; then sh ../.ores-lint/lint.sh; else echo 'ores-lint not installed'; fi",
+    "prepublishOnly": "npm run lint:ores"
   },
   "devDependencies": {
     "@typespec/compiler": "1.15.0",
@@ -20,5 +22,13 @@
     "drizzle-orm": "0.45.2",
     "pg": "8.23.0",
     "protobufjs": "8.8.0"
+  },
+  "oresLint": {
+    "note": "Declared, not installed. ores-lint resolves these from a global install - see .ores-lint/README.md",
+    "requires": {
+      "eslint": ">=9",
+      "typescript-eslint": ">=8 (optional; without it .ts files are skipped)"
+    },
+    "install": "npm i -g eslint typescript-eslint"
   }
 }
