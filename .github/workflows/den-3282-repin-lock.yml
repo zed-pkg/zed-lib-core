@@ -28,12 +28,14 @@ jobs:
         run: |
           set -euo pipefail
           grep -F 'rev = "aa0f87be13cdf003600b42a6088202898fcbae8d"' src/rust/Cargo.toml
-          cargo update -p 'zed-interfaces 0.1.0' --precise aa0f87be13cdf003600b42a6088202898fcbae8d || \
-            cargo update -p zed-interfaces --precise aa0f87be13cdf003600b42a6088202898fcbae8d
+          cargo update \
+            -p 'git+https://github.com/zed-pkg/zed-interfaces.git?rev=0c2ffa7be791a44c8aa2a69ab4b1ea87aab4729c#zed-interfaces@0.1.0' \
+            --precise aa0f87be13cdf003600b42a6088202898fcbae8d
           cargo fmt --all -- --check
           cargo test --locked -p zed-lib
           cargo clippy --locked -p zed-lib --all-targets -- -D warnings
           grep -F 'aa0f87be13cdf003600b42a6088202898fcbae8d' Cargo.lock
+          grep -F '7d31f80dd8a310f218931165a3ad636a2f32b932' Cargo.lock
       - name: Commit only resolver output and remove this workflow
         run: |
           set -euo pipefail
