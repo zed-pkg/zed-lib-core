@@ -1,0 +1,71 @@
+name: DEN-3282 certify type identity
+
+on:
+  push:
+    branches: ["den-3282-align-interfaces-aa0f87be-20260918"]
+    paths:
+      - ".github/workflows/den-3282-certify-type-identity.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: den-3282-align-interfaces-aa0f87be-20260918
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+      - name: Certify exact external Cargo type identity
+        env:
+          INTERFACES_SHA: aa0f87be13cdf003600b42a6088202898fcbae8d
+        run: |
+          set -euo pipefail
+          cargo test --locked -p zed-lib
+          consumer="$RUNNER_TEMP/zed-lib-den-3282-consumer"
+          mkdir -p "$consumer/src"
+          cat >"$consumer/Cargo.toml" <<EOF
+          [package]
+          name = "zed-lib-den-3282-consumer"
+          version = "0.0.0"
+          edition = "2024"
+
+          [dependencies]
+          serde_json = "1"
+          zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "$INTERFACES_SHA" }
+          zed-lib = { git = "https://github.com/zed-pkg/zed-lib-core.git", rev = "$GITHUB_SHA" }
+          EOF
+          cat >"$consumer/src/main.rs" <<'EOF'
+          fn main() {
+              let metadata: zed_interfaces::registry::PackageMetadata =
+                  serde_json::from_value(serde_json::json!({
+                      "org": "acme",
+                      "name": "kit",
+                      "vcs": "git",
+                      "repo_url": "https://github.com/acme/kit",
+                      "description": null,
+                      "latest": "1.2.0",
+                      "versions": ["1.0.0", "1.2.0"],
+                      "version_scheme": "semver",
+                      "tags": []
+                  }))
+                  .expect("shared interface fixture");
+              assert_eq!(zed_lib::resolve_version(&metadata, "^1.0").unwrap(), "1.2.0");
+          }
+          EOF
+          cargo run --manifest-path "$consumer/Cargo.toml"
+      - name: Remove certification workflow after success
+        run: |
+          set -euo pipefail
+          rm .github/workflows/den-3282-certify-type-identity.yml
+          git config user.name "ORESoftware"
+          git config user.email "alex@oresoftware.com"
+          git add .github/workflows/den-3282-certify-type-identity.yml
+          git commit -m "DEN-3282: remove completed type identity certification"
+          git push origin HEAD:den-3282-align-interfaces-aa0f87be-20260918
