@@ -1,0 +1,4 @@
+# Rendering entry points may accept one cohesive set of product-email fields.
+# Keep the repository default narrow enough to flag broader parameter sprawl;
+# exceptional APIs above this threshold must opt out locally with rationale.
+too-many-arguments-threshold = 8
