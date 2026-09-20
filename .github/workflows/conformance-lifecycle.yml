@@ -1,0 +1,35 @@
+name: conformance-lifecycle
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'conformance/**'
+      - 'src/rust/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/conformance-lifecycle.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'conformance/**'
+      - 'src/rust/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/conformance-lifecycle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Execute the same checker Zed lifecycles consume
+        run: sh conformance/check.sh
