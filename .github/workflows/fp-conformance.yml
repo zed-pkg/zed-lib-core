@@ -67,14 +67,14 @@ jobs:
         with:
           components: rustfmt,clippy
 
-      - name: Format scanner
-        run: cargo fmt --manifest-path tools/fp-conformance/Cargo.toml --all -- --check
-
       - name: Test scanner
         run: cargo test --manifest-path tools/fp-conformance/Cargo.toml --locked
 
       - name: Clippy scanner
         run: cargo clippy --manifest-path tools/fp-conformance/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Format scanner
+        run: cargo fmt --manifest-path tools/fp-conformance/Cargo.toml --all -- --check
 
       - name: Build scanner once
         run: cargo build --manifest-path tools/fp-conformance/Cargo.toml --locked
