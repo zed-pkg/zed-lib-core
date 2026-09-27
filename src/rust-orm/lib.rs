@@ -53,6 +53,8 @@ pub mod invitations;
 #[cfg(feature = "read-write")]
 pub mod publication;
 #[cfg(feature = "read-write")]
+pub mod publication_repair;
+#[cfg(feature = "read-write")]
 pub mod write;
 
 #[cfg(feature = "migrate")]
