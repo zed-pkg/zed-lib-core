@@ -434,6 +434,56 @@ fn package_version_by_package_and_version_query(
         .filter(package_version::Column::Version.eq(version))
 }
 
+/// Maximum number of active package references admitted for one content digest.
+///
+/// A digest may legitimately be shared by multiple public/private packages.
+/// Authorization callers must see the complete bounded set rather than an
+/// arbitrary first row, so the query fetches one extra row and fails closed
+/// when this ceiling would truncate the authorization view.
+pub const ARTIFACT_REFERENCE_LIMIT: u64 = 128;
+
+/// Return every active canonical package that references an exact artifact SHA.
+///
+/// This is the authorization lookup for digest-addressed artifact routes. It
+/// deliberately returns *all* bounded package references because a digest can
+/// be shared: one public reference makes the content public, while an
+/// all-private set requires membership in at least one referencing package's
+/// organization/project.
+pub async fn packages_for_artifact_sha256(
+    context: &ReadContext,
+    sha256: &str,
+) -> Result<Vec<PackageSummary>, OrmError> {
+    let rows = packages_for_artifact_sha256_query(sha256)
+        .limit(ARTIFACT_REFERENCE_LIMIT + 1)
+        .all(context.connection())
+        .await
+        .map_err(OrmError::from_db_err)?;
+
+    if rows.len() as u64 > ARTIFACT_REFERENCE_LIMIT {
+        return Err(OrmError::policy(
+            "artifact digest has too many package references for a complete authorization decision",
+        ));
+    }
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|(package_row, org_row)| {
+            org_row.map(|org_row| package_summary(package_row, org_row.slug))
+        })
+        .collect())
+}
+
+fn packages_for_artifact_sha256_query(
+    sha256: &str,
+) -> sea_orm::SelectTwo<package::Entity, org::Entity> {
+    package::Entity::find()
+        .join(JoinType::InnerJoin, package::Relation::PackageVersion.def())
+        .filter(package_version::Column::Sha256.eq(sha256))
+        .filter(package::Column::IsSoftDeleted.eq(false))
+        .find_also_related(org::Entity)
+        .order_by_asc(package::Column::Id)
+}
+
 /// Licenses for a package: the package-level default plus any version overrides.
 pub async fn licenses_for_package(
     context: &ReadContext,
@@ -618,6 +668,27 @@ mod tests {
             .contains("\"zed_projects\".\"is_soft_deleted\" = $2"));
         assert!(!statement.sql.contains("JOIN"));
         assert!(!statement.sql.contains(&format!("LIMIT {PAGE_LIMIT}")));
+    }
+
+    #[test]
+    fn artifact_sha_lookup_joins_versions_and_keeps_authorization_set_bounded() {
+        let statement = packages_for_artifact_sha256_query("abcd")
+            .limit(ARTIFACT_REFERENCE_LIMIT + 1)
+            .build(DatabaseBackend::Postgres);
+
+        assert!(statement.sql.contains("\"zed_package_versions\""));
+        assert!(statement
+            .sql
+            .contains("\"zed_package_versions\".\"sha256\" = $1"));
+        assert!(statement
+            .sql
+            .contains("\"zed_packages\".\"is_soft_deleted\" = $2"));
+        assert!(statement.sql.contains("\"zed_orgs\""));
+        assert!(
+            statement.sql.contains("LIMIT $3"),
+            "artifact reference bound must remain parameterized after SHA and soft-delete predicates: {}",
+            statement.sql
+        );
     }
 
     #[test]
