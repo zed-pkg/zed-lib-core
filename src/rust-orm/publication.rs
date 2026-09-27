@@ -559,6 +559,12 @@ fn validate_historical_repair(input: &HistoricalDigestRepairInput) -> Result<(),
         &input.replacement_artifact_key,
         1_024,
     )?;
+    let expected_old_key = format!("artifacts/{}.{}", input.expected_old_sha256, input.format);
+    if input.expected_old_artifact_key != expected_old_key {
+        return Err(OrmError::policy(
+            "expected old artifact key must be the canonical content-addressed key",
+        ));
+    }
     let expected_replacement_key =
         format!("artifacts/{}.{}", input.replacement_sha256, input.format);
     if input.replacement_artifact_key != expected_replacement_key {
@@ -566,13 +572,8 @@ fn validate_historical_repair(input: &HistoricalDigestRepairInput) -> Result<(),
             "replacement artifact key must be the canonical content-addressed key",
         ));
     }
-    required_text("admin actor subject", &input.actor_subject, 256)?;
-    let reason = input.reason.trim();
-    if reason.len() < 8 || reason.len() > 500 {
-        return Err(OrmError::policy(
-            "historical digest repair reason must contain 8 to 500 bytes",
-        ));
-    }
+    log_safe_text("admin actor subject", &input.actor_subject, 1, 256)?;
+    log_safe_text("historical digest repair reason", &input.reason, 8, 500)?;
     Ok(())
 }
 
@@ -615,6 +616,25 @@ fn validate(input: &MachinePublishInput) -> Result<(), OrmError> {
         sha256("client IP hash", hash)?;
     }
     optional_text("user agent", input.user_agent.as_deref(), 512)
+}
+
+fn log_safe_text(
+    field: &str,
+    value: &str,
+    minimum: usize,
+    maximum: usize,
+) -> Result<(), OrmError> {
+    if value.len() < minimum
+        || value.len() > maximum
+        || value.trim() != value
+        || value.chars().any(char::is_control)
+    {
+        Err(OrmError::policy(format!(
+            "{field} must contain {minimum} to {maximum} trimmed, log-safe bytes"
+        )))
+    } else {
+        Ok(())
+    }
 }
 
 fn required_text(field: &str, value: &str, maximum: usize) -> Result<(), OrmError> {
@@ -751,7 +771,15 @@ mod tests {
         assert!(validate_historical_repair(&input).is_err());
 
         let mut input = repair_input();
+        input.expected_old_artifact_key = "github/guessable/old.tar.gz".to_owned();
+        assert!(validate_historical_repair(&input).is_err());
+
+        let mut input = repair_input();
         input.replacement_artifact_key = "github/guessable/path.tar.gz".to_owned();
+        assert!(validate_historical_repair(&input).is_err());
+
+        let mut input = repair_input();
+        input.actor_subject = "admin\nsubject".to_owned();
         assert!(validate_historical_repair(&input).is_err());
 
         let mut input = repair_input();
