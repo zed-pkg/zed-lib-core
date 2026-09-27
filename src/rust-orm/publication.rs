@@ -48,6 +48,55 @@ pub struct MachinePublishInput {
     pub user_agent: Option<String>,
 }
 
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HistoricalDigestRepairClass {
+    /// Zed CLI v0.3.0 fallback metadata could fingerprint raw GitHub source
+    /// archives while publication used Zed's deterministic packer. The repair
+    /// migrates only that historical split-brain into the deterministic bytes.
+    LegacyGithubArchiveV030,
+}
+
+impl HistoricalDigestRepairClass {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::LegacyGithubArchiveV030 => "legacy-github-archive-v0.3.0",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HistoricalDigestRepairInput {
+    pub repair_class: HistoricalDigestRepairClass,
+    pub org_slug: String,
+    pub package_name: String,
+    pub version: String,
+    pub expected_old_sha256: String,
+    pub expected_old_size_bytes: i64,
+    pub expected_old_artifact_key: String,
+    pub replacement_sha256: String,
+    pub replacement_size_bytes: i64,
+    pub replacement_artifact_key: String,
+    pub format: String,
+    pub vcs_tag: Option<String>,
+    pub vcs_commit: Option<String>,
+    /// Canonical Shared Auth admin subject. Stored in the append-only audit
+    /// detail because admin identities intentionally do not map to customer
+    /// registry user rows.
+    pub actor_subject: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HistoricalDigestRepairReceipt {
+    pub org_id: Uuid,
+    pub package_id: Uuid,
+    pub package_version_id: Uuid,
+    pub old_sha256: String,
+    pub replacement_sha256: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MachinePublishReceipt {
     pub org_id: Uuid,
@@ -291,6 +340,242 @@ pub async fn adopt_machine_publish(
     })
 }
 
+
+/**
+ * Compare-and-swap one known historical digest split-brain after replacement
+ * bytes have already been staged under `replacement_artifact_key`.
+ *
+ * This is not a republish or a general version override. Ordinary publication
+ * remains immutable. The caller must arrive through the isolated admin repair
+ * workflow and prove the exact previous immutable identity. Any drift between
+ * the request and the stored version aborts before mutation.
+ *
+ * The canonical version row, every matching verified upload-ledger row, and
+ * the append-only repair audit fact are changed in one database transaction.
+ *
+ * # Errors
+ *
+ * Returns a policy error for malformed repair evidence, a missing coordinate,
+ * a mismatched old identity, a mismatched verified-upload ledger, or an
+ * unsupported repair class. Database failures abort the transaction.
+ */
+pub async fn repair_historical_machine_publish_digest(
+    context: &WriteContext,
+    input: HistoricalDigestRepairInput,
+) -> Result<HistoricalDigestRepairReceipt, OrmError> {
+    validate_historical_repair(&input)?;
+    let transaction = context
+        .connection()
+        .begin()
+        .await
+        .map_err(OrmError::from_db_err)?;
+
+    let lock_coordinate = format!(
+        "zed-machine-publish:{}/{}",
+        input.org_slug, input.package_name
+    );
+    transaction
+        .execute(Statement::from_sql_and_values(
+            transaction.get_database_backend(),
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            [Value::String(Some(Box::new(lock_coordinate)))],
+        ))
+        .await
+        .map_err(OrmError::from_db_err)?;
+
+    let organization = org::Entity::find()
+        .filter(org::Column::Slug.eq(&input.org_slug))
+        .filter(org::Column::IsSoftDeleted.eq(false))
+        .one(&transaction)
+        .await
+        .map_err(OrmError::from_db_err)?
+        .ok_or_else(|| {
+            OrmError::not_found(format!(
+                "repair organization {} does not exist",
+                input.org_slug
+            ))
+        })?;
+
+    let package = package::Entity::find()
+        .filter(package::Column::OrgId.eq(organization.id))
+        .filter(package::Column::Name.eq(&input.package_name))
+        .filter(package::Column::IsSoftDeleted.eq(false))
+        .one(&transaction)
+        .await
+        .map_err(OrmError::from_db_err)?
+        .ok_or_else(|| {
+            OrmError::not_found(format!(
+                "repair package {}/{} does not exist",
+                input.org_slug, input.package_name
+            ))
+        })?;
+
+    let version = package_version::Entity::find()
+        .filter(package_version::Column::PackageId.eq(package.id))
+        .filter(package_version::Column::Version.eq(&input.version))
+        .one(&transaction)
+        .await
+        .map_err(OrmError::from_db_err)?
+        .ok_or_else(|| {
+            OrmError::not_found(format!(
+                "repair version {}/{}@{} does not exist",
+                input.org_slug, input.package_name, input.version
+            ))
+        })?;
+
+    if !repair_old_identity_matches(&version, &input) {
+        return Err(OrmError::policy(format!(
+            "historical digest repair compare-and-swap failed for {}/{}@{}",
+            input.org_slug, input.package_name, input.version
+        )));
+    }
+
+    let verified_uploads = package_upload::Entity::find()
+        .filter(package_upload::Column::PackageVersionId.eq(version.id))
+        .filter(package_upload::Column::Status.eq("verified"))
+        .all(&transaction)
+        .await
+        .map_err(OrmError::from_db_err)?;
+    if verified_uploads.is_empty() {
+        return Err(OrmError::policy(
+            "historical digest repair requires an existing verified upload ledger",
+        ));
+    }
+    if verified_uploads.iter().any(|upload| {
+        upload.sha256.as_deref() != Some(input.expected_old_sha256.as_str())
+            || upload.size_bytes != Some(input.expected_old_size_bytes)
+            || upload.storage_key.as_deref() != Some(input.expected_old_artifact_key.as_str())
+            || upload.format.as_deref() != Some(input.format.as_str())
+    }) {
+        return Err(OrmError::policy(
+            "historical digest repair verified-upload ledger does not match expected old identity",
+        ));
+    }
+
+    let mut replacement_version: package_version::ActiveModel = version.clone().into();
+    replacement_version.sha256 = Set(input.replacement_sha256.clone());
+    replacement_version.size_bytes = Set(input.replacement_size_bytes);
+    replacement_version.artifact_key = Set(input.replacement_artifact_key.clone());
+    replacement_version
+        .update(&transaction)
+        .await
+        .map_err(OrmError::from_db_err)?;
+
+    let now = chrono::Utc::now().fixed_offset();
+    for upload in verified_uploads {
+        let mut replacement_upload: package_upload::ActiveModel = upload.into();
+        replacement_upload.sha256 = Set(Some(input.replacement_sha256.clone()));
+        replacement_upload.size_bytes = Set(Some(input.replacement_size_bytes));
+        replacement_upload.storage_key = Set(Some(input.replacement_artifact_key.clone()));
+        replacement_upload.updated_at = Set(now);
+        replacement_upload
+            .update(&transaction)
+            .await
+            .map_err(OrmError::from_db_err)?;
+    }
+
+    audit_log::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        org_id: Set(Some(organization.id)),
+        actor_user_id: Set(None),
+        api_token_id: Set(None),
+        action: Set("package.version.digest_repair".to_owned()),
+        entity_type: Set("package_version".to_owned()),
+        entity_id: Set(Some(version.id)),
+        detail: Set(serde_json::json!({
+            "repair_class": input.repair_class.as_str(),
+            "package": input.package_name,
+            "version": input.version,
+            "old_sha256": input.expected_old_sha256,
+            "replacement_sha256": input.replacement_sha256,
+            "old_size_bytes": input.expected_old_size_bytes,
+            "replacement_size_bytes": input.replacement_size_bytes,
+            "old_artifact_key": input.expected_old_artifact_key,
+            "replacement_artifact_key": input.replacement_artifact_key,
+            "format": input.format,
+            "vcs_tag": input.vcs_tag,
+            "vcs_commit": input.vcs_commit,
+            "actor_subject": input.actor_subject,
+            "reason": input.reason,
+        })),
+        client_ip_hash: Set(None),
+        created_at: Set(now),
+    }
+    .insert(&transaction)
+    .await
+    .map_err(OrmError::from_db_err)?;
+
+    transaction.commit().await.map_err(OrmError::from_db_err)?;
+    Ok(HistoricalDigestRepairReceipt {
+        org_id: organization.id,
+        package_id: package.id,
+        package_version_id: version.id,
+        old_sha256: input.expected_old_sha256,
+        replacement_sha256: input.replacement_sha256,
+    })
+}
+
+fn repair_old_identity_matches(
+    version: &package_version::Model,
+    input: &HistoricalDigestRepairInput,
+) -> bool {
+    version.sha256 == input.expected_old_sha256
+        && version.size_bytes == input.expected_old_size_bytes
+        && version.artifact_key == input.expected_old_artifact_key
+        && version.format == input.format
+        && version.vcs_tag == input.vcs_tag
+        && version.vcs_commit == input.vcs_commit
+}
+
+fn validate_historical_repair(input: &HistoricalDigestRepairInput) -> Result<(), OrmError> {
+    match input.repair_class {
+        HistoricalDigestRepairClass::LegacyGithubArchiveV030 => {}
+    }
+    required_text("organization slug", &input.org_slug, 64)?;
+    required_text("package name", &input.package_name, 128)?;
+    required_text("package version", &input.version, 128)?;
+    sha256("expected old artifact SHA-256", &input.expected_old_sha256)?;
+    sha256("replacement artifact SHA-256", &input.replacement_sha256)?;
+    if input.expected_old_sha256 == input.replacement_sha256 {
+        return Err(OrmError::policy(
+            "historical digest repair requires different old and replacement digests",
+        ));
+    }
+    if input.expected_old_size_bytes <= 0 || input.replacement_size_bytes <= 0 {
+        return Err(OrmError::policy(
+            "historical digest repair sizes must be positive",
+        ));
+    }
+    one_of("archive format", &input.format, ARCHIVE_FORMATS)?;
+    optional_text("VCS tag", input.vcs_tag.as_deref(), 160)?;
+    optional_text("VCS commit", input.vcs_commit.as_deref(), 120)?;
+    required_text(
+        "expected old artifact key",
+        &input.expected_old_artifact_key,
+        1_024,
+    )?;
+    required_text(
+        "replacement artifact key",
+        &input.replacement_artifact_key,
+        1_024,
+    )?;
+    let expected_replacement_key =
+        format!("artifacts/{}.{}", input.replacement_sha256, input.format);
+    if input.replacement_artifact_key != expected_replacement_key {
+        return Err(OrmError::policy(
+            "replacement artifact key must be the canonical content-addressed key",
+        ));
+    }
+    required_text("admin actor subject", &input.actor_subject, 256)?;
+    let reason = input.reason.trim();
+    if reason.len() < 8 || reason.len() > 500 {
+        return Err(OrmError::policy(
+            "historical digest repair reason must contain 8 to 500 bytes",
+        ));
+    }
+    Ok(())
+}
+
 fn immutable_facts_match(version: &package_version::Model, input: &MachinePublishInput) -> bool {
     version.version_scheme == input.version_scheme
         && version.sha256 == input.sha256
@@ -405,6 +690,73 @@ mod tests {
             client_ip_hash: None,
             user_agent: Some("zed-cli/test".to_owned()),
         }
+    }
+
+
+    fn repair_input() -> HistoricalDigestRepairInput {
+        HistoricalDigestRepairInput {
+            repair_class: HistoricalDigestRepairClass::LegacyGithubArchiveV030,
+            org_slug: "zed-pkg".to_owned(),
+            package_name: "zed-orm-core".to_owned(),
+            version: "0.1.0".to_owned(),
+            expected_old_sha256: "a".repeat(64),
+            expected_old_size_bytes: 100,
+            expected_old_artifact_key: format!("artifacts/{}.tar.gz", "a".repeat(64)),
+            replacement_sha256: "b".repeat(64),
+            replacement_size_bytes: 120,
+            replacement_artifact_key: format!("artifacts/{}.tar.gz", "b".repeat(64)),
+            format: "tar.gz".to_owned(),
+            vcs_tag: Some("v0.1.0".to_owned()),
+            vcs_commit: Some("c".repeat(40)),
+            actor_subject: "admin:shared-auth-subject".to_owned(),
+            reason: "repair deterministic packer split-brain".to_owned(),
+        }
+    }
+
+    #[test]
+    fn historical_repair_is_a_narrow_compare_and_swap_contract() {
+        let input = repair_input();
+        assert!(validate_historical_repair(&input).is_ok());
+        let now = chrono::Utc::now().fixed_offset();
+        let version = package_version::Model {
+            id: Uuid::nil(),
+            package_id: Uuid::nil(),
+            version: input.version.clone(),
+            version_scheme: "semver".to_owned(),
+            sha256: input.expected_old_sha256.clone(),
+            size_bytes: input.expected_old_size_bytes,
+            format: input.format.clone(),
+            vcs_tag: input.vcs_tag.clone(),
+            vcs_commit: input.vcs_commit.clone(),
+            artifact_key: input.expected_old_artifact_key.clone(),
+            manifest: serde_json::json!({"package": {"name": "zed-orm-core"}}),
+            download_count: 0,
+            yanked: false,
+            yanked_at: None,
+            yanked_reason: None,
+            published_by_user_id: None,
+            published_at: now,
+        };
+        assert!(repair_old_identity_matches(&version, &input));
+
+        let mut wrong_old = input.clone();
+        wrong_old.expected_old_sha256 = "d".repeat(64);
+        assert!(!repair_old_identity_matches(&version, &wrong_old));
+    }
+
+    #[test]
+    fn historical_repair_rejects_generic_overwrite_shapes() {
+        let mut input = repair_input();
+        input.replacement_sha256 = input.expected_old_sha256.clone();
+        assert!(validate_historical_repair(&input).is_err());
+
+        let mut input = repair_input();
+        input.replacement_artifact_key = "github/guessable/path.tar.gz".to_owned();
+        assert!(validate_historical_repair(&input).is_err());
+
+        let mut input = repair_input();
+        input.reason = "short".to_owned();
+        assert!(validate_historical_repair(&input).is_err());
     }
 
     #[test]
