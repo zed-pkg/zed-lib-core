@@ -56,8 +56,7 @@ value!.run();
 "#;
         let counts = analyse_text("src/domain.ts", Language::TypeScript, source).counts();
         for code in [
-            "TS001", "TS002", "TS004", "TS005", "TS006", "TS007", "TS008", "TS009",
-            "TS010",
+            "TS001", "TS002", "TS004", "TS005", "TS006", "TS007", "TS008", "TS009", "TS010",
         ] {
             assert_eq!(counts.get(code), Some(&1), "{code}");
         }
@@ -89,14 +88,8 @@ default:
     #[test]
     fn exact_base_comparison_is_per_rule_and_zero_fills_missing_rules() {
         let base = BTreeMap::from([("RS001".to_owned(), 4_usize)]);
-        let head = BTreeMap::from([
-            ("RS001".to_owned(), 4_usize),
-            ("RS002".to_owned(), 1_usize),
-        ]);
-        assert_eq!(
-            regressions(&base, &head),
-            vec![("RS002".to_owned(), 0, 1)]
-        );
+        let head = BTreeMap::from([("RS001".to_owned(), 4_usize), ("RS002".to_owned(), 1_usize)]);
+        assert_eq!(regressions(&base, &head), vec![("RS002".to_owned(), 0, 1)]);
     }
 
     #[test]
@@ -104,13 +97,11 @@ default:
         let scanner = r#"{"counts":{"RS001":111,"RS003":91}}"#;
         let budget = r#"{"budget":{"RS001":57,"RS003":56}}"#;
         assert_eq!(
-            parse_count_object(scanner, "counts")
-                .and_then(|counts| counts.get("RS001").copied()),
+            parse_count_object(scanner, "counts").and_then(|counts| counts.get("RS001").copied()),
             Some(111)
         );
         assert_eq!(
-            parse_count_object(budget, "budget")
-                .and_then(|counts| counts.get("RS003").copied()),
+            parse_count_object(budget, "budget").and_then(|counts| counts.get("RS003").copied()),
             Some(56)
         );
     }
