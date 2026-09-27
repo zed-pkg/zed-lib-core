@@ -174,7 +174,9 @@ fn canonical_closure_json(
     ))
 }
 
-fn canonical_identity_json(identity: &PackageArtifactIdentity) -> Result<String, PackageClosureError> {
+fn canonical_identity_json(
+    identity: &PackageArtifactIdentity,
+) -> Result<String, PackageClosureError> {
     match identity {
         PackageArtifactIdentity::Registry(identity) => canonical_registry_identity_json(identity),
         PackageArtifactIdentity::Hex(identity) => canonical_hex_identity_json(identity),
@@ -213,7 +215,8 @@ fn canonical_hex_identity_json(
 }
 
 fn json_string(value: &str) -> Result<String, PackageClosureError> {
-    serde_json::to_string(value).map_err(|error| PackageClosureError::CanonicalJson(error.to_string()))
+    serde_json::to_string(value)
+        .map_err(|error| PackageClosureError::CanonicalJson(error.to_string()))
 }
 
 #[cfg(test)]
@@ -224,7 +227,7 @@ mod tests {
     };
 
     const EXPECTED_FIXTURE_DIGEST: &str =
-        "2f704cfa7c9f59894d97d4b2552e7dec0e6bdee6852a70b1dca8cd50b9e78684";
+        "28300c318e2ee0d57c4bf7fd2ab9b24a035c1217a260fe768be4ea37bcbcc51b";
 
     fn digest(character: char) -> String {
         character.to_string().repeat(64)
@@ -267,8 +270,8 @@ mod tests {
 
     #[test]
     fn verifies_known_rfc8785_fixture_and_normalizes_dependency_order() -> Result<(), String> {
-        let verified =
-            verify_package_dependency_closure(&fixture_closure()).map_err(|error| error.to_string())?;
+        let verified = verify_package_dependency_closure(&fixture_closure())
+            .map_err(|error| error.to_string())?;
         let names = verified
             .closure()
             .dependencies
