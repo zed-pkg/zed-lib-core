@@ -52,7 +52,12 @@ jobs:
           python-version: '3.11'
 
       - name: Test exact-base comparator
-        run: python3 tools/fp-conformance/test_compare_exact_base.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test tools/fp-conformance/compare_exact_base.rs \
+            -o "$RUNNER_TEMP/compare-exact-base-tests"
+          "$RUNNER_TEMP/compare-exact-base-tests"
 
       - name: Scan exact base and contributor head
         shell: bash
@@ -74,9 +79,16 @@ jobs:
           python3 tools/fp-conformance/fp_conformance.py . \
             --json fp-findings.json --limit 60
 
-          python3 tools/fp-conformance/compare_exact_base.py \
-            --base "$RUNNER_TEMP/fp-base.json" \
-            --head fp-findings.json
+          jq -r '.counts | to_entries[] | [.key, (.value|tostring)] | @tsv' \
+            "$RUNNER_TEMP/fp-base.json" > "$RUNNER_TEMP/fp-base.tsv"
+          jq -r '.counts | to_entries[] | [.key, (.value|tostring)] | @tsv' \
+            fp-findings.json > "$RUNNER_TEMP/fp-head.tsv"
+
+          rustc --edition=2024 tools/fp-conformance/compare_exact_base.rs \
+            -o "$RUNNER_TEMP/compare-exact-base"
+          "$RUNNER_TEMP/compare-exact-base" \
+            --base "$RUNNER_TEMP/fp-base.tsv" \
+            --head "$RUNNER_TEMP/fp-head.tsv"
 
       - name: Upload findings
         if: always()
