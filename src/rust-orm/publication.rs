@@ -48,7 +48,6 @@ pub struct MachinePublishInput {
     pub user_agent: Option<String>,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HistoricalDigestRepairClass {
     /// Zed CLI v0.3.0 fallback metadata could fingerprint raw GitHub source
@@ -340,7 +339,6 @@ pub async fn adopt_machine_publish(
     })
 }
 
-
 /**
  * Compare-and-swap one known historical digest split-brain after replacement
  * bytes have already been staged under `replacement_artifact_key`.
@@ -618,12 +616,7 @@ fn validate(input: &MachinePublishInput) -> Result<(), OrmError> {
     optional_text("user agent", input.user_agent.as_deref(), 512)
 }
 
-fn log_safe_text(
-    field: &str,
-    value: &str,
-    minimum: usize,
-    maximum: usize,
-) -> Result<(), OrmError> {
+fn log_safe_text(field: &str, value: &str, minimum: usize, maximum: usize) -> Result<(), OrmError> {
     if value.len() < minimum
         || value.len() > maximum
         || value.trim() != value
@@ -711,7 +704,6 @@ mod tests {
             user_agent: Some("zed-cli/test".to_owned()),
         }
     }
-
 
     fn repair_input() -> HistoricalDigestRepairInput {
         HistoricalDigestRepairInput {
