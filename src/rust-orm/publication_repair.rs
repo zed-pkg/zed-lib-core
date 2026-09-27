@@ -9,10 +9,8 @@
 //! at the canonical content-addressed key before this transaction is invoked.
 
 use sea_orm::{
-    prelude::Uuid,
-    ActiveModelTrait,
-    ActiveValue::Set,
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, TransactionTrait, Value,
+    prelude::Uuid, ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait,
+    QueryFilter, Statement, TransactionTrait, Value,
 };
 
 use crate::{
