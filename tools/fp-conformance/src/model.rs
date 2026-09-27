@@ -100,11 +100,14 @@ pub struct ScanResult {
 
 impl ScanResult {
     pub fn counts(&self) -> BTreeMap<String, usize> {
-        let counts = self.findings.iter().fold(BTreeMap::new(), |mut acc, finding| {
-            let entry = acc.entry(finding.code.to_owned()).or_insert(0_usize);
-            *entry = entry.saturating_add(1);
-            return acc;
-        });
+        let counts = self
+            .findings
+            .iter()
+            .fold(BTreeMap::new(), |mut acc, finding| {
+                let entry = acc.entry(finding.code.to_owned()).or_insert(0_usize);
+                *entry = entry.saturating_add(1);
+                return acc;
+            });
         return counts;
     }
 }
