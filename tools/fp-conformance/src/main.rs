@@ -128,8 +128,7 @@ fn run() -> Result<ExitCode, String> {
 
     let mut failed = false;
     if let Some(path) = options.budget.as_deref() {
-        let baseline =
-            read_count_object(path, "budget").map_err(|error| error.to_string())?;
+        let baseline = read_count_object(path, "budget").map_err(|error| error.to_string())?;
         let deltas = regressions(&baseline, &counts);
         if !deltas.is_empty() {
             println!("\nfp-conformance: regression against budget");
@@ -139,16 +138,13 @@ fn run() -> Result<ExitCode, String> {
                     .unwrap_or("unknown rule");
                 println!("  {code} {title}: {before} -> {after}");
             }
-            println!(
-                "\nFix the new occurrences; do not expand the baseline to hide them."
-            );
+            println!("\nFix the new occurrences; do not expand the baseline to hide them.");
             failed = true;
         }
     }
 
     if let Some(path) = options.compare_json.as_deref() {
-        let baseline =
-            read_count_object(path, "counts").map_err(|error| error.to_string())?;
+        let baseline = read_count_object(path, "counts").map_err(|error| error.to_string())?;
         let better = improvements(&baseline, &counts);
         if !better.is_empty() {
             println!("\nfp-conformance improvements from exact base:");
@@ -159,9 +155,7 @@ fn run() -> Result<ExitCode, String> {
 
         let deltas = regressions(&baseline, &counts);
         if deltas.is_empty() {
-            println!(
-                "\nfp-conformance: pass; no rule count increased from exact base"
-            );
+            println!("\nfp-conformance: pass; no rule count increased from exact base");
         } else {
             println!("\nfp-conformance: regression against exact base");
             for (code, before, after) in deltas {
