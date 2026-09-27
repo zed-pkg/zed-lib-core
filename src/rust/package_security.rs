@@ -109,8 +109,10 @@ pub fn verify_package_dependency_closure(
         });
     }
 
-    let mut normalized = closure.clone();
-    normalized.dependencies = dependencies;
+    let normalized = PackageDependencyClosure {
+        dependencies,
+        ..closure.clone()
+    };
 
     Ok(VerifiedPackageDependencyClosure {
         closure: normalized,
@@ -217,7 +219,9 @@ fn json_string(value: &str) -> Result<String, PackageClosureError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zed_interfaces::package_security::{HexPackageEcosystem, PACKAGE_DEPENDENCY_CLOSURE_FORMAT_V1};
+    use zed_interfaces::package_security::{
+        HexPackageEcosystem, PACKAGE_DEPENDENCY_CLOSURE_FORMAT_V1,
+    };
 
     const EXPECTED_FIXTURE_DIGEST: &str =
         "2f704cfa7c9f59894d97d4b2552e7dec0e6bdee6852a70b1dca8cd50b9e78684";
@@ -262,79 +266,123 @@ mod tests {
     }
 
     #[test]
-    fn verifies_known_rfc8785_fixture_and_normalizes_dependency_order() {
+    fn verifies_known_rfc8785_fixture_and_normalizes_dependency_order() -> Result<(), String> {
         let verified =
-            verify_package_dependency_closure(&fixture_closure()).expect("fixture verifies");
+            verify_package_dependency_closure(&fixture_closure()).map_err(|error| error.to_string())?;
+        let names = verified
+            .closure()
+            .dependencies
+            .iter()
+            .map(identity_key)
+            .map(|key| key.package_name)
+            .collect::<Vec<_>>();
+
         assert_eq!(verified.closure_digest(), EXPECTED_FIXTURE_DIGEST);
-        assert_eq!(
-            identity_key(&verified.closure().dependencies[0]).package_name,
-            "gleam_json"
-        );
-        assert_eq!(
-            identity_key(&verified.closure().dependencies[1]).package_name,
-            "gleam_stdlib"
-        );
+        assert_eq!(names, vec!["gleam_json", "gleam_stdlib"]);
         assert!(!verified.canonical_json().contains("closure_digest"));
+        Ok(())
     }
 
     #[test]
-    fn dependency_input_order_does_not_change_digest() {
-        let mut closure = fixture_closure();
-        closure.dependencies.reverse();
-        verify_package_dependency_closure(&closure).expect("reordered fixture verifies");
-    }
-
-    #[test]
-    fn rejects_duplicate_dependency_identity_even_if_other_fields_match() {
-        let mut closure = fixture_closure();
-        closure.dependencies.push(closure.dependencies[0].clone());
-        assert_eq!(
-            verify_package_dependency_closure(&closure)
-                .expect_err("duplicate must fail")
-                .kind(),
-            "duplicate_dependency"
-        );
-    }
-
-    #[test]
-    fn rejects_root_substitution_into_dependency_set() {
-        let mut closure = fixture_closure();
-        closure.dependencies.push(closure.root.clone());
-        assert_eq!(
-            verify_package_dependency_closure(&closure)
-                .expect_err("root repetition must fail")
-                .kind(),
-            "root_repeated"
-        );
-    }
-
-    #[test]
-    fn rejects_supplied_digest_instead_of_trusting_it() {
-        let mut closure = fixture_closure();
-        closure.closure_digest = digest('9');
-        let error =
-            verify_package_dependency_closure(&closure).expect_err("forged digest must fail");
-        assert_eq!(error.kind(), "digest_mismatch");
-        match error {
-            PackageClosureError::DigestMismatch { actual, .. } => {
-                assert_eq!(actual, EXPECTED_FIXTURE_DIGEST);
-            }
-            other => panic!("unexpected error: {other}"),
-        }
-    }
-
-    #[test]
-    fn changed_transitive_identity_invalidates_the_closure() {
-        let mut closure = fixture_closure();
-        let PackageArtifactIdentity::Hex(dependency) = &mut closure.dependencies[0] else {
-            panic!("fixture dependency is Hex");
+    fn dependency_input_order_does_not_change_digest() -> Result<(), String> {
+        let original = fixture_closure();
+        let closure = PackageDependencyClosure {
+            dependencies: original.dependencies.iter().cloned().rev().collect(),
+            ..original
         };
-        dependency.outer_checksum = digest('0');
-        assert_eq!(
-            verify_package_dependency_closure(&closure)
-                .expect_err("changed bytes must invalidate digest")
-                .kind(),
-            "digest_mismatch"
-        );
+        verify_package_dependency_closure(&closure).map_err(|error| error.to_string())?;
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_duplicate_dependency_identity_even_if_other_fields_match() -> Result<(), String> {
+        let original = fixture_closure();
+        let duplicate = original
+            .dependencies
+            .first()
+            .cloned()
+            .ok_or_else(|| "fixture must have a dependency".to_string())?;
+        let closure = PackageDependencyClosure {
+            dependencies: original
+                .dependencies
+                .iter()
+                .cloned()
+                .chain(std::iter::once(duplicate))
+                .collect(),
+            ..original
+        };
+        let Err(error) = verify_package_dependency_closure(&closure) else {
+            return Err("duplicate dependency unexpectedly verified".into());
+        };
+        assert_eq!(error.kind(), "duplicate_dependency");
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_root_substitution_into_dependency_set() -> Result<(), String> {
+        let original = fixture_closure();
+        let root = original.root.clone();
+        let closure = PackageDependencyClosure {
+            dependencies: original
+                .dependencies
+                .iter()
+                .cloned()
+                .chain(std::iter::once(root))
+                .collect(),
+            ..original
+        };
+        let Err(error) = verify_package_dependency_closure(&closure) else {
+            return Err("root repetition unexpectedly verified".into());
+        };
+        assert_eq!(error.kind(), "root_repeated");
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_supplied_digest_instead_of_trusting_it() -> Result<(), String> {
+        let closure = PackageDependencyClosure {
+            closure_digest: digest('9'),
+            ..fixture_closure()
+        };
+        let Err(error) = verify_package_dependency_closure(&closure) else {
+            return Err("forged digest unexpectedly verified".into());
+        };
+        assert_eq!(error.kind(), "digest_mismatch");
+        if let PackageClosureError::DigestMismatch { actual, .. } = error {
+            assert_eq!(actual, EXPECTED_FIXTURE_DIGEST);
+            return Ok(());
+        }
+        Err("digest mismatch returned the wrong error variant".into())
+    }
+
+    #[test]
+    fn changed_transitive_identity_invalidates_the_closure() -> Result<(), String> {
+        let original = fixture_closure();
+        let dependencies = original
+            .dependencies
+            .iter()
+            .cloned()
+            .map(|dependency| match dependency {
+                PackageArtifactIdentity::Hex(identity)
+                    if identity.package_name == "gleam_stdlib" =>
+                {
+                    PackageArtifactIdentity::Hex(HexPackageArtifactIdentity {
+                        outer_checksum: digest('0'),
+                        ..identity
+                    })
+                }
+                other => other,
+            })
+            .collect();
+        let closure = PackageDependencyClosure {
+            dependencies,
+            ..original
+        };
+
+        let Err(error) = verify_package_dependency_closure(&closure) else {
+            return Err("changed transitive identity unexpectedly verified".into());
+        };
+        assert_eq!(error.kind(), "digest_mismatch");
+        Ok(())
     }
 }
