@@ -3,9 +3,9 @@ name: fp-conformance
 # Functional-programming conformance ratchet.
 #
 # Deliberately cheap: stdlib Python, no toolchain, no dependency install, no
-# network. It compares current findings against the recorded budget and fails
-# only on regression, so the pre-existing backlog never blocks a pull request
-# while new violations do.
+# network. Pull requests compare the exact contributor head against the exact
+# PR base with the same scanner, so inherited backlog never blocks unrelated
+# work while any per-rule count increase still fails.
 #
 # Language-native checks (cargo clippy, eslint, dart analyze) are configured in
 # the tree but not run here, to keep Actions minutes low. See FP-GUIDELINES.md.
@@ -42,17 +42,41 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Scan
+      - name: Test exact-base comparator
+        run: python3 tools/fp-conformance/test_compare_exact_base.py
+
+      - name: Scan exact base and contributor head
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
+          set -euo pipefail
+          base_sha="$BASE_SHA"
+          if [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ || "$base_sha" =~ ^0+$ ]]; then
+            base_sha="$(git rev-parse HEAD^)"
+          fi
+          git cat-file -e "${base_sha}^{commit}"
+          base_tree="$RUNNER_TEMP/fp-base"
+          trap 'git worktree remove --force "$base_tree" >/dev/null 2>&1 || true' EXIT
+          git worktree add --detach "$base_tree" "$base_sha"
+
+          python3 tools/fp-conformance/fp_conformance.py "$base_tree" \
+            --json "$RUNNER_TEMP/fp-base.json" --quiet
           python3 tools/fp-conformance/fp_conformance.py . \
-            --json fp-findings.json \
-            --budget tools/fp-conformance/budget.json \
-            --limit 60
+            --json fp-findings.json --limit 60
+
+          python3 tools/fp-conformance/compare_exact_base.py \
+            --base "$RUNNER_TEMP/fp-base.json" \
+            --head fp-findings.json
 
       - name: Upload findings
         if: always()
