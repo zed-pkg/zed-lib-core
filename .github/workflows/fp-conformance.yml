@@ -2,13 +2,10 @@ name: fp-conformance
 
 # Functional-programming conformance ratchet.
 #
-# Deliberately cheap: stdlib Python, no toolchain, no dependency install, no
-# network. It compares current findings against the recorded budget and fails
-# only on regression, so the pre-existing backlog never blocks a pull request
-# while new violations do.
-#
-# Language-native checks (cargo clippy, eslint, dart analyze) are configured in
-# the tree but not run here, to keep Actions minutes low. See FP-GUIDELINES.md.
+# The scanner is a zero-dependency Rust tool. Pull requests compare the exact
+# contributor head against the exact PR base with the same binary, so inherited
+# backlog never blocks unrelated work while any per-rule count increase fails.
+# Pushes compare against the pushed-from commit (or HEAD^ when unavailable).
 
 on:
   pull_request:
@@ -16,47 +13,94 @@ on:
       - '**.rs'
       - '**.ts'
       - '**.tsx'
+      - '**.mts'
+      - '**.cts'
       - '**.dart'
       - 'tools/fp-conformance/**'
       - '.github/workflows/fp-conformance.yml'
+      - 'FP-GUIDELINES.md'
+      - 'agents.md'
   push:
     branches: [main, dev]
     paths:
       - '**.rs'
       - '**.ts'
       - '**.tsx'
+      - '**.mts'
+      - '**.cts'
       - '**.dart'
+      - 'tools/fp-conformance/**'
+      - '.github/workflows/fp-conformance.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: fp-conformance-${{ github.ref }}
+  group: fp-conformance-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
   conformance:
     name: functional programming conformance
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - name: Check out exact contributor head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          python-version: '3.11'
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+          show-progress: false
 
-      - name: Scan
+      - name: Verify exact contributor head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          components: rustfmt,clippy
+
+      - name: Format scanner
+        run: cargo fmt --manifest-path tools/fp-conformance/Cargo.toml --all -- --check
+
+      - name: Test scanner
+        run: cargo test --manifest-path tools/fp-conformance/Cargo.toml --locked
+
+      - name: Clippy scanner
+        run: cargo clippy --manifest-path tools/fp-conformance/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Build scanner once
+        run: cargo build --manifest-path tools/fp-conformance/Cargo.toml --locked
+
+      - name: Scan exact base and exact contributor head
+        shell: bash
         run: |
-          python3 tools/fp-conformance/fp_conformance.py . \
-            --json fp-findings.json \
-            --budget tools/fp-conformance/budget.json \
-            --limit 60
+          set -euo pipefail
+          base_sha="$BASE_SHA"
+          if [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ || "$base_sha" =~ ^0+$ ]]; then
+            base_sha="$(git rev-parse HEAD^)"
+          fi
+          git cat-file -e "${base_sha}^{commit}"
+
+          base_tree="$RUNNER_TEMP/fp-base"
+          trap 'git worktree remove "$base_tree" >/dev/null 2>&1 || true' EXIT
+          git worktree add --detach "$base_tree" "$base_sha"
+
+          scanner="$PWD/tools/fp-conformance/target/debug/fp-conformance"
+          "$scanner" "$base_tree"             --json "$RUNNER_TEMP/fp-base.json"             --quiet
+
+          "$scanner" .             --json fp-findings.json             --compare-json "$RUNNER_TEMP/fp-base.json"             --limit 60
 
       - name: Upload findings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fp-findings
           path: fp-findings.json
