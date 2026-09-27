@@ -68,10 +68,12 @@ This repository carries an FP conformance ratchet. Before you land a change:
 python3 tools/fp-conformance/fp_conformance.py .
 ```
 
-CI compares your findings against `tools/fp-conformance/budget.json` and fails
-only when a rule's count *increases*. Do not raise the budget to get green — fix
-the new violations. When you clear a class of violation, lower the budget in the
-same commit with `--write-budget`.
+Pull-request CI scans the exact PR base and exact contributor head with the
+same scanner and fails when any rule count increases. This avoids stale
+snapshot budgets blocking unrelated work while preserving the no-new-debt
+ratchet. `tools/fp-conformance/budget.json` remains a historical/local snapshot;
+do not raise it to get green. When you clear a class of violation, update the
+snapshot deliberately with `--write-budget`.
 
 The principles, the rule codes and the remedy for each are in `FP-GUIDELINES.md`.
 
