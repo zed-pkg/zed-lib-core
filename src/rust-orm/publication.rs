@@ -13,7 +13,7 @@ use sea_orm::{
     prelude::{Json, Uuid},
     ActiveModelTrait,
     ActiveValue::Set,
-    ColumnTrait, EntityTrait, QueryFilter, Statement, TransactionTrait, Value,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, TransactionTrait, Value,
 };
 
 use crate::{
