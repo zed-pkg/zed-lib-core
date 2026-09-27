@@ -477,10 +477,7 @@ fn packages_for_artifact_sha256_query(
     sha256: &str,
 ) -> sea_orm::SelectTwo<package::Entity, org::Entity> {
     package::Entity::find()
-        .join(
-            JoinType::InnerJoin,
-            package::Relation::PackageVersion.def(),
-        )
+        .join(JoinType::InnerJoin, package::Relation::PackageVersion.def())
         .filter(package_version::Column::Sha256.eq(sha256))
         .filter(package::Column::IsSoftDeleted.eq(false))
         .find_also_related(org::Entity)
@@ -679,9 +676,7 @@ mod tests {
             .limit(ARTIFACT_REFERENCE_LIMIT + 1)
             .build(DatabaseBackend::Postgres);
 
-        assert!(statement
-            .sql
-            .contains("\"zed_package_versions\""));
+        assert!(statement.sql.contains("\"zed_package_versions\""));
         assert!(statement
             .sql
             .contains("\"zed_package_versions\".\"sha256\" = $1"));
@@ -689,9 +684,11 @@ mod tests {
             .sql
             .contains("\"zed_packages\".\"is_soft_deleted\" = $2"));
         assert!(statement.sql.contains("\"zed_orgs\""));
-        assert!(statement
-            .sql
-            .contains(&format!("LIMIT {}", ARTIFACT_REFERENCE_LIMIT + 1)));
+        assert!(
+            statement.sql.contains("LIMIT $3"),
+            "artifact reference bound must remain parameterized after SHA and soft-delete predicates: {}",
+            statement.sql
+        );
     }
 
     #[test]
