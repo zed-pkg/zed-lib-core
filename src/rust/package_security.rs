@@ -8,6 +8,8 @@
 //! A verified closure is evidence only. It is not a package approval or a
 //! deployment authorization.
 
+use std::collections::BTreeMap;
+
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use zed_interfaces::package_security::{
@@ -65,16 +67,16 @@ impl PackageClosureError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct IdentityKey<'a> {
-    ecosystem: &'a str,
-    registry_uri: &'a str,
-    package_name: &'a str,
-    package_version: &'a str,
-    resolved_revision: &'a str,
-    artifact_digest: &'a str,
-    source_digest: &'a str,
-    outer_checksum: &'a str,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct IdentityKey {
+    ecosystem: String,
+    registry_uri: String,
+    package_name: String,
+    package_version: String,
+    resolved_revision: String,
+    artifact_digest: String,
+    source_digest: String,
+    outer_checksum: String,
 }
 
 pub fn verify_package_dependency_closure(
@@ -83,21 +85,21 @@ pub fn verify_package_dependency_closure(
     closure.validate()?;
 
     let root_key = identity_key(&closure.root);
-    let mut dependencies = closure.dependencies.clone();
-    dependencies.sort_by(|left, right| identity_key(left).cmp(&identity_key(right)));
+    let keyed_dependencies = closure
+        .dependencies
+        .iter()
+        .cloned()
+        .map(|dependency| (identity_key(&dependency), dependency))
+        .collect::<BTreeMap<_, _>>();
 
-    let mut previous: Option<IdentityKey<'_>> = None;
-    for dependency in &dependencies {
-        let key = identity_key(dependency);
-        if key == root_key {
-            return Err(PackageClosureError::RootRepeated);
-        }
-        if previous.as_ref().is_some_and(|prior| *prior == key) {
-            return Err(PackageClosureError::DuplicateDependency);
-        }
-        previous = Some(key);
+    if keyed_dependencies.len() != closure.dependencies.len() {
+        return Err(PackageClosureError::DuplicateDependency);
+    }
+    if keyed_dependencies.contains_key(&root_key) {
+        return Err(PackageClosureError::RootRepeated);
     }
 
+    let dependencies = keyed_dependencies.into_values().collect::<Vec<_>>();
     let canonical_json = canonical_closure_json(closure, &dependencies)?;
     let actual = format!("{:x}", Sha256::digest(canonical_json.as_bytes()));
     if actual != closure.closure_digest {
@@ -116,27 +118,27 @@ pub fn verify_package_dependency_closure(
     })
 }
 
-fn identity_key(identity: &PackageArtifactIdentity) -> IdentityKey<'_> {
+fn identity_key(identity: &PackageArtifactIdentity) -> IdentityKey {
     match identity {
         PackageArtifactIdentity::Registry(identity) => IdentityKey {
-            ecosystem: registry_ecosystem(identity.ecosystem),
-            registry_uri: "",
-            package_name: &identity.package_name,
-            package_version: &identity.package_version,
-            resolved_revision: &identity.resolved_revision,
-            artifact_digest: &identity.artifact_digest,
-            source_digest: &identity.source_digest,
-            outer_checksum: "",
+            ecosystem: registry_ecosystem(identity.ecosystem).into(),
+            registry_uri: String::new(),
+            package_name: identity.package_name.clone(),
+            package_version: identity.package_version.clone(),
+            resolved_revision: identity.resolved_revision.clone(),
+            artifact_digest: identity.artifact_digest.clone(),
+            source_digest: identity.source_digest.clone(),
+            outer_checksum: String::new(),
         },
         PackageArtifactIdentity::Hex(identity) => IdentityKey {
-            ecosystem: "hex",
-            registry_uri: &identity.registry_uri,
-            package_name: &identity.package_name,
-            package_version: &identity.package_version,
-            resolved_revision: &identity.resolved_revision,
-            artifact_digest: &identity.artifact_digest,
-            source_digest: &identity.source_digest,
-            outer_checksum: &identity.outer_checksum,
+            ecosystem: "hex".into(),
+            registry_uri: identity.registry_uri.clone(),
+            package_name: identity.package_name.clone(),
+            package_version: identity.package_version.clone(),
+            resolved_revision: identity.resolved_revision.clone(),
+            artifact_digest: identity.artifact_digest.clone(),
+            source_digest: identity.source_digest.clone(),
+            outer_checksum: identity.outer_checksum.clone(),
         },
     }
 }
