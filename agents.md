@@ -62,18 +62,20 @@ Functional programming is mostly the following:
 
 ## Functional programming conformance
 
-This repository carries an FP conformance ratchet. Before you land a change:
+This repository carries a Rust FP conformance ratchet. Before you land a change:
 
 ```sh
-python3 tools/fp-conformance/fp_conformance.py .
+cargo run --quiet --locked --manifest-path tools/fp-conformance/Cargo.toml -- .
 ```
 
-CI compares your findings against `tools/fp-conformance/budget.json` and fails
-only when a rule's count *increases*. Do not raise the budget to get green — fix
-the new violations. When you clear a class of violation, lower the budget in the
-same commit with `--write-budget`.
+Pull-request CI scans the exact base and exact contributor head with the same
+Rust binary and fails only when a rule's count increases. Inherited debt
+therefore cannot make an unrelated PR red. The historical
+`tools/fp-conformance/budget.json` remains a reference snapshot and can be
+lowered when debt is removed; do not raise it to hide regressions. Durable
+changes to the scanner itself must remain Rust-first under the fleet policy.
 
-The principles, the rule codes and the remedy for each are in `FP-GUIDELINES.md`.
+The principles, rule codes, and remedies are in `FP-GUIDELINES.md`.
 
 ## Repository-local Git worktrees
 
