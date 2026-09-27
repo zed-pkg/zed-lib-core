@@ -40,10 +40,7 @@ pub fn render(result: &ScanResult, limit: usize) -> String {
         output.push("by rule:".to_owned());
         let mut ordered = counts.iter().collect::<Vec<_>>();
         ordered.sort_by(|left, right| {
-            return right
-                .1
-                .cmp(left.1)
-                .then_with(|| left.0.cmp(right.0));
+            return right.1.cmp(left.1).then_with(|| left.0.cmp(right.0));
         });
         for (code, count) in ordered {
             if let Some(metadata) = rule(code) {
@@ -133,10 +130,7 @@ pub fn write_budget(path: &Path, result: &ScanResult) -> io::Result<()> {
         result.stats.rust,
         result.stats.ts
     ));
-    output.push_str(&format!(
-        " \"version\": \"{}\"\n",
-        escape_json(VERSION)
-    ));
+    output.push_str(&format!(" \"version\": \"{}\"\n", escape_json(VERSION)));
     output.push_str("}\n");
     return fs::write(path, output);
 }
@@ -234,11 +228,7 @@ pub fn regressions(
     base: &BTreeMap<String, usize>,
     head: &BTreeMap<String, usize>,
 ) -> Vec<(String, usize, usize)> {
-    let mut codes = base
-        .keys()
-        .chain(head.keys())
-        .cloned()
-        .collect::<Vec<_>>();
+    let mut codes = base.keys().chain(head.keys()).cloned().collect::<Vec<_>>();
     codes.sort();
     codes.dedup();
     return codes
@@ -258,11 +248,7 @@ pub fn improvements(
     base: &BTreeMap<String, usize>,
     head: &BTreeMap<String, usize>,
 ) -> Vec<(String, usize, usize)> {
-    let mut codes = base
-        .keys()
-        .chain(head.keys())
-        .cloned()
-        .collect::<Vec<_>>();
+    let mut codes = base.keys().chain(head.keys()).cloned().collect::<Vec<_>>();
     codes.sort();
     codes.dedup();
     return codes
