@@ -26,9 +26,9 @@ effects: that is the point of pushing effects outward.
 ## Running the check
 
 ```sh
-python3 tools/fp-conformance/fp_conformance.py .                    # report
-python3 tools/fp-conformance/fp_conformance.py . --limit 200        # more detail
-python3 tools/fp-conformance/fp_conformance.py . --json /tmp/fp.json
+cargo run --quiet --locked --manifest-path tools/fp-conformance/Cargo.toml -- .                    # report
+cargo run --quiet --locked --manifest-path tools/fp-conformance/Cargo.toml -- . --limit 200        # more detail
+cargo run --quiet --locked --manifest-path tools/fp-conformance/Cargo.toml -- . --json /tmp/fp.json
 ```
 
 Stdlib Python 3 only — no toolchain, no dependencies, no network — so it runs
@@ -36,20 +36,22 @@ identically on a laptop and on a CI runner.
 
 ## The budget, and why CI is not red today
 
-`tools/fp-conformance/budget.json` records the per-rule counts at the moment this
-check was introduced: **200 findings across 48 files
-and 10,656 lines**. CI compares against that budget and fails only when a
-rule's count *increases*. The existing backlog blocks nobody; new violations do.
+Pull-request CI no longer compares against a stale repository-wide snapshot.
+Instead, the Rust scanner evaluates the exact PR base and exact contributor
+head with identical rules, then fails only when a per-rule count increases.
+That is the actual ratchet property: inherited debt never blocks unrelated
+work, while new violations still do.
 
-The budget is a ratchet. It should only ever move down. When you clear a class of
-violation, re-baseline in the same commit as the fix:
+`tools/fp-conformance/budget.json` is retained as a historical/reference
+snapshot and for deliberate local debt accounting. It is not the PR admission
+authority. When a cleanup removes findings, the snapshot may be lowered with:
 
 ```sh
-python3 tools/fp-conformance/fp_conformance.py . \
+cargo run --quiet --locked --manifest-path tools/fp-conformance/Cargo.toml -- . \
     --write-budget tools/fp-conformance/budget.json
 ```
 
-Raising the budget to turn CI green defeats the whole mechanism. Fix the code.
+Never raise the snapshot to turn CI green. Fix the new occurrences instead.
 
 ## Baseline for this repository
 
