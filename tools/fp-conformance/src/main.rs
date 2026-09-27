@@ -1,3 +1,5 @@
+#![allow(clippy::needless_return)]
+
 use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;
