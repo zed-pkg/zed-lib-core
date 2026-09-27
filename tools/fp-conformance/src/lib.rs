@@ -54,11 +54,12 @@ value!.run();
 "#;
         let counts = analyse_text("src/domain.ts", Language::TypeScript, source).counts();
         for code in [
-            "TS001", "TS002", "TS003", "TS004", "TS005", "TS006", "TS007", "TS008",
-            "TS009", "TS010",
+            "TS001", "TS002", "TS004", "TS005", "TS006", "TS007", "TS008", "TS009",
+            "TS010",
         ] {
             assert_eq!(counts.get(code), Some(&1), "{code}");
         }
+        assert_eq!(counts.get("TS003"), Some(&2));
     }
 
     #[test]
@@ -76,11 +77,11 @@ default:
 "#;
         let counts = analyse_text("lib/domain.dart", Language::Dart, source).counts();
         for code in [
-            "DA001", "DA002", "DA003", "DA004", "DA005", "DA006", "DA007", "DA008",
-            "DA009",
+            "DA001", "DA003", "DA004", "DA005", "DA006", "DA007", "DA008", "DA009",
         ] {
             assert_eq!(counts.get(code), Some(&1), "{code}");
         }
+        assert_eq!(counts.get("DA002"), Some(&2));
     }
 
     #[test]
