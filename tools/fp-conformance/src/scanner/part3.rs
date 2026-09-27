@@ -139,7 +139,7 @@ fn scan_cross_language(context: &FileContext, findings: &mut Vec<Finding>) {
     }
     for (line, name, length) in long_functions(context) {
         if length > 60 {
-            push_finding(context, findings, "XX002", line, format!("\`{name}\` spans {length} lines"));
+            push_finding(context, findings, "XX002", line, format!("`{name}` spans {length} lines"));
         }
     }
 }
