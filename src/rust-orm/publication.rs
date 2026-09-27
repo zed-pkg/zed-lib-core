@@ -368,113 +368,176 @@ pub async fn repair_historical_machine_publish_digest(
         .await
         .map_err(OrmError::from_db_err)?;
 
+    lock_repair_coordinate(&transaction, &input).await?;
+    let (organization, package, version) = load_repair_target(&transaction, &input).await?;
+    let verified_uploads = load_verified_repair_uploads(&transaction, version.id, &input).await?;
+    apply_repair_models(
+        &transaction,
+        &organization,
+        &package,
+        &version,
+        verified_uploads,
+        &input,
+    )
+    .await?;
+
+    transaction.commit().await.map_err(OrmError::from_db_err)?;
+    return Ok(HistoricalDigestRepairReceipt {
+        org_id: organization.id,
+        package_id: package.id,
+        package_version_id: version.id,
+        old_sha256: input.expected_old_sha256,
+        replacement_sha256: input.replacement_sha256,
+    });
+}
+
+async fn lock_repair_coordinate<C: ConnectionTrait>(
+    connection: &C,
+    input: &HistoricalDigestRepairInput,
+) -> Result<(), OrmError> {
     let lock_coordinate = format!(
         "zed-machine-publish:{}/{}",
         input.org_slug, input.package_name
     );
-    transaction
+    connection
         .execute(Statement::from_sql_and_values(
-            transaction.get_database_backend(),
+            connection.get_database_backend(),
             "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
             [Value::String(Some(Box::new(lock_coordinate)))],
         ))
         .await
         .map_err(OrmError::from_db_err)?;
+    return Ok(());
+}
 
+async fn load_repair_target<C: ConnectionTrait>(
+    connection: &C,
+    input: &HistoricalDigestRepairInput,
+) -> Result<(org::Model, package::Model, package_version::Model), OrmError> {
     let organization = org::Entity::find()
         .filter(org::Column::Slug.eq(&input.org_slug))
         .filter(org::Column::IsSoftDeleted.eq(false))
-        .one(&transaction)
+        .one(connection)
         .await
         .map_err(OrmError::from_db_err)?
         .ok_or_else(|| {
-            OrmError::not_found(format!(
+            return OrmError::not_found(format!(
                 "repair organization {} does not exist",
                 input.org_slug
-            ))
+            ));
         })?;
-
     let package = package::Entity::find()
         .filter(package::Column::OrgId.eq(organization.id))
         .filter(package::Column::Name.eq(&input.package_name))
         .filter(package::Column::IsSoftDeleted.eq(false))
-        .one(&transaction)
+        .one(connection)
         .await
         .map_err(OrmError::from_db_err)?
         .ok_or_else(|| {
-            OrmError::not_found(format!(
+            return OrmError::not_found(format!(
                 "repair package {}/{} does not exist",
                 input.org_slug, input.package_name
-            ))
+            ));
         })?;
-
     let version = package_version::Entity::find()
         .filter(package_version::Column::PackageId.eq(package.id))
         .filter(package_version::Column::Version.eq(&input.version))
-        .one(&transaction)
+        .one(connection)
         .await
         .map_err(OrmError::from_db_err)?
         .ok_or_else(|| {
-            OrmError::not_found(format!(
+            return OrmError::not_found(format!(
                 "repair version {}/{}@{} does not exist",
                 input.org_slug, input.package_name, input.version
-            ))
+            ));
         })?;
-
-    if !repair_old_identity_matches(&version, &input) {
+    if !repair_old_identity_matches(&version, input) {
         return Err(OrmError::policy(format!(
             "historical digest repair compare-and-swap failed for {}/{}@{}",
             input.org_slug, input.package_name, input.version
         )));
     }
+    return Ok((organization, package, version));
+}
 
-    let verified_uploads = package_upload::Entity::find()
-        .filter(package_upload::Column::PackageVersionId.eq(version.id))
+async fn load_verified_repair_uploads<C: ConnectionTrait>(
+    connection: &C,
+    package_version_id: Uuid,
+    input: &HistoricalDigestRepairInput,
+) -> Result<Vec<package_upload::Model>, OrmError> {
+    let uploads = package_upload::Entity::find()
+        .filter(package_upload::Column::PackageVersionId.eq(package_version_id))
         .filter(package_upload::Column::Status.eq("verified"))
-        .all(&transaction)
+        .all(connection)
         .await
         .map_err(OrmError::from_db_err)?;
-    if verified_uploads.is_empty() {
+    if uploads.is_empty() {
         return Err(OrmError::policy(
             "historical digest repair requires an existing verified upload ledger",
         ));
     }
-    if verified_uploads.iter().any(|upload| {
-        upload.sha256.as_deref() != Some(input.expected_old_sha256.as_str())
+    if uploads.iter().any(|upload| {
+        return upload.sha256.as_deref() != Some(input.expected_old_sha256.as_str())
             || upload.size_bytes != Some(input.expected_old_size_bytes)
             || upload.storage_key.as_deref() != Some(input.expected_old_artifact_key.as_str())
-            || upload.format.as_deref() != Some(input.format.as_str())
+            || upload.format.as_deref() != Some(input.format.as_str());
     }) {
         return Err(OrmError::policy(
             "historical digest repair verified-upload ledger does not match expected old identity",
         ));
     }
+    return Ok(uploads);
+}
 
-    let mut replacement_version: package_version::ActiveModel = version.clone().into();
-    replacement_version.sha256 = Set(input.replacement_sha256.clone());
-    replacement_version.size_bytes = Set(input.replacement_size_bytes);
-    replacement_version.artifact_key = Set(input.replacement_artifact_key.clone());
+async fn apply_repair_models<C: ConnectionTrait>(
+    connection: &C,
+    organization: &org::Model,
+    package: &package::Model,
+    version: &package_version::Model,
+    verified_uploads: Vec<package_upload::Model>,
+    input: &HistoricalDigestRepairInput,
+) -> Result<(), OrmError> {
+    let replacement_version = package_version::ActiveModel {
+        sha256: Set(input.replacement_sha256.clone()),
+        size_bytes: Set(input.replacement_size_bytes),
+        artifact_key: Set(input.replacement_artifact_key.clone()),
+        ..version.clone().into()
+    };
     replacement_version
-        .update(&transaction)
+        .update(connection)
         .await
         .map_err(OrmError::from_db_err)?;
 
     let now = chrono::Utc::now().fixed_offset();
     for upload in verified_uploads {
-        let mut replacement_upload: package_upload::ActiveModel = upload.into();
-        replacement_upload.sha256 = Set(Some(input.replacement_sha256.clone()));
-        replacement_upload.size_bytes = Set(Some(input.replacement_size_bytes));
-        replacement_upload.storage_key = Set(Some(input.replacement_artifact_key.clone()));
-        replacement_upload.updated_at = Set(now);
+        let replacement_upload = package_upload::ActiveModel {
+            sha256: Set(Some(input.replacement_sha256.clone())),
+            size_bytes: Set(Some(input.replacement_size_bytes)),
+            storage_key: Set(Some(input.replacement_artifact_key.clone())),
+            updated_at: Set(now),
+            ..upload.into()
+        };
         replacement_upload
-            .update(&transaction)
+            .update(connection)
             .await
             .map_err(OrmError::from_db_err)?;
     }
 
+    insert_repair_audit(connection, organization.id, package, version, input, now).await?;
+    return Ok(());
+}
+
+async fn insert_repair_audit<C: ConnectionTrait>(
+    connection: &C,
+    org_id: Uuid,
+    package: &package::Model,
+    version: &package_version::Model,
+    input: &HistoricalDigestRepairInput,
+    now: chrono::DateTime<chrono::FixedOffset>,
+) -> Result<(), OrmError> {
     audit_log::ActiveModel {
         id: Set(Uuid::new_v4()),
-        org_id: Set(Some(organization.id)),
+        org_id: Set(Some(org_id)),
         actor_user_id: Set(None),
         api_token_id: Set(None),
         action: Set("package.version.digest_repair".to_owned()),
@@ -482,7 +545,7 @@ pub async fn repair_historical_machine_publish_digest(
         entity_id: Set(Some(version.id)),
         detail: Set(serde_json::json!({
             "repair_class": input.repair_class.as_str(),
-            "package": input.package_name,
+            "package": package.name,
             "version": input.version,
             "old_sha256": input.expected_old_sha256,
             "replacement_sha256": input.replacement_sha256,
@@ -499,18 +562,10 @@ pub async fn repair_historical_machine_publish_digest(
         client_ip_hash: Set(None),
         created_at: Set(now),
     }
-    .insert(&transaction)
+    .insert(connection)
     .await
     .map_err(OrmError::from_db_err)?;
-
-    transaction.commit().await.map_err(OrmError::from_db_err)?;
-    Ok(HistoricalDigestRepairReceipt {
-        org_id: organization.id,
-        package_id: package.id,
-        package_version_id: version.id,
-        old_sha256: input.expected_old_sha256,
-        replacement_sha256: input.replacement_sha256,
-    })
+    return Ok(());
 }
 
 fn repair_old_identity_matches(
