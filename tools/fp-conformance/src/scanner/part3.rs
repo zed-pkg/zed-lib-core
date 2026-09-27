@@ -35,10 +35,10 @@ fn scan_rust_line(context: &FileContext, number: usize, line: &str, findings: &m
     if !context.is_stateful && contains_word_pair(line, "let", "mut") {
         push_finding(context, findings, "RS001", number, excerpt(line));
     }
-    if !context.is_effect_boundary {
-        if contains_word_pair(line, "static", "mut") || is_global_lock(line) {
-            push_finding(context, findings, "RS002", number, excerpt(line));
-        }
+    if !context.is_effect_boundary
+        && (contains_word_pair(line, "static", "mut") || is_global_lock(line))
+    {
+        push_finding(context, findings, "RS002", number, excerpt(line));
     }
     if contains_any(line, &[".unwrap()", ".expect(", "panic!(", "unreachable!(", "todo!(", ".unwrap_unchecked("]) {
         push_finding(context, findings, "RS003", number, excerpt(line));
