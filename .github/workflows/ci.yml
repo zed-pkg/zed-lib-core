@@ -28,8 +28,8 @@ jobs:
           show-progress: false
 
       # zed-lib is a three-language behavior suite. Pin the exact merged
-      # zed-interfaces commit whose Rust, TypeScript, Dart, and generated-schema
-      # surfaces define the shared namespace contract under test.
+      # zed-interfaces commit whose peer package-security authorities include
+      # the PackageDependencyClosure contract under test.
       - name: Check out merged polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
