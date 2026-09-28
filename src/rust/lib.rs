@@ -21,7 +21,13 @@
 //! `conformance/`, so a front end and the CLI cannot disagree about a plan.
 
 pub mod namespace_plan;
+pub mod package_security;
 pub mod resolve;
 
 pub use namespace_plan::plan_registry_namespaces;
+pub use package_security::{
+    PACKAGE_DEPENDENCY_CLOSURE_FORMAT_V1, PACKAGE_DEPENDENCY_CLOSURE_MAX_DEPENDENCIES,
+    PackageDependencyClosureError, PackageDependencyClosureEvidence,
+    recompute_package_dependency_closure, verify_package_dependency_closure,
+};
 pub use resolve::{ResolveError, latest_stable, requirement_matches, resolve_version};
