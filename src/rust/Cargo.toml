@@ -18,9 +18,10 @@ path = "lib.rs"
 # manifest-authoritative source-composition contract and generated schema on
 # top of the previously admitted signing, mirror, binary-artifact, Git CLI
 # receipt, and registry transport contracts consumed by clients and zed-cli.
-zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "aa0f87be13cdf003600b42a6088202898fcbae8d" }
+zed-interfaces = { git = "https://github.com/zed-pkg/zed-interfaces.git", rev = "69ccba03c6a5b23bcb5af63315ef2cc0e7a6a8a5" }
+serde_json = "1.0.151"
+sha2 = "0.10.9"
 thiserror = "2.0.19"
 
 [dev-dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
