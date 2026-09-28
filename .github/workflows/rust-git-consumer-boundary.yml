@@ -25,7 +25,7 @@ env:
   # DEN-3282 typed source-composition authority merged in zed-interfaces#138.
   # This must match the exact native interface revision consumed by zed-lib so
   # downstream Cargo consumers cannot resolve two nominally distinct types.
-  INTERFACES_SHA: aa0f87be13cdf003600b42a6088202898fcbae8d
+  INTERFACES_SHA: 31a7eca1562ce9c6e37afddad1e704b29b213b9e
   LIB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
