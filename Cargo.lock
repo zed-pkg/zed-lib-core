@@ -2574,7 +2574,7 @@ dependencies = [
 [[package]]
 name = "zed-interfaces"
 version = "0.1.1"
-source = "git+https://github.com/zed-pkg/zed-interfaces.git?rev=aa0f87be13cdf003600b42a6088202898fcbae8d#aa0f87be13cdf003600b42a6088202898fcbae8d"
+source = "git+https://github.com/zed-pkg/zed-interfaces.git?rev=69ccba03c6a5b23bcb5af63315ef2cc0e7a6a8a5#69ccba03c6a5b23bcb5af63315ef2cc0e7a6a8a5"
 dependencies = [
  "bs58",
  "hex",
@@ -2593,6 +2593,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "zed-interfaces 0.1.1",
 ]

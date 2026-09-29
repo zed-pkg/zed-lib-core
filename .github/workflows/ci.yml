@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_INTERFACES_POLYGLOT_REF: aa0f87be13cdf003600b42a6088202898fcbae8d
+  ZED_INTERFACES_POLYGLOT_REF: 69ccba03c6a5b23bcb5af63315ef2cc0e7a6a8a5
 
 jobs:
   rust:
@@ -28,8 +28,8 @@ jobs:
           show-progress: false
 
       # zed-lib is a three-language behavior suite. Pin the exact merged
-      # zed-interfaces commit whose Rust, TypeScript, Dart, and generated-schema
-      # surfaces define the shared namespace contract under test.
+      # zed-interfaces commit whose peer package-security authorities include
+      # the PackageDependencyClosure contract under test.
       - name: Check out merged polyglot zed-interfaces contract
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
