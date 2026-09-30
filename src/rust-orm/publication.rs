@@ -1,3 +1,5 @@
+#![allow(clippy::needless_return)]
+
 //! Transactional adoption of the machine registry's immutable publish facts.
 //!
 //! The legacy `/v1` machine API remains available during the cutover, but a
