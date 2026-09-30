@@ -13,7 +13,7 @@ jobs:
       ZED_PKG_INTERACTIVE: "false"
       GITHUB_TOKEN: "${{ github.token }}"
       EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      ZED_CLI_COMMIT: 9e0136845a829a8186fd7d7e7bc0bc5f2a2effca
+      ZED_CLI_COMMIT: d352d18d7868ab83ef0b165ed2a310f58bc426e3
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
