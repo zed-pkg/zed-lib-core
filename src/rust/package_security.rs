@@ -171,9 +171,7 @@ pub fn verify_package_dependency_closure(
     })
 }
 
-fn normalize_semantics(
-    value: &Value,
-) -> Result<(Value, String), PackageDependencyClosureError> {
+fn normalize_semantics(value: &Value) -> Result<(Value, String), PackageDependencyClosureError> {
     let mut normalized = value.clone();
     let object = normalized
         .as_object_mut()
@@ -194,10 +192,7 @@ fn normalize_semantics(
     );
 
     let supplied = normalize_digest_field(object, "closure_digest", "closure_digest")?;
-    object.insert(
-        "closure_digest".to_owned(),
-        Value::String(supplied.clone()),
-    );
+    object.insert("closure_digest".to_owned(), Value::String(supplied.clone()));
 
     for field in ["resolver_id", "resolver_version"] {
         if string_field(object, field, field)?.is_empty() {
@@ -288,8 +283,11 @@ fn normalize_identity(
     let _source_uri = non_empty_string(object, "source_uri", location)?;
     let resolved_revision = non_empty_string(object, "resolved_revision", location)?;
 
-    let source_digest =
-        normalize_digest_field(object, "source_digest", &format!("{location}.source_digest"))?;
+    let source_digest = normalize_digest_field(
+        object,
+        "source_digest",
+        &format!("{location}.source_digest"),
+    )?;
     object.insert(
         "source_digest".to_owned(),
         Value::String(source_digest.clone()),
@@ -333,10 +331,7 @@ fn normalize_identity(
 }
 
 fn has_exact_fields(object: &Map<String, Value>, allowed: &[&str]) -> bool {
-    object.len() == allowed.len()
-        && object
-            .keys()
-            .all(|field| allowed.contains(&field.as_str()))
+    object.len() == allowed.len() && object.keys().all(|field| allowed.contains(&field.as_str()))
 }
 
 fn string_field(
@@ -418,9 +413,7 @@ fn compare_utf16(left: &str, right: &str) -> Ordering {
 /// RFC 8785 JCS is broader than this contract, but the admitted closure domain
 /// contains only objects, arrays, and strings. Canonicalizing exactly that
 /// restricted domain avoids depending on a looser general-purpose serializer.
-fn compute_normalized_digest(
-    normalized: &Value,
-) -> Result<String, PackageDependencyClosureError> {
+fn compute_normalized_digest(normalized: &Value) -> Result<String, PackageDependencyClosureError> {
     let mut preimage = normalized.clone();
     preimage
         .as_object_mut()
