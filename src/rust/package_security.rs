@@ -259,7 +259,7 @@ fn normalize_dependency_entries(
             .map(|(_, dependency)| dependency),
     );
     Ok(())
-
+}
 
 fn normalize_identity(
     value: &mut Value,
