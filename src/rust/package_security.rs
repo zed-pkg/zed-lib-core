@@ -248,7 +248,7 @@ fn normalize_dependency_entries(
     }
     if normalized_dependencies
         .iter()
-        .any(|(key, _)| compare_identity_keys(key, &root_key) == Ordering::Equal)
+        .any(|(key, _)| compare_identity_keys(key, root_key) == Ordering::Equal)
     {
         return Err(PackageDependencyClosureError::RootRepeated);
     }
