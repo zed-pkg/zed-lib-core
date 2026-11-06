@@ -95,6 +95,9 @@ fn negative_control_detects_first_published_instead_of_highest_matching() {
         .iter()
         .find(|version| requirement_matches(VersionScheme::Semver, "^1.0", version))
         .expect("bounded mutation should match");
-    assert_ne!(correct, broken, "negative control failed to catch first-match resolution");
+    assert_ne!(
+        correct, broken,
+        "negative control failed to catch first-match resolution"
+    );
     assert_eq!(correct, "1.9.0");
 }
