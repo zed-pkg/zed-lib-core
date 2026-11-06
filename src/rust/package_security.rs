@@ -213,6 +213,17 @@ fn normalize_semantics(value: &Value) -> Result<(Value, String), PackageDependen
         .get_mut("dependencies")
         .and_then(Value::as_array_mut)
         .ok_or(PackageDependencyClosureError::DependenciesNotArray)?;
+    normalize_dependency_entries(dependencies, &root_key)?;
+    Ok((normalized, supplied))
+}
+
+/// Normalize the complete dependency set before publishing any digest.
+/// This keeps duplicate/root admission atomic, and makes the header and
+/// dependency semantic checks independently reviewable.
+fn normalize_dependency_entries(
+    dependencies: &mut Vec<Value>,
+    root_key: &IdentitySortKey,
+) -> Result<(), PackageDependencyClosureError> {
     if dependencies.len() > PACKAGE_DEPENDENCY_CLOSURE_MAX_DEPENDENCIES {
         return Err(PackageDependencyClosureError::TooManyDependencies {
             actual: dependencies.len(),
@@ -247,8 +258,8 @@ fn normalize_semantics(value: &Value) -> Result<(Value, String), PackageDependen
             .into_iter()
             .map(|(_, dependency)| dependency),
     );
-    Ok((normalized, supplied))
-}
+    Ok(())
+
 
 fn normalize_identity(
     value: &mut Value,
