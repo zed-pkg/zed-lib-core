@@ -40,13 +40,19 @@ fn resolution_is_independent_of_published_version_order() {
 }
 
 #[test]
-fn opaque_exact_tags_and_ranges_obey_pinned_contract() {
+fn opaque_exact_tags_resolve_without_normalizing_published_spelling() {
     let published = ["2026.07.24", "release-a", "release-b"];
     let meta = metadata(VersionScheme::Opaque, &published);
     for tag in published {
         assert_eq!(resolve_version(&meta, tag).unwrap(), tag);
         assert!(requirement_matches(VersionScheme::Opaque, tag, tag));
     }
+}
+
+#[test]
+fn opaque_range_syntax_remains_invalid_across_published_tags() {
+    let published = ["2026.07.24", "release-a", "release-b"];
+    let meta = metadata(VersionScheme::Opaque, &published);
     for range in ["^1.0", "~1.0", ">=1.0", "*"] {
         assert_eq!(
             resolve_version(&meta, range).unwrap_err().kind(),
@@ -60,10 +66,13 @@ fn opaque_exact_tags_and_ranges_obey_pinned_contract() {
             ));
         }
     }
-    // The registry's stale latest pointer is never silently trusted.
-    let mut withdrawn = meta;
-    withdrawn.latest = Some("withdrawn".to_owned());
-    assert_eq!(latest_stable(&withdrawn), None);
+}
+
+#[test]
+fn opaque_latest_never_accepts_withdrawn_registry_tag() {
+    let mut meta = metadata(VersionScheme::Opaque, &["release-a"]);
+    meta.latest = Some("withdrawn".to_owned());
+    assert_eq!(latest_stable(&meta), None);
 }
 
 #[test]
