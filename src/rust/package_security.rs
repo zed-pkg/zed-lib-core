@@ -213,6 +213,14 @@ fn normalize_semantics(value: &Value) -> Result<(Value, String), PackageDependen
         .get_mut("dependencies")
         .and_then(Value::as_array_mut)
         .ok_or(PackageDependencyClosureError::DependenciesNotArray)?;
+    normalize_dependencies(dependencies, &root_key)?;
+    Ok((normalized, supplied))
+}
+
+fn normalize_dependencies(
+    dependencies: &mut Vec<Value>,
+    root_key: &IdentitySortKey,
+) -> Result<(), PackageDependencyClosureError> {
     if dependencies.len() > PACKAGE_DEPENDENCY_CLOSURE_MAX_DEPENDENCIES {
         return Err(PackageDependencyClosureError::TooManyDependencies {
             actual: dependencies.len(),
@@ -237,7 +245,7 @@ fn normalize_semantics(value: &Value) -> Result<(Value, String), PackageDependen
     }
     if normalized_dependencies
         .iter()
-        .any(|(key, _)| compare_identity_keys(key, &root_key) == Ordering::Equal)
+        .any(|(key, _)| compare_identity_keys(key, root_key) == Ordering::Equal)
     {
         return Err(PackageDependencyClosureError::RootRepeated);
     }
@@ -247,7 +255,7 @@ fn normalize_semantics(value: &Value) -> Result<(Value, String), PackageDependen
             .into_iter()
             .map(|(_, dependency)| dependency),
     );
-    Ok((normalized, supplied))
+    Ok(())
 }
 
 fn normalize_identity(
