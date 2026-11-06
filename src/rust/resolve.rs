@@ -138,7 +138,7 @@ pub fn resolve_version<'a>(
         let range_syntax = requirement.bytes().any(|byte| {
             matches!(
                 byte,
-                b'^' | b'~' | b'<' | b'>' | b'=' | b'*' | b',' | b' ' | b'\\t'
+                b'^' | b'~' | b'<' | b'>' | b'=' | b'*' | b',' | b' ' | b'\t'
             )
         }) || requirement.split('.').any(|part| matches!(part, "x" | "X"));
         if range_syntax {
