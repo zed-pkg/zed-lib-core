@@ -130,17 +130,40 @@ pub fn resolve_version<'a>(
     }
 
     let scheme = metadata.version_scheme;
-    let parsed = Requirement::parse(requirement);
-
-    if scheme == VersionScheme::Opaque && matches!(parsed, Requirement::Range(_)) {
-        return Err(ResolveError::InvalidRequirement {
-            org,
-            name,
-            requirement: requirement.to_string(),
-            reason: "opaque-versioned packages have no range algebra; require an exact tag"
-                .to_string(),
-        });
+    if scheme == VersionScheme::Opaque {
+        // Requirement::parse("1.0.0") treats a bare numeric version as a
+        // Cargo-compatible range. Opaque packages have no range algebra:
+        // resolve by the *published tag's exact bytes* instead, while
+        // refusing explicit range operators and dotted wildcards.
+        let range_syntax = requirement.bytes().any(|byte| {
+            matches!(
+                byte,
+                b'^' | b'~' | b'<' | b'>' | b'=' | b'*' | b',' | b' ' | b'\\t'
+            )
+        }) || requirement.split('.').any(|part| matches!(part, "x" | "X"));
+        if range_syntax {
+            return Err(ResolveError::InvalidRequirement {
+                org,
+                name,
+                requirement: requirement.to_string(),
+                reason: "opaque-versioned packages have no range algebra; require an exact tag"
+                    .to_string(),
+            });
+        }
+        return metadata
+            .versions
+            .iter()
+            .find(|tag| tag.as_str() == requirement)
+            .map(String::as_str)
+            .ok_or_else(|| ResolveError::Unsatisfied {
+                org,
+                name,
+                requirement: requirement.to_string(),
+                published: metadata.versions.join(", "),
+            });
     }
+
+    let parsed = Requirement::parse(requirement);
 
     // A range that looks like one but does not parse (`^1.x.y`, `1.x.y`, or
     // `1.2.3.4`) would degrade into an exact tag and never match. The pinned
