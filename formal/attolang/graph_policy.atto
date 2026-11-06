@@ -1,0 +1,13 @@
+// Draft AttoLang oracle for document/edge commit admission.
+define module graph_policy as
+  pub fnc may_commit(bool document_valid, bool normalized_edges,
+                     bool semantic_digest_matches): bool {
+    return document_valid && normalized_edges && semantic_digest_matches;
+  }
+  pub fnc self_check(): bool {
+    return may_commit(true,true,true) &&
+      !may_commit(false,true,true) &&
+      !may_commit(true,false,true) &&
+      !may_commit(true,true,false);
+  }
+end

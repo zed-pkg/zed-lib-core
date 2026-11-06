@@ -22,10 +22,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # DEN-3282 typed source-composition authority merged in zed-interfaces#138.
-  # This must match the exact native interface revision consumed by zed-lib so
-  # downstream Cargo consumers cannot resolve two nominally distinct types.
-  INTERFACES_SHA: aa0f87be13cdf003600b42a6088202898fcbae8d
+  # Match the exact native zed-interfaces revision in src/rust/Cargo.toml.
+  # Distinct Git revisions create incompatible nominal Rust types even when
+  # struct names and shapes are identical. Do not loosen this boundary.
+  INTERFACES_SHA: 69ccba03c6a5b23bcb5af63315ef2cc0e7a6a8a5
   LIB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
