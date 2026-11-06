@@ -40,8 +40,8 @@ fn resolution_is_independent_of_published_version_order() {
 }
 
 #[test]
-fn opaque_versions_are_never_silently_promoted_by_range_matching() {
-    let published = ["1.0.0", "1.9.0", "release-a", "release-b"];
+fn opaque_exact_tags_and_ranges_obey_pinned_contract() {
+    let published = ["2026.07.24", "release-a", "release-b"];
     let meta = metadata(VersionScheme::Opaque, &published);
     for tag in published {
         assert_eq!(resolve_version(&meta, tag).unwrap(), tag);
